@@ -1,0 +1,58 @@
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDEs and editors
+.vscode/
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# Logs
+logs/
+*.log
+
+# Java build output and caches
+.gradle/
+build/
+target/
+bin/
+
+# Maven/Gradle generated files
+dependency-reduced-pom.xml
+.flattened-pom.xml
+
+# Test and coverage output
+coverage/
+htmlcov/
+.jacoco/
+
+# Local environment
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Spring local-only config
+application-local.yml
+application-local.yaml
+application-local.properties
+application-secret.yml
+application-secret.yaml
+application-secret.properties
+src/main/resources/application-local.yml
+src/main/resources/application-local.yaml
+src/main/resources/application-local.properties
+src/main/resources/application-secret.yml
+src/main/resources/application-secret.yaml
+src/main/resources/application-secret.properties
+
+# Local databases and dumps
+*.db
+*.sqlite
+*.sqlite3
+*.dump
+*.sql.gz
+
