@@ -1,46 +1,155 @@
-# OS files
+# Curated from gitignore.io/Toptal and GitHub gitignore templates for Spring Boot.
+# Keep Gradle/Maven wrapper scripts, wrapper jars, and .env.example files tracked.
+
+# OS files - macOS
 .DS_Store
 ._*
 .AppleDouble
 .LSOverride
-.Spotlight-V100/
-.Trashes/
+.DocumentRevisions-V100/
 .fseventsd/
+.Spotlight-V100/
+.TemporaryItems/
+.Trashes/
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder/
+Temporary Items/
+.apdisk
+*.icloud
 Icon?
+
+# OS files - Windows
 Thumbs.db
 Thumbs.db:encryptable
 ehthumbs.db
 ehthumbs_vista.db
-Desktop.ini
+[Dd]esktop.ini
 $RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
 *.lnk
+*.stackdump
+
+# OS files - Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*/
+.nfs*
 
 # IDEs and editors
-.vscode/
-.idea/
-*.iml
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+!.vscode/*.code-snippets
+.history/
+*.vsix
+.ionide
+.idea/**/workspace.xml
+.idea/**/tasks.xml
+.idea/**/usage.statistics.xml
+.idea/**/dictionaries
+.idea/**/shelf/
+.idea/**/aws.xml
+.idea/**/contentModel.xml
+.idea/**/dataSources/
+.idea/**/dataSources.ids
+.idea/**/dataSources.local.xml
+.idea/**/sqlDataSources.xml
+.idea/**/dynamic.xml
+.idea/**/uiDesigner.xml
+.idea/**/dbnavigator.xml
+.idea/**/gradle.xml
+.idea/**/libraries/
+.idea/**/mongoSettings.xml
+.idea/**/httpRequests/
+.idea/**/caches/
+.idea/**/sonarlint/
+.idea/**/sonarIssues.xml
+.idea/**/markdown-navigator.xml
+.idea/**/markdown-navigator-enh.xml
+.idea/**/markdown-navigator/
+.idea/**/azureSettings.xml
+.idea/codestream.xml
+.idea/$CACHE_FILE$
+.idea_modules/
+cmake-build-*/
+atlassian-ide-plugin.xml
 *.iws
+*.iml
 *.ipr
-out/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+*.swo
 
-# Logs
+# Eclipse and Spring Tool Suite
+.project
+.classpath
+.settings/
+.springBeans
+.sts4-cache/
+
+# Logs and runtime data
 logs/
 *.log
+hs_err_pid*
+replay_pid*
+*.hprof
 
-# Java build output and caches
-.gradle/
-build/
-target/
+# Java build artifacts
+*.class
+*.ctxt
+.mtj.tmp/
 bin/
+out/
+*.jar
+*.war
+*.nar
+*.ear
+*.zip
+*.tar.gz
+*.rar
+!gradle/wrapper/gradle-wrapper.jar
+!.mvn/wrapper/maven-wrapper.jar
 
-# Maven/Gradle generated files
+# Gradle
+.gradle/
+**/build/
+!src/**/build/
+gradle-app.setting
+.gradletasknamecache
+
+# Maven
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
 dependency-reduced-pom.xml
 .flattened-pom.xml
+buildNumber.properties
+.mvn/timing.properties
 
-# Test and coverage output
+# Test, coverage, and analysis output
 coverage/
 htmlcov/
 .jacoco/
+jacoco.exec
+.scannerwork/
+surefire-reports/
+failsafe-reports/
 
 # Local environment
 .env
@@ -55,16 +164,38 @@ application-local.properties
 application-secret.yml
 application-secret.yaml
 application-secret.properties
+application-*.local.yml
+application-*.local.yaml
+application-*.local.properties
 src/main/resources/application-local.yml
 src/main/resources/application-local.yaml
 src/main/resources/application-local.properties
 src/main/resources/application-secret.yml
 src/main/resources/application-secret.yaml
 src/main/resources/application-secret.properties
+src/main/resources/application-*.local.yml
+src/main/resources/application-*.local.yaml
+src/main/resources/application-*.local.properties
 
 # Local databases and dumps
 *.db
+*.h2.db
+*.mv.db
+*.trace.db
 *.sqlite
 *.sqlite3
 *.dump
 *.sql.gz
+
+# Local containers and overrides
+docker-compose.override.yml
+docker-compose.override.yaml
+compose.override.yml
+compose.override.yaml
+
+# Local secrets and certificates
+*.pem
+*.key
+*.p12
+*.jks
+*.keystore
