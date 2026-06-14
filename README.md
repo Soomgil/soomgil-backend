@@ -187,6 +187,26 @@ Rules:
 - Persona definitions must keep exactly 50 active personas per generator version.
 - Synthetic persona swipe data must stay separate from real user swipe events.
 
+## Tourism Source Resources
+
+Tourism source import and award-photo matching resources live under `src/main/resources/tourism-source/`.
+
+```text
+src/main/resources/tourism-source/
+  imports/
+    # Manifests for KTO/SSAFY-style sidos, guguns, contenttypes, attractions, attraction image imports.
+  award-photos/
+    # S3 object metadata manifests for downloaded KTO Contents Lab award photos.
+  matching-rules/
+    # Region/file-name alias rules used before manual matching.
+```
+
+Rules:
+
+- Source tourism data is for enrichment/tag extraction and is not the production service place master.
+- Award photo binaries are uploaded to S3-compatible storage, not committed to the repository.
+- Award photos may match exact attractions, region only, or remain unmatched for future use.
+
 ## Naming
 
 - `Command`: request data for an operation that changes state.
