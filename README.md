@@ -10,6 +10,7 @@ Spring Boot backend for Soomgil.
 - PostgreSQL
 - Redis
 - Flyway
+- MyBatis
 - Spring Security
 - Spring Modulith
 
@@ -102,18 +103,15 @@ Each domain package follows the same shape:
     query/
       dto/
       service/
-    port/
-      in/
-      out/
   domain/
     model/
     policy/
     event/
   infrastructure/
     persistence/
-      entity/
-      repository/
       mapper/
+      repository/
+      row/
     external/
 ```
 
@@ -122,6 +120,63 @@ Rules:
 - Controllers call command handlers or query services.
 - Command handlers own writes and transactions.
 - Query services own read-only lookup and projection access.
-- Domain code does not depend on API, persistence, or external clients.
-- Infrastructure implements outbound ports.
+- Domain code does not depend on API, persistence, MyBatis, or external clients.
+- Application code may depend on infrastructure repository interfaces/classes directly in this lite structure.
+- Infrastructure repositories use MyBatis mappers and row records.
 - Use `common.cqrs.Command`, `CommandHandler`, `Query`, and `QueryHandler` when a use case benefits from explicit typing.
+
+## MyBatis Persistence
+
+Use this shape for SQL-backed persistence:
+
+```text
+{domain}/
+  application/
+    command/
+      dto/
+        CreateTripCommand.java
+      handler/
+        CreateTripHandler.java
+    query/
+      dto/
+        FindTripDetailQuery.java
+        TripDetailView.java
+      service/
+        TripQueryService.java
+  infrastructure/
+    persistence/
+      mapper/
+        TripCommandMapper.java
+        TripQueryMapper.java
+      repository/
+        TripCommandRepository.java
+        TripQueryRepository.java
+      row/
+        TripRow.java
+
+src/main/resources/mappers/{domain}/
+  TripCommandMapper.xml
+  TripQueryMapper.xml
+```
+
+Guidelines:
+
+- Mapper interfaces are annotated with `@Mapper`.
+- XML SQL lives under `src/main/resources/mappers/{domain}/`.
+- `row` records represent database rows, not domain models.
+- Repository implementations translate between domain/view DTOs and rows.
+- Command handlers use command repositories for writes.
+- Query services use query repositories for reads.
+- Do not introduce JPA entities, `EntityManager`, Hibernate repositories, or `spring-boot-starter-data-jpa`.
+
+## Naming
+
+- `Command`: request data for an operation that changes state.
+- `CommandHandler`: one focused class that handles one command and owns the write transaction.
+- `Query`: request data for an operation that reads state.
+- `QueryService`: read-side service that can group related query methods for one domain.
+- `Repository`: persistence-facing class that calls MyBatis mappers.
+- `Mapper`: MyBatis interface connected to XML SQL.
+- `Row`: database row shape.
+
+We use `Handler` for commands because writes are usually business actions with one clear intent, such as `CreateTrip` or `InviteTripMember`. We use `Service` for queries because reads are often lightweight and related queries can live together without adding one class per select.
