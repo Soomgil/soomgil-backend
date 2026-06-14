@@ -169,6 +169,24 @@ Guidelines:
 - Query services use query repositories for reads.
 - Do not introduce JPA entities, `EntityManager`, Hibernate repositories, or `spring-boot-starter-data-jpa`.
 
+## Preference Resources
+
+Preference and recommendation seed inputs live under `src/main/resources/preference/`.
+
+```text
+src/main/resources/preference/
+  tags/
+    # Fixed tag dictionary seed. Must match .agent/docs/product-specs/preference_tagging_policy.md.
+  personas/
+    # 50 fixed cold-start persona definitions for synthetic swipe generation.
+```
+
+Rules:
+
+- Tag dictionary seed data must use only the fixed whitelist from the product policy.
+- Persona definitions must keep exactly 50 active personas per generator version.
+- Synthetic persona swipe data must stay separate from real user swipe events.
+
 ## Naming
 
 - `Command`: request data for an operation that changes state.
