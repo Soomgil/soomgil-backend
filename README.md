@@ -218,3 +218,10 @@ Rules:
 - `Row`: database row shape.
 
 We use `Handler` for commands because writes are usually business actions with one clear intent, such as `CreateTrip` or `InviteTripMember`. We use `Service` for queries because reads are often lightweight and related queries can live together without adding one class per select.
+
+## Common Contracts
+
+- CQRS handler generic order is input first, result second: `CommandHandler<CreateTripCommand, CreateTripResult>` and `QueryHandler<FindTripQuery, TripView>`.
+- Controllers and application services should use `ProblemDetails` for common error response shape.
+- `CurrentUserProvider` is the minimal security contract for domain code that needs the authenticated user id.
+- Tests can use a fake `CurrentUserProvider` without waiting for full auth implementation.
