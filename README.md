@@ -241,3 +241,4 @@ Handler return rules:
 - Controllers and application services should use `ProblemDetails` for common error response shape.
 - `CurrentUserProvider` is the minimal security contract for domain code that needs the authenticated user id.
 - Tests can use a fake `CurrentUserProvider` without waiting for full auth implementation.
+- Domain events shared across modules use `EventEnvelope<T>` with `eventId`, `eventType`, `schemaVersion`, `occurredAt`, aggregate metadata, optional `actorUserId`, and typed payload.
