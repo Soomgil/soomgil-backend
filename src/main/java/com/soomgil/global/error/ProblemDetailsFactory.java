@@ -27,6 +27,7 @@ public class ProblemDetailsFactory {
 			errorCode.status().value(),
 			detail,
 			request.getRequestURI(),
+			request.getMethod(),
 			errorCode.code(),
 			requestId,
 			fields

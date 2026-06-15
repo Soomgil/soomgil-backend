@@ -16,6 +16,7 @@ public record ProblemDetails(
 	Integer status,
 	String detail,
 	String instance,
+	String method,
 	@NotBlank
 	String code,
 	String requestId,

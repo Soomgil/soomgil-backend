@@ -26,6 +26,7 @@ class GlobalExceptionHandlerTest {
 		assertThat(response.getBody().status()).isEqualTo(403);
 		assertThat(response.getBody().detail()).isEqualTo("Only trip members can edit this trip.");
 		assertThat(response.getBody().instance()).isEqualTo("/api/v1/trips");
+		assertThat(response.getBody().method()).isEqualTo("POST");
 		assertThat(response.getBody().requestId()).isEqualTo("req-123");
 		assertThat(response.getBody().fields()).isEmpty();
 	}
