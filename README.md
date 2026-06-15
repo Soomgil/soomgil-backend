@@ -243,3 +243,4 @@ Handler return rules:
 - Tests can use a fake `CurrentUserProvider` without waiting for full auth implementation.
 - Domain events shared across modules use `EventEnvelope<T>` with `eventId`, `eventType`, `schemaVersion`, `occurredAt`, aggregate metadata, optional `actorUserId`, and typed payload.
 - S3/MinIO metadata shared across modules uses `StorageObjectKey` and `StorageObjectMetadata`; object keys are relative, forward-slash paths and `publicUrl` is optional.
+- Use `Ids`, `TimeProvider`, and `ValidationRules` for shared UUID parsing, testable current time, and repeated domain invariants.
