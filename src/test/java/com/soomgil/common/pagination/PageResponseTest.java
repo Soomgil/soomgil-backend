@@ -6,6 +6,7 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 
 class PageResponseTest {
 
@@ -24,5 +25,26 @@ class PageResponseTest {
 		assertThat(response.page().size()).isEqualTo(2);
 		assertThat(response.page().totalElements()).isEqualTo(7);
 		assertThat(response.page().totalPages()).isEqualTo(4);
+		assertThat(response.page().sort()).isEmpty();
+	}
+
+	@Test
+	void includesSortMetadataFromSpringPage() {
+		PageImpl<String> page = new PageImpl<>(
+			List.of("a", "b"),
+			PageRequest.of(
+				0,
+				2,
+				Sort.by(
+					Sort.Order.desc("createdAt"),
+					Sort.Order.asc("title")
+				)
+			),
+			7
+		);
+
+		PageResponse<String> response = PageResponse.from(page);
+
+		assertThat(response.page().sort()).containsExactly("createdAt,desc", "title,asc");
 	}
 }
