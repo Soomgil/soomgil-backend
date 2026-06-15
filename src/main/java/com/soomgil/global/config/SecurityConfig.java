@@ -1,5 +1,6 @@
 package com.soomgil.global.config;
 
+import com.soomgil.global.security.ProblemDetailsAuthenticationEntryPoint;
 import java.util.List;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -21,7 +22,8 @@ public class SecurityConfig {
 	@Bean
 	SecurityFilterChain securityFilterChain(
 		HttpSecurity http,
-		CorsConfigurationSource corsConfigurationSource
+		CorsConfigurationSource corsConfigurationSource,
+		ProblemDetailsAuthenticationEntryPoint authenticationEntryPoint
 	) throws Exception {
 		return http
 			.csrf(AbstractHttpConfigurer::disable)
@@ -29,6 +31,7 @@ public class SecurityConfig {
 			.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 			.formLogin(AbstractHttpConfigurer::disable)
 			.httpBasic(AbstractHttpConfigurer::disable)
+			.exceptionHandling(exception -> exception.authenticationEntryPoint(authenticationEntryPoint))
 			.authorizeHttpRequests(auth -> auth
 				.requestMatchers(HttpMethod.GET, "/api/v1/health").permitAll()
 				.requestMatchers("/actuator/health/**", "/actuator/info").permitAll()
