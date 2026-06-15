@@ -24,6 +24,15 @@ class CqrsContractTest {
 		assertThat(result.name()).isEqualTo("thing:trip-1");
 	}
 
+	@Test
+	void commandHandlerCanReturnNoResultInsteadOfNull() {
+		ArchiveThingHandler handler = new ArchiveThingHandler();
+
+		NoResult result = handler.handle(new ArchiveThingCommand("trip-1"));
+
+		assertThat(result).isEqualTo(NoResult.INSTANCE);
+	}
+
 	private record CreateThingCommand(String name) implements Command<CreateThingResult> {
 	}
 
@@ -35,6 +44,17 @@ class CqrsContractTest {
 		@Override
 		public CreateThingResult handle(CreateThingCommand command) {
 			return new CreateThingResult("created:" + command.name());
+		}
+	}
+
+	private record ArchiveThingCommand(String id) implements Command<NoResult> {
+	}
+
+	private static class ArchiveThingHandler implements CommandHandler<ArchiveThingCommand, NoResult> {
+
+		@Override
+		public NoResult handle(ArchiveThingCommand command) {
+			return NoResult.INSTANCE;
 		}
 	}
 

@@ -102,7 +102,7 @@ Each domain package follows the same shape:
       handler/
     query/
       dto/
-      service/
+      handler/
   domain/
     model/
     policy/
@@ -117,9 +117,9 @@ Each domain package follows the same shape:
 
 Rules:
 
-- Controllers call command handlers or query services.
+- Controllers call command handlers or query handlers.
 - Command handlers own writes and transactions.
-- Query services own read-only lookup and projection access.
+- Query handlers own read-only lookup and projection access.
 - Domain code does not depend on API, persistence, MyBatis, or external clients.
 - Application code may depend on infrastructure repository interfaces/classes directly in this lite structure.
 - Infrastructure repositories use MyBatis mappers and row records.
@@ -141,8 +141,8 @@ Use this shape for SQL-backed persistence:
       dto/
         FindTripDetailQuery.java
         TripDetailView.java
-      service/
-        TripQueryService.java
+      handler/
+        FindTripDetailHandler.java
   infrastructure/
     persistence/
       mapper/
@@ -166,7 +166,7 @@ Guidelines:
 - `row` records represent database rows, not domain models.
 - Repository implementations translate between domain/view DTOs and rows.
 - Command handlers use command repositories for writes.
-- Query services use query repositories for reads.
+- Query handlers use query repositories for reads.
 - Do not introduce JPA entities, `EntityManager`, Hibernate repositories, or `spring-boot-starter-data-jpa`.
 
 ## Preference Resources
@@ -212,16 +212,32 @@ Rules:
 - `Command`: request data for an operation that changes state.
 - `CommandHandler`: one focused class that handles one command and owns the write transaction.
 - `Query`: request data for an operation that reads state.
-- `QueryService`: read-side service that can group related query methods for one domain.
+- `QueryHandler`: one focused class that handles one query and owns the read use case.
 - `Repository`: persistence-facing class that calls MyBatis mappers.
 - `Mapper`: MyBatis interface connected to XML SQL.
 - `Row`: database row shape.
 
-We use `Handler` for commands because writes are usually business actions with one clear intent, such as `CreateTrip` or `InviteTripMember`. We use `Service` for queries because reads are often lightweight and related queries can live together without adding one class per select.
+Use the same action name across a command/query, its handler, and its result/view:
+
+```text
+CreateTripCommand -> CreateTripHandler -> CreateTripResult
+InviteTripMemberCommand -> InviteTripMemberHandler -> InviteTripMemberResult
+FindTripDetailQuery -> FindTripDetailHandler -> TripDetailView
+FindRecommendedPlacesQuery -> FindRecommendedPlacesHandler -> PageResponse<RecommendedPlaceView>
+```
+
+Handler return rules:
+
+- Commands that create or change state return an explicit `{Action}Result` record.
+- Commands that do not need a response body return `NoResult`, not `Void` or `null`.
+- Queries that return one object use `{Resource}View`.
+- Queries that return a list use `PageResponse<{Resource}View>` or another agreed page response type.
+- API response DTOs stay in `api/dto`; application handlers return result/view records, not HTTP DTOs.
 
 ## Common Contracts
 
 - CQRS handler generic order is input first, result second: `CommandHandler<CreateTripCommand, CreateTripResult>` and `QueryHandler<FindTripQuery, TripView>`.
+- Use `NoResult` for command handlers that intentionally produce no response body.
 - Controllers and application services should use `ProblemDetails` for common error response shape.
 - `CurrentUserProvider` is the minimal security contract for domain code that needs the authenticated user id.
 - Tests can use a fake `CurrentUserProvider` without waiting for full auth implementation.
