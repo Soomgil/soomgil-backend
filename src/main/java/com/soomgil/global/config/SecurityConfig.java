@@ -1,6 +1,7 @@
 package com.soomgil.global.config;
 
 import com.soomgil.global.security.ProblemDetailsAuthenticationEntryPoint;
+import com.soomgil.global.security.ProblemDetailsAccessDeniedHandler;
 import java.util.List;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -23,7 +24,8 @@ public class SecurityConfig {
 	SecurityFilterChain securityFilterChain(
 		HttpSecurity http,
 		CorsConfigurationSource corsConfigurationSource,
-		ProblemDetailsAuthenticationEntryPoint authenticationEntryPoint
+		ProblemDetailsAuthenticationEntryPoint authenticationEntryPoint,
+		ProblemDetailsAccessDeniedHandler accessDeniedHandler
 	) throws Exception {
 		return http
 			.csrf(AbstractHttpConfigurer::disable)
@@ -31,7 +33,10 @@ public class SecurityConfig {
 			.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 			.formLogin(AbstractHttpConfigurer::disable)
 			.httpBasic(AbstractHttpConfigurer::disable)
-			.exceptionHandling(exception -> exception.authenticationEntryPoint(authenticationEntryPoint))
+			.exceptionHandling(exception -> exception
+				.authenticationEntryPoint(authenticationEntryPoint)
+				.accessDeniedHandler(accessDeniedHandler)
+			)
 			.authorizeHttpRequests(auth -> auth
 				.requestMatchers(HttpMethod.GET, "/api/v1/health").permitAll()
 				.requestMatchers("/actuator/health/**", "/actuator/info").permitAll()
