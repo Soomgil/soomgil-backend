@@ -6,9 +6,12 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import java.util.List;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -59,6 +62,53 @@ public class GlobalExceptionHandler {
 			ErrorCode.VALIDATION_FAILED.defaultMessage(),
 			request,
 			fields
+		);
+		return ResponseEntity.badRequest().body(problemDetail);
+	}
+
+	@ExceptionHandler(MissingServletRequestParameterException.class)
+	ResponseEntity<ProblemDetails> handleMissingServletRequestParameter(
+		MissingServletRequestParameterException exception,
+		HttpServletRequest request
+	) {
+		List<ProblemField> fields = List.of(new ProblemField(
+			exception.getParameterName(),
+			"Required request parameter is missing."
+		));
+		ProblemDetails problemDetail = problemDetailsFactory.create(
+			ErrorCode.VALIDATION_FAILED,
+			ErrorCode.VALIDATION_FAILED.defaultMessage(),
+			request,
+			fields
+		);
+		return ResponseEntity.badRequest().body(problemDetail);
+	}
+
+	@ExceptionHandler(MethodArgumentTypeMismatchException.class)
+	ResponseEntity<ProblemDetails> handleMethodArgumentTypeMismatch(
+		MethodArgumentTypeMismatchException exception,
+		HttpServletRequest request
+	) {
+		List<ProblemField> fields = List.of(new ProblemField(exception.getName(), "Invalid value."));
+		ProblemDetails problemDetail = problemDetailsFactory.create(
+			ErrorCode.VALIDATION_FAILED,
+			ErrorCode.VALIDATION_FAILED.defaultMessage(),
+			request,
+			fields
+		);
+		return ResponseEntity.badRequest().body(problemDetail);
+	}
+
+	@ExceptionHandler(HttpMessageNotReadableException.class)
+	ResponseEntity<ProblemDetails> handleHttpMessageNotReadable(
+		HttpMessageNotReadableException exception,
+		HttpServletRequest request
+	) {
+		ProblemDetails problemDetail = problemDetailsFactory.create(
+			ErrorCode.INVALID_REQUEST,
+			"Malformed request body.",
+			request,
+			List.of()
 		);
 		return ResponseEntity.badRequest().body(problemDetail);
 	}
