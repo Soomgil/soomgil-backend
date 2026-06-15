@@ -7,6 +7,13 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * API 실패 응답의 공통 body.
+ *
+ * <p>RFC Problem Details 형식을 따르되, frontend 분기 처리를 위해 안정적인 {@code code},
+ * 요청 추적을 위한 {@code requestId}, field validation 정보를 함께 담는다.
+ * {@code instance}는 요청 path이고, {@code method}는 HTTP method이다.
+ */
 public record ProblemDetails(
 	@NotNull
 	URI type,

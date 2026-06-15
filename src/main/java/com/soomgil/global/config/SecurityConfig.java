@@ -16,6 +16,12 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+/**
+ * API 보안 filter chain과 CORS 정책을 구성한다.
+ *
+ * <p>backend는 stateless API를 기준으로 form login과 HTTP basic을 비활성화한다.
+ * 인증 실패와 권한 실패는 각각 ProblemDetails 401/403 응답으로 변환한다.
+ */
 @Configuration
 @EnableConfigurationProperties(CorsProperties.class)
 public class SecurityConfig {

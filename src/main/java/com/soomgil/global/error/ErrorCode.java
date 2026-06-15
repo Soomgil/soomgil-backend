@@ -2,6 +2,12 @@ package com.soomgil.global.error;
 
 import org.springframework.http.HttpStatus;
 
+/**
+ * API 실패 응답에서 사용하는 안정적인 error code 목록.
+ *
+ * <p>각 값은 HTTP status, frontend 분기용 문자열 code, 기본 메시지를 함께 가진다.
+ * 도메인별 세부 code가 필요해지기 전까지 공통 code로 실패 의미를 맞춘다.
+ */
 public enum ErrorCode {
 	INVALID_REQUEST(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "Invalid request."),
 	VALIDATION_FAILED(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", "Request validation failed."),
@@ -23,14 +29,29 @@ public enum ErrorCode {
 		this.defaultMessage = defaultMessage;
 	}
 
+	/**
+	 * 이 error code에 대응하는 HTTP status.
+	 *
+	 * @return HTTP status
+	 */
 	public HttpStatus status() {
 		return status;
 	}
 
+	/**
+	 * response body의 {@code code} field에 들어가는 안정적인 문자열.
+	 *
+	 * @return error code 문자열
+	 */
 	public String code() {
 		return code;
 	}
 
+	/**
+	 * 별도 상세 메시지가 없을 때 사용하는 기본 설명.
+	 *
+	 * @return 기본 메시지
+	 */
 	public String defaultMessage() {
 		return defaultMessage;
 	}

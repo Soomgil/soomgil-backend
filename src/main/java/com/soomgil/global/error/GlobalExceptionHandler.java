@@ -13,6 +13,12 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
+/**
+ * Controller 계층에서 올라온 예외를 공통 ProblemDetails 응답으로 변환한다.
+ *
+ * <p>입력값 검증 실패는 {@code VALIDATION_FAILED}, JSON 파싱처럼 요청 자체를 읽을 수 없는 경우는
+ * {@code INVALID_REQUEST}, 예상하지 못한 예외는 {@code INTERNAL_ERROR}로 매핑한다.
+ */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 

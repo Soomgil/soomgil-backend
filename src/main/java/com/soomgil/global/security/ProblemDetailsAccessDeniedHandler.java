@@ -14,6 +14,12 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.stereotype.Component;
 
+/**
+ * Spring Security 인가 실패를 403 ProblemDetails 응답으로 변환한다.
+ *
+ * <p>사용자는 인증되었지만 resource 접근 권한이 없을 때 사용된다.
+ * 인증 자체가 없는 경우는 {@link ProblemDetailsAuthenticationEntryPoint}가 401로 처리한다.
+ */
 @Component
 public class ProblemDetailsAccessDeniedHandler implements AccessDeniedHandler {
 

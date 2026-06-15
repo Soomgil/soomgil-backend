@@ -14,6 +14,12 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.stereotype.Component;
 
+/**
+ * Spring Security 인증 실패를 401 ProblemDetails 응답으로 변환한다.
+ *
+ * <p>토큰이 없거나 잘못되어 현재 사용자를 식별할 수 없는 요청에 사용된다.
+ * 로그인은 되었지만 권한이 부족한 경우는 {@link ProblemDetailsAccessDeniedHandler}가 403으로 처리한다.
+ */
 @Component
 public class ProblemDetailsAuthenticationEntryPoint implements AuthenticationEntryPoint {
 
