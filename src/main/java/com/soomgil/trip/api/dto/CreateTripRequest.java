@@ -11,7 +11,7 @@ public record CreateTripRequest(
 	String title,
 	@Size(max = 160)
 	String displayDestination,
-	List<String> legalRegionCodes,
+	List<@Size(min = 10, max = 10) String> legalRegionCodes,
 	LocalDate startDate,
 	LocalDate endDate
 ) {

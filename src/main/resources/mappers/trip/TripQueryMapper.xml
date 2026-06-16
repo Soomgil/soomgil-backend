@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.soomgil.trip.infrastructure.persistence.mapper.TripQueryMapper">
+  <select id="findTripAccess" resultType="com.soomgil.trip.infrastructure.persistence.row.TripAccessRow">
+    SELECT
+      t.id AS trip_id,
+      #{userId} AS user_id,
+      t.status AS trip_status,
+      m.status AS member_status,
+      t.owner_user_id AS owner_user_id
+    FROM trip.trips t
+    LEFT JOIN trip.trip_members m
+      ON m.trip_id = t.id
+      AND m.user_id = #{userId}
+    WHERE t.id = #{tripId}
+  </select>
+</mapper>

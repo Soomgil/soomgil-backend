@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.soomgil.trip.infrastructure.persistence.mapper.TripCommandMapper">
+  <insert id="insertTrip" parameterType="com.soomgil.trip.infrastructure.persistence.row.TripRow">
+    INSERT INTO trip.trips (
+      id,
+      owner_user_id,
+      title,
+      display_destination,
+      status,
+      itinerary_version,
+      retripped_from_post_id,
+      retripped_from_snapshot_version,
+      created_at,
+      updated_at,
+      deleted_at
+    )
+    VALUES (
+      #{id},
+      #{ownerUserId},
+      #{title},
+      #{displayDestination},
+      #{status},
+      #{itineraryVersion},
+      #{retrippedFromPostId},
+      #{retrippedFromSnapshotVersion},
+      #{createdAt},
+      #{updatedAt},
+      #{deletedAt}
+    )
+  </insert>
+
+  <insert id="insertTripMember" parameterType="com.soomgil.trip.infrastructure.persistence.row.TripMemberRow">
+    INSERT INTO trip.trip_members (
+      id,
+      trip_id,
+      user_id,
+      role,
+      status,
+      joined_at,
+      left_at,
+      removed_by_user_id
+    )
+    VALUES (
+      #{id},
+      #{tripId},
+      #{userId},
+      #{role},
+      #{status},
+      #{joinedAt},
+      #{leftAt},
+      #{removedByUserId}
+    )
+  </insert>
+
+  <insert id="insertTripRegion" parameterType="com.soomgil.trip.infrastructure.persistence.row.TripRegionRow">
+    INSERT INTO trip.trip_regions (
+      trip_id,
+      legal_region_code,
+      sort_order,
+      created_at
+    )
+    VALUES (
+      #{tripId},
+      #{legalRegionCode},
+      #{sortOrder},
+      #{createdAt}
+    )
+  </insert>
+</mapper>

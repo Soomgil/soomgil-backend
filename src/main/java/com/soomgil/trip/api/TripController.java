@@ -1,17 +1,28 @@
 package com.soomgil.trip.api;
 
 import com.soomgil.common.api.ApiControllerSupport;
+import com.soomgil.common.id.Ids;
+import com.soomgil.global.error.BusinessException;
+import com.soomgil.global.error.ErrorCode;
+import com.soomgil.trip.application.command.dto.CreateTripCommand;
+import com.soomgil.trip.application.command.dto.CreateTripResult;
+import com.soomgil.trip.application.command.handler.CreateTripHandler;
 import com.soomgil.trip.api.dto.AcceptTripInviteRequest;
 import com.soomgil.trip.api.dto.CreateTripInviteRequest;
 import com.soomgil.trip.api.dto.CreateTripRequest;
 import com.soomgil.trip.api.dto.PagedTripSummary;
+import com.soomgil.trip.api.dto.TripAccessRole;
 import com.soomgil.trip.api.dto.TripDetail;
 import com.soomgil.trip.api.dto.TripInvite;
 import com.soomgil.trip.api.dto.TripMember;
 import com.soomgil.trip.api.dto.TripStatus;
 import com.soomgil.trip.api.dto.UpdateTripRequest;
 import jakarta.validation.Valid;
+import java.security.Principal;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.validation.annotation.Validated;
@@ -31,6 +42,12 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/trips")
 public class TripController extends ApiControllerSupport {
 
+	private final CreateTripHandler createTripHandler;
+
+	public TripController(CreateTripHandler createTripHandler) {
+		this.createTripHandler = Objects.requireNonNull(createTripHandler, "createTripHandler must not be null");
+	}
+
 	@GetMapping
 	public PagedTripSummary listTrips(
 		@RequestParam(required = false) TripStatus status,
@@ -43,8 +60,15 @@ public class TripController extends ApiControllerSupport {
 
 	@PostMapping
 	@ResponseStatus(HttpStatus.CREATED)
-	public TripDetail createTrip(@Valid @RequestBody CreateTripRequest request) {
-		return notImplemented();
+	public TripDetail createTrip(@Valid @RequestBody CreateTripRequest request, Principal principal) {
+		UUID currentUserId = currentUserId(principal);
+		CreateTripResult result = createTripHandler.handle(new CreateTripCommand(
+			currentUserId,
+			request.title(),
+			request.displayDestination(),
+			request.legalRegionCodes()
+		));
+		return toTripDetail(result);
 	}
 
 	@GetMapping("/{tripId}")
@@ -97,5 +121,33 @@ public class TripController extends ApiControllerSupport {
 	@PostMapping("/invites/accept")
 	public TripDetail acceptTripInvite(@Valid @RequestBody AcceptTripInviteRequest request) {
 		return notImplemented();
+	}
+
+	private UUID currentUserId(Principal principal) {
+		if (principal == null || principal.getName() == null || principal.getName().isBlank()) {
+			throw new BusinessException(ErrorCode.UNAUTHORIZED, "Authenticated user is required.");
+		}
+		try {
+			return Ids.parseUuid(principal.getName(), "currentUserId");
+		}
+		catch (IllegalArgumentException exception) {
+			throw new BusinessException(ErrorCode.UNAUTHORIZED, "Authenticated user id must be a UUID.");
+		}
+	}
+
+	private TripDetail toTripDetail(CreateTripResult result) {
+		return new TripDetail(
+			result.tripId(),
+			result.title(),
+			result.displayDestination(),
+			TripStatus.valueOf(result.status().name()),
+			TripAccessRole.OWNER,
+			result.itineraryVersion(),
+			OffsetDateTime.ofInstant(result.createdAt(), ZoneOffset.UTC),
+			result.ownerUserId(),
+			List.of(),
+			List.of(),
+			null
+		);
 	}
 }
