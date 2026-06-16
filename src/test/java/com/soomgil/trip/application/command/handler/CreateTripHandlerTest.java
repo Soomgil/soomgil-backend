@@ -9,10 +9,12 @@ import com.soomgil.trip.application.command.dto.CreateTripCommand;
 import com.soomgil.trip.application.command.dto.CreateTripResult;
 import com.soomgil.trip.application.port.TripCommandRepository;
 import com.soomgil.trip.domain.model.Trip;
+import com.soomgil.trip.domain.model.TripInvite;
 import com.soomgil.trip.domain.model.TripMember;
 import com.soomgil.trip.domain.model.TripMemberRole;
 import com.soomgil.trip.domain.model.TripMemberStatus;
 import com.soomgil.trip.domain.model.TripStatus;
+import java.time.Instant;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -96,6 +98,14 @@ class CreateTripHandlerTest {
 			this.savedTrip = trip;
 			this.savedMember = initialMember;
 			this.savedRegionCodes = List.copyOf(legalRegionCodes);
+		}
+
+		@Override
+		public void saveTripInvite(TripInvite invite) {
+		}
+
+		@Override
+		public void revokeTripInvite(UUID inviteId, UUID revokedByUserId, Instant revokedAt) {
 		}
 	}
 }

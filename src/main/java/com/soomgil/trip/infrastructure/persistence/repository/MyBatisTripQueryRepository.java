@@ -1,16 +1,19 @@
 package com.soomgil.trip.infrastructure.persistence.repository;
 
 import com.soomgil.trip.application.port.TripAccessSnapshot;
+import com.soomgil.trip.application.port.TripInviteReadModel;
 import com.soomgil.trip.application.port.TripMemberReadModel;
 import com.soomgil.trip.application.port.TripQueryRepository;
 import com.soomgil.trip.application.port.TripReadModel;
 import com.soomgil.trip.application.port.TripSummaryPage;
+import com.soomgil.trip.domain.model.InviteStatus;
 import com.soomgil.trip.domain.model.TripAccessRole;
 import com.soomgil.trip.domain.model.TripMemberRole;
 import com.soomgil.trip.domain.model.TripMemberStatus;
 import com.soomgil.trip.domain.model.TripStatus;
 import com.soomgil.trip.infrastructure.persistence.mapper.TripQueryMapper;
 import com.soomgil.trip.infrastructure.persistence.row.TripAccessRow;
+import com.soomgil.trip.infrastructure.persistence.row.TripInviteRow;
 import com.soomgil.trip.infrastructure.persistence.row.TripMemberReadRow;
 import com.soomgil.trip.infrastructure.persistence.row.TripRow;
 import java.util.List;
@@ -85,6 +88,15 @@ public class MyBatisTripQueryRepository implements TripQueryRepository {
 		return new TripSummaryPage(items, totalElements);
 	}
 
+	@Override
+	public List<TripInviteReadModel> findTripInvites(UUID tripId, InviteStatus status) {
+		String statusValue = status == null ? null : status.name();
+		return mapper.findTripInvites(tripId, statusValue)
+			.stream()
+			.map(this::toTripInviteReadModel)
+			.toList();
+	}
+
 	private TripReadModel toTripReadModel(TripRow row) {
 		return new TripReadModel(
 			row.id(),
@@ -107,6 +119,18 @@ public class MyBatisTripQueryRepository implements TripQueryRepository {
 			TripMemberStatus.valueOf(row.status()),
 			row.joinedAt(),
 			row.ownerUserId()
+		);
+	}
+
+	private TripInviteReadModel toTripInviteReadModel(TripInviteRow row) {
+		return new TripInviteReadModel(
+			row.id(),
+			row.tripId(),
+			row.inviteCode(),
+			row.inviteeUserId(),
+			InviteStatus.valueOf(row.status()),
+			row.expiresAt(),
+			row.createdAt()
 		);
 	}
 }

@@ -97,4 +97,26 @@
     SELECT count(*)
     <include refid="myTripsFilter" />
   </select>
+
+  <select id="findTripInvites" resultType="com.soomgil.trip.infrastructure.persistence.row.TripInviteRow">
+    SELECT
+      id,
+      trip_id,
+      created_by_user_id,
+      invitee_user_id,
+      invite_code,
+      invite_token_hash,
+      status,
+      expires_at,
+      accepted_by_user_id,
+      accepted_at,
+      revoked_at,
+      created_at
+    FROM trip.trip_invites
+    WHERE trip_id = #{tripId}
+    <if test="status != null">
+      AND status = #{status}
+    </if>
+    ORDER BY created_at DESC, id DESC
+  </select>
 </mapper>

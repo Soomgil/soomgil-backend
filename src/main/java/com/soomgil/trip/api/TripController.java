@@ -6,15 +6,23 @@ import com.soomgil.global.error.BusinessException;
 import com.soomgil.global.error.ErrorCode;
 import com.soomgil.trip.application.command.dto.CreateTripCommand;
 import com.soomgil.trip.application.command.dto.CreateTripResult;
+import com.soomgil.trip.application.command.dto.CreateTripInviteCommand;
+import com.soomgil.trip.application.command.dto.CreateTripInviteResult;
+import com.soomgil.trip.application.command.dto.RevokeTripInviteCommand;
 import com.soomgil.trip.application.command.handler.CreateTripHandler;
+import com.soomgil.trip.application.command.handler.CreateTripInviteHandler;
+import com.soomgil.trip.application.command.handler.RevokeTripInviteHandler;
 import com.soomgil.trip.application.query.dto.FindTripDetailQuery;
 import com.soomgil.trip.application.query.dto.ListMyTripsQuery;
+import com.soomgil.trip.application.query.dto.ListTripInvitesQuery;
 import com.soomgil.trip.application.query.dto.ListTripMembersQuery;
 import com.soomgil.trip.application.query.dto.PagedTripSummaryView;
 import com.soomgil.trip.application.query.dto.TripDetailView;
+import com.soomgil.trip.application.query.dto.TripInviteView;
 import com.soomgil.trip.application.query.dto.TripMemberView;
 import com.soomgil.trip.application.query.dto.TripSummaryView;
 import com.soomgil.trip.application.query.handler.FindTripDetailHandler;
+import com.soomgil.trip.application.query.handler.ListTripInvitesHandler;
 import com.soomgil.trip.application.query.handler.ListMyTripsHandler;
 import com.soomgil.trip.application.query.handler.ListTripMembersHandler;
 import com.soomgil.trip.api.dto.AcceptTripInviteRequest;
@@ -55,20 +63,29 @@ import org.springframework.web.bind.annotation.RestController;
 public class TripController extends ApiControllerSupport {
 
 	private final CreateTripHandler createTripHandler;
+	private final CreateTripInviteHandler createTripInviteHandler;
+	private final RevokeTripInviteHandler revokeTripInviteHandler;
 	private final ListMyTripsHandler listMyTripsHandler;
 	private final FindTripDetailHandler findTripDetailHandler;
 	private final ListTripMembersHandler listTripMembersHandler;
+	private final ListTripInvitesHandler listTripInvitesHandler;
 
 	public TripController(
 		CreateTripHandler createTripHandler,
+		CreateTripInviteHandler createTripInviteHandler,
+		RevokeTripInviteHandler revokeTripInviteHandler,
 		ListMyTripsHandler listMyTripsHandler,
 		FindTripDetailHandler findTripDetailHandler,
-		ListTripMembersHandler listTripMembersHandler
+		ListTripMembersHandler listTripMembersHandler,
+		ListTripInvitesHandler listTripInvitesHandler
 	) {
 		this.createTripHandler = Objects.requireNonNull(createTripHandler, "createTripHandler must not be null");
+		this.createTripInviteHandler = Objects.requireNonNull(createTripInviteHandler, "createTripInviteHandler must not be null");
+		this.revokeTripInviteHandler = Objects.requireNonNull(revokeTripInviteHandler, "revokeTripInviteHandler must not be null");
 		this.listMyTripsHandler = Objects.requireNonNull(listMyTripsHandler, "listMyTripsHandler must not be null");
 		this.findTripDetailHandler = Objects.requireNonNull(findTripDetailHandler, "findTripDetailHandler must not be null");
 		this.listTripMembersHandler = Objects.requireNonNull(listTripMembersHandler, "listTripMembersHandler must not be null");
+		this.listTripInvitesHandler = Objects.requireNonNull(listTripInvitesHandler, "listTripInvitesHandler must not be null");
 	}
 
 	@GetMapping
@@ -145,23 +162,43 @@ public class TripController extends ApiControllerSupport {
 	}
 
 	@GetMapping("/{tripId}/invites")
-	public List<TripInvite> listTripInvites(@PathVariable UUID tripId) {
-		return notImplemented();
+	public List<TripInvite> listTripInvites(
+		@PathVariable UUID tripId,
+		@RequestParam(required = false) com.soomgil.trip.api.dto.InviteStatus status,
+		Principal principal
+	) {
+		UUID currentUserId = currentUserId(principal);
+		return listTripInvitesHandler.handle(new ListTripInvitesQuery(
+			tripId,
+			currentUserId,
+			toDomainInviteStatus(status)
+		)).stream()
+			.map(this::toTripInvite)
+			.toList();
 	}
 
 	@PostMapping("/{tripId}/invites")
 	@ResponseStatus(HttpStatus.CREATED)
 	public TripInvite createTripInvite(
 		@PathVariable UUID tripId,
-		@Valid @RequestBody CreateTripInviteRequest request
+		@Valid @RequestBody CreateTripInviteRequest request,
+		Principal principal
 	) {
-		return notImplemented();
+		UUID currentUserId = currentUserId(principal);
+		CreateTripInviteResult result = createTripInviteHandler.handle(new CreateTripInviteCommand(
+			tripId,
+			currentUserId,
+			request.inviteeUserId(),
+			request.expiresAt() == null ? null : request.expiresAt().toInstant()
+		));
+		return toTripInvite(result);
 	}
 
 	@DeleteMapping("/{tripId}/invites/{inviteId}")
 	@ResponseStatus(HttpStatus.NO_CONTENT)
-	public void revokeTripInvite(@PathVariable UUID tripId, @PathVariable UUID inviteId) {
-		notImplemented();
+	public void revokeTripInvite(@PathVariable UUID tripId, @PathVariable UUID inviteId, Principal principal) {
+		UUID currentUserId = currentUserId(principal);
+		revokeTripInviteHandler.handle(new RevokeTripInviteCommand(tripId, inviteId, currentUserId));
 	}
 
 	@PostMapping("/invites/accept")
@@ -252,6 +289,32 @@ public class TripController extends ApiControllerSupport {
 		);
 	}
 
+	private TripInvite toTripInvite(CreateTripInviteResult result) {
+		return new TripInvite(
+			result.id(),
+			result.tripId(),
+			result.inviteCode(),
+			null,
+			result.inviteeUserId(),
+			com.soomgil.trip.api.dto.InviteStatus.valueOf(result.status().name()),
+			result.expiresAt() == null ? null : OffsetDateTime.ofInstant(result.expiresAt(), ZoneOffset.UTC),
+			OffsetDateTime.ofInstant(result.createdAt(), ZoneOffset.UTC)
+		);
+	}
+
+	private TripInvite toTripInvite(TripInviteView view) {
+		return new TripInvite(
+			view.id(),
+			view.tripId(),
+			view.inviteCode(),
+			null,
+			view.inviteeUserId(),
+			com.soomgil.trip.api.dto.InviteStatus.valueOf(view.status().name()),
+			view.expiresAt() == null ? null : OffsetDateTime.ofInstant(view.expiresAt(), ZoneOffset.UTC),
+			OffsetDateTime.ofInstant(view.createdAt(), ZoneOffset.UTC)
+		);
+	}
+
 	private UserSummary userSummary(UUID userId) {
 		return new UserSummary(userId, userId.toString(), null);
 	}
@@ -268,5 +331,11 @@ public class TripController extends ApiControllerSupport {
 		com.soomgil.trip.api.dto.TripMemberStatus status
 	) {
 		return status == null ? null : com.soomgil.trip.domain.model.TripMemberStatus.valueOf(status.name());
+	}
+
+	private com.soomgil.trip.domain.model.InviteStatus toDomainInviteStatus(
+		com.soomgil.trip.api.dto.InviteStatus status
+	) {
+		return status == null ? null : com.soomgil.trip.domain.model.InviteStatus.valueOf(status.name());
 	}
 }

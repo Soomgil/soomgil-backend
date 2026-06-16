@@ -1,8 +1,11 @@
 package com.soomgil.trip.application.port;
 
 import com.soomgil.trip.domain.model.Trip;
+import com.soomgil.trip.domain.model.TripInvite;
 import com.soomgil.trip.domain.model.TripMember;
+import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * 여행방 쓰기 persistence 계약.
@@ -19,4 +22,20 @@ public interface TripCommandRepository {
 	 * @param legalRegionCodes 선택적 법정동 코드 목록
 	 */
 	void saveCreatedTrip(Trip trip, TripMember initialMember, List<String> legalRegionCodes);
+
+	/**
+	 * 여행방 초대를 저장한다.
+	 *
+	 * @param invite 저장할 초대
+	 */
+	void saveTripInvite(TripInvite invite);
+
+	/**
+	 * 대기 중인 초대를 취소한다.
+	 *
+	 * @param inviteId 초대 ID
+	 * @param revokedByUserId 취소한 사용자 ID
+	 * @param revokedAt 취소 시각
+	 */
+	void revokeTripInvite(UUID inviteId, UUID revokedByUserId, Instant revokedAt);
 }

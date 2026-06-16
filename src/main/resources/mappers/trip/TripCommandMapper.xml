@@ -69,4 +69,44 @@
       #{createdAt}
     )
   </insert>
+
+  <insert id="insertTripInvite" parameterType="com.soomgil.trip.infrastructure.persistence.row.TripInviteRow">
+    INSERT INTO trip.trip_invites (
+      id,
+      trip_id,
+      created_by_user_id,
+      invitee_user_id,
+      invite_code,
+      invite_token_hash,
+      status,
+      expires_at,
+      accepted_by_user_id,
+      accepted_at,
+      revoked_at,
+      created_at
+    )
+    VALUES (
+      #{id},
+      #{tripId},
+      #{createdByUserId},
+      #{inviteeUserId},
+      #{inviteCode},
+      #{inviteTokenHash},
+      #{status},
+      #{expiresAt},
+      #{acceptedByUserId},
+      #{acceptedAt},
+      #{revokedAt},
+      #{createdAt}
+    )
+  </insert>
+
+  <update id="revokeTripInvite">
+    UPDATE trip.trip_invites
+    SET
+      status = 'REVOKED',
+      revoked_at = #{revokedAt}
+    WHERE id = #{inviteId}
+      AND status = 'PENDING'
+  </update>
 </mapper>

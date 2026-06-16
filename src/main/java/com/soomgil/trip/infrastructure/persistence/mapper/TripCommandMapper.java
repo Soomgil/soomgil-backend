@@ -2,8 +2,12 @@ package com.soomgil.trip.infrastructure.persistence.mapper;
 
 import com.soomgil.trip.infrastructure.persistence.row.TripMemberRow;
 import com.soomgil.trip.infrastructure.persistence.row.TripRegionRow;
+import com.soomgil.trip.infrastructure.persistence.row.TripInviteRow;
 import com.soomgil.trip.infrastructure.persistence.row.TripRow;
+import java.time.Instant;
+import java.util.UUID;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
 
 /**
  * 여행방 쓰기 SQL mapper.
@@ -33,4 +37,19 @@ public interface TripCommandMapper {
 	 * @param row 저장할 지역 row
 	 */
 	void insertTripRegion(TripRegionRow row);
+
+	/**
+	 * 여행방 초대 row를 추가한다.
+	 *
+	 * @param row 저장할 초대 row
+	 */
+	void insertTripInvite(TripInviteRow row);
+
+	/**
+	 * 대기 중인 여행방 초대를 취소 상태로 전환한다.
+	 *
+	 * @param inviteId 초대 ID
+	 * @param revokedAt 취소 시각
+	 */
+	void revokeTripInvite(@Param("inviteId") UUID inviteId, @Param("revokedAt") Instant revokedAt);
 }

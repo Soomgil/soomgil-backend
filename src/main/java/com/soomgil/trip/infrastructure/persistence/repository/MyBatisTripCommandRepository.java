@@ -2,14 +2,18 @@ package com.soomgil.trip.infrastructure.persistence.repository;
 
 import com.soomgil.trip.application.port.TripCommandRepository;
 import com.soomgil.trip.domain.model.Trip;
+import com.soomgil.trip.domain.model.TripInvite;
 import com.soomgil.trip.domain.model.TripMember;
 import com.soomgil.trip.infrastructure.persistence.mapper.TripCommandMapper;
+import com.soomgil.trip.infrastructure.persistence.row.TripInviteRow;
 import com.soomgil.trip.infrastructure.persistence.row.TripMemberRow;
 import com.soomgil.trip.infrastructure.persistence.row.TripRegionRow;
 import com.soomgil.trip.infrastructure.persistence.row.TripRow;
+import java.time.Instant;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.UUID;
 import org.springframework.stereotype.Repository;
 
 /**
@@ -56,5 +60,28 @@ public class MyBatisTripCommandRepository implements TripCommandRepository {
 		for (String legalRegionCode : new LinkedHashSet<>(legalRegionCodes)) {
 			mapper.insertTripRegion(new TripRegionRow(trip.id(), legalRegionCode, order++, trip.createdAt()));
 		}
+	}
+
+	@Override
+	public void saveTripInvite(TripInvite invite) {
+		mapper.insertTripInvite(new TripInviteRow(
+			invite.id(),
+			invite.tripId(),
+			invite.createdByUserId(),
+			invite.inviteeUserId(),
+			invite.inviteCode(),
+			invite.inviteTokenHash(),
+			invite.status().name(),
+			invite.expiresAt(),
+			invite.acceptedByUserId(),
+			invite.acceptedAt(),
+			invite.revokedAt(),
+			invite.createdAt()
+		));
+	}
+
+	@Override
+	public void revokeTripInvite(UUID inviteId, UUID revokedByUserId, Instant revokedAt) {
+		mapper.revokeTripInvite(inviteId, revokedAt);
 	}
 }

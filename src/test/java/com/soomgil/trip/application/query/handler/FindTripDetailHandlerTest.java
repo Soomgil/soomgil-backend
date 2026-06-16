@@ -6,12 +6,14 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.soomgil.global.error.BusinessException;
 import com.soomgil.global.error.ErrorCode;
 import com.soomgil.trip.application.port.TripAccessSnapshot;
+import com.soomgil.trip.application.port.TripInviteReadModel;
 import com.soomgil.trip.application.port.TripMemberReadModel;
 import com.soomgil.trip.application.port.TripQueryRepository;
 import com.soomgil.trip.application.port.TripReadModel;
 import com.soomgil.trip.application.port.TripSummaryPage;
 import com.soomgil.trip.application.query.dto.FindTripDetailQuery;
 import com.soomgil.trip.application.query.dto.TripDetailView;
+import com.soomgil.trip.domain.model.InviteStatus;
 import com.soomgil.trip.domain.model.TripAccessRole;
 import com.soomgil.trip.domain.model.TripMemberRole;
 import com.soomgil.trip.domain.model.TripMemberStatus;
@@ -143,6 +145,11 @@ class FindTripDetailHandlerTest {
 			List<String> sort
 		) {
 			return new TripSummaryPage(List.of(), 0);
+		}
+
+		@Override
+		public List<TripInviteReadModel> findTripInvites(UUID tripId, InviteStatus status) {
+			return List.of();
 		}
 	}
 }

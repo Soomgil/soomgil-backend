@@ -8,17 +8,24 @@ import com.soomgil.trip.api.dto.TripAccessRole;
 import com.soomgil.trip.api.dto.TripDetail;
 import com.soomgil.trip.api.dto.TripStatus;
 import com.soomgil.trip.application.command.handler.CreateTripHandler;
+import com.soomgil.trip.application.command.handler.CreateTripInviteHandler;
+import com.soomgil.trip.application.command.handler.RevokeTripInviteHandler;
+import com.soomgil.trip.application.port.TripInviteCodeGenerator;
 import com.soomgil.trip.application.port.TripAccessSnapshot;
 import com.soomgil.trip.application.port.TripCommandRepository;
+import com.soomgil.trip.application.port.TripInviteReadModel;
 import com.soomgil.trip.application.port.TripMemberReadModel;
 import com.soomgil.trip.application.port.TripQueryRepository;
 import com.soomgil.trip.application.port.TripReadModel;
 import com.soomgil.trip.application.port.TripSummaryPage;
 import com.soomgil.trip.application.query.handler.FindTripDetailHandler;
+import com.soomgil.trip.application.query.handler.ListTripInvitesHandler;
 import com.soomgil.trip.application.query.handler.ListMyTripsHandler;
 import com.soomgil.trip.application.query.handler.ListTripMembersHandler;
 import com.soomgil.trip.application.query.handler.TripAccessGuard;
 import com.soomgil.trip.domain.model.Trip;
+import com.soomgil.trip.domain.model.InviteStatus;
+import com.soomgil.trip.domain.model.TripInvite;
 import com.soomgil.trip.domain.model.TripMember;
 import com.soomgil.trip.domain.model.TripMemberStatus;
 import java.security.Principal;
@@ -56,9 +63,12 @@ class TripControllerTest {
 		TripAccessGuard accessGuard = new TripAccessGuard(queryRepository);
 		return new TripController(
 			new CreateTripHandler(new NoopTripCommandRepository(), fixedTime()),
+			new CreateTripInviteHandler(new NoopTripCommandRepository(), queryRepository, fixedTime(), fixedCodeGenerator()),
+			new RevokeTripInviteHandler(new NoopTripCommandRepository(), queryRepository, fixedTime()),
 			new ListMyTripsHandler(queryRepository),
 			new FindTripDetailHandler(accessGuard, queryRepository),
-			new ListTripMembersHandler(accessGuard, queryRepository)
+			new ListTripMembersHandler(accessGuard, queryRepository),
+			new ListTripInvitesHandler(accessGuard, queryRepository)
 		);
 	}
 
@@ -70,10 +80,22 @@ class TripControllerTest {
 		return () -> Instant.parse("2026-06-16T00:00:00Z");
 	}
 
+	private static TripInviteCodeGenerator fixedCodeGenerator() {
+		return () -> "ABCD1234";
+	}
+
 	private static class NoopTripCommandRepository implements TripCommandRepository {
 
 		@Override
 		public void saveCreatedTrip(Trip trip, TripMember initialMember, List<String> legalRegionCodes) {
+		}
+
+		@Override
+		public void saveTripInvite(TripInvite invite) {
+		}
+
+		@Override
+		public void revokeTripInvite(UUID inviteId, UUID revokedByUserId, Instant revokedAt) {
 		}
 	}
 
@@ -104,6 +126,11 @@ class TripControllerTest {
 			List<String> sort
 		) {
 			return new TripSummaryPage(List.of(), 0);
+		}
+
+		@Override
+		public List<TripInviteReadModel> findTripInvites(UUID tripId, InviteStatus status) {
+			return List.of();
 		}
 	}
 }

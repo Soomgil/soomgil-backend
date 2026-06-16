@@ -3,12 +3,14 @@ package com.soomgil.trip.application.query.handler;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.soomgil.trip.application.port.TripAccessSnapshot;
+import com.soomgil.trip.application.port.TripInviteReadModel;
 import com.soomgil.trip.application.port.TripMemberReadModel;
 import com.soomgil.trip.application.port.TripQueryRepository;
 import com.soomgil.trip.application.port.TripReadModel;
 import com.soomgil.trip.application.port.TripSummaryPage;
 import com.soomgil.trip.application.query.dto.ListMyTripsQuery;
 import com.soomgil.trip.application.query.dto.PagedTripSummaryView;
+import com.soomgil.trip.domain.model.InviteStatus;
 import com.soomgil.trip.domain.model.TripAccessRole;
 import com.soomgil.trip.domain.model.TripMemberStatus;
 import com.soomgil.trip.domain.model.TripStatus;
@@ -100,6 +102,11 @@ class ListMyTripsHandlerTest {
 			this.pageNumber = page;
 			this.pageSize = size;
 			return this.page;
+		}
+
+		@Override
+		public List<TripInviteReadModel> findTripInvites(UUID tripId, InviteStatus status) {
+			return List.of();
 		}
 	}
 }

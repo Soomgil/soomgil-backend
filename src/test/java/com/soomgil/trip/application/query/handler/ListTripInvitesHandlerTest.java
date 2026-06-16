@@ -11,11 +11,10 @@ import com.soomgil.trip.application.port.TripMemberReadModel;
 import com.soomgil.trip.application.port.TripQueryRepository;
 import com.soomgil.trip.application.port.TripReadModel;
 import com.soomgil.trip.application.port.TripSummaryPage;
-import com.soomgil.trip.application.query.dto.ListTripMembersQuery;
-import com.soomgil.trip.application.query.dto.TripMemberView;
+import com.soomgil.trip.application.query.dto.ListTripInvitesQuery;
+import com.soomgil.trip.application.query.dto.TripInviteView;
 import com.soomgil.trip.domain.model.InviteStatus;
 import com.soomgil.trip.domain.model.TripAccessRole;
-import com.soomgil.trip.domain.model.TripMemberRole;
 import com.soomgil.trip.domain.model.TripMemberStatus;
 import com.soomgil.trip.domain.model.TripStatus;
 import java.time.Instant;
@@ -24,16 +23,46 @@ import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
-class ListTripMembersHandlerTest {
+class ListTripInvitesHandlerTest {
 
 	private final UUID tripId = UUID.randomUUID();
 	private final UUID ownerUserId = UUID.randomUUID();
 	private final UUID memberUserId = UUID.randomUUID();
 	private final StubTripQueryRepository repository = new StubTripQueryRepository();
-	private final ListTripMembersHandler handler = new ListTripMembersHandler(new TripAccessGuard(repository), repository);
+	private final ListTripInvitesHandler handler = new ListTripInvitesHandler(new TripAccessGuard(repository), repository);
 
 	@Test
-	void activeMemberCanListTripMembers() {
+	void ownerCanListTripInvites() {
+		repository.access = Optional.of(new TripAccessSnapshot(
+			tripId,
+			ownerUserId,
+			TripStatus.ACTIVE,
+			TripMemberStatus.ACTIVE,
+			ownerUserId
+		));
+		repository.invites = List.of(new TripInviteReadModel(
+			UUID.randomUUID(),
+			tripId,
+			"ABCD1234",
+			null,
+			InviteStatus.PENDING,
+			null,
+			Instant.parse("2026-06-16T00:00:00Z")
+		));
+
+		List<TripInviteView> invites = handler.handle(new ListTripInvitesQuery(
+			tripId,
+			ownerUserId,
+			InviteStatus.PENDING
+		));
+
+		assertThat(invites).hasSize(1);
+		assertThat(invites.get(0).inviteCode()).isEqualTo("ABCD1234");
+		assertThat(invites.get(0).status()).isEqualTo(InviteStatus.PENDING);
+	}
+
+	@Test
+	void nonOwnerCannotListTripInvites() {
 		repository.access = Optional.of(new TripAccessSnapshot(
 			tripId,
 			memberUserId,
@@ -41,51 +70,17 @@ class ListTripMembersHandlerTest {
 			TripMemberStatus.ACTIVE,
 			ownerUserId
 		));
-		repository.members = List.of(member(ownerUserId), member(memberUserId));
 
-		List<TripMemberView> members = handler.handle(new ListTripMembersQuery(
-			tripId,
-			memberUserId,
-			TripMemberStatus.ACTIVE
-		));
-
-		assertThat(members).hasSize(2);
-		assertThat(members.get(0).accessRole()).isEqualTo(TripAccessRole.OWNER);
-		assertThat(members.get(1).accessRole()).isEqualTo(TripAccessRole.MEMBER);
-	}
-
-	@Test
-	void nonMemberCannotListTripMembers() {
-		repository.access = Optional.of(new TripAccessSnapshot(
-			tripId,
-			memberUserId,
-			TripStatus.ACTIVE,
-			null,
-			ownerUserId
-		));
-
-		assertThatThrownBy(() -> handler.handle(new ListTripMembersQuery(tripId, memberUserId, null)))
+		assertThatThrownBy(() -> handler.handle(new ListTripInvitesQuery(tripId, memberUserId, null)))
 			.isInstanceOfSatisfying(BusinessException.class, exception ->
 				assertThat(exception.errorCode()).isEqualTo(ErrorCode.FORBIDDEN)
 			);
 	}
 
-	private TripMemberReadModel member(UUID userId) {
-		return new TripMemberReadModel(
-			UUID.randomUUID(),
-			tripId,
-			userId,
-			TripMemberRole.MEMBER,
-			TripMemberStatus.ACTIVE,
-			Instant.parse("2026-06-16T00:00:00Z"),
-			ownerUserId
-		);
-	}
-
 	private static class StubTripQueryRepository implements TripQueryRepository {
 
 		private Optional<TripAccessSnapshot> access = Optional.empty();
-		private List<TripMemberReadModel> members = List.of();
+		private List<TripInviteReadModel> invites = List.of();
 
 		@Override
 		public Optional<TripAccessSnapshot> findTripAccess(UUID tripId, UUID userId) {
@@ -99,7 +94,7 @@ class ListTripMembersHandlerTest {
 
 		@Override
 		public List<TripMemberReadModel> findTripMembers(UUID tripId, TripMemberStatus status) {
-			return members;
+			return List.of();
 		}
 
 		@Override
@@ -116,7 +111,7 @@ class ListTripMembersHandlerTest {
 
 		@Override
 		public List<TripInviteReadModel> findTripInvites(UUID tripId, InviteStatus status) {
-			return List.of();
+			return invites;
 		}
 	}
 }

@@ -1,6 +1,7 @@
 package com.soomgil.trip.application.port;
 
 import com.soomgil.trip.domain.model.TripAccessRole;
+import com.soomgil.trip.domain.model.InviteStatus;
 import com.soomgil.trip.domain.model.TripMemberStatus;
 import com.soomgil.trip.domain.model.TripStatus;
 import java.util.List;
@@ -60,4 +61,13 @@ public interface TripQueryRepository {
 		int size,
 		List<String> sort
 	);
+
+	/**
+	 * 여행방 초대 목록을 조회한다.
+	 *
+	 * @param tripId 여행방 ID
+	 * @param status 선택적 초대 상태
+	 * @return 초대 목록
+	 */
+	List<TripInviteReadModel> findTripInvites(UUID tripId, InviteStatus status);
 }

@@ -5,6 +5,7 @@ import com.soomgil.global.error.ErrorCode;
 import com.soomgil.trip.application.port.TripAccessSnapshot;
 import com.soomgil.trip.application.port.TripQueryRepository;
 import com.soomgil.trip.application.query.dto.TripAccessView;
+import com.soomgil.trip.domain.model.TripAccessRole;
 import com.soomgil.trip.domain.model.TripStatus;
 import com.soomgil.trip.domain.policy.TripAccessPolicy;
 import java.util.Objects;
@@ -42,6 +43,21 @@ public class TripAccessGuard {
 		TripAccessView access = TripAccessPolicy.evaluate(tripId, userId, snapshot);
 		if (!access.canAccess()) {
 			throw new BusinessException(ErrorCode.FORBIDDEN, "Trip member access is required.");
+		}
+		return access;
+	}
+
+	/**
+	 * 여행방 owner 권한을 요구한다.
+	 *
+	 * @param tripId 여행방 ID
+	 * @param userId 요청 사용자 ID
+	 * @return owner 접근 view
+	 */
+	public TripAccessView requireOwner(UUID tripId, UUID userId) {
+		TripAccessView access = requireActiveMember(tripId, userId);
+		if (access.accessRole() != TripAccessRole.OWNER) {
+			throw new BusinessException(ErrorCode.FORBIDDEN, "Trip owner access is required.");
 		}
 		return access;
 	}

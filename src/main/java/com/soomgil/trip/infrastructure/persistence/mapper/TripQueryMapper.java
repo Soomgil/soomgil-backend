@@ -1,6 +1,7 @@
 package com.soomgil.trip.infrastructure.persistence.mapper;
 
 import com.soomgil.trip.infrastructure.persistence.row.TripAccessRow;
+import com.soomgil.trip.infrastructure.persistence.row.TripInviteRow;
 import com.soomgil.trip.infrastructure.persistence.row.TripMemberReadRow;
 import com.soomgil.trip.infrastructure.persistence.row.TripRow;
 import java.util.List;
@@ -69,4 +70,13 @@ public interface TripQueryMapper {
 	 * @return 전체 개수
 	 */
 	long countMyTrips(@Param("userId") UUID userId, @Param("status") String status, @Param("role") String role);
+
+	/**
+	 * 여행방 초대 목록을 조회한다.
+	 *
+	 * @param tripId 여행방 ID
+	 * @param status 선택적 초대 상태
+	 * @return 초대 목록
+	 */
+	List<TripInviteRow> findTripInvites(@Param("tripId") UUID tripId, @Param("status") String status);
 }
