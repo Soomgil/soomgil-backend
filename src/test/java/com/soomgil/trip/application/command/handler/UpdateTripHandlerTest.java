@@ -6,7 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.soomgil.common.time.TimeProvider;
 import com.soomgil.global.error.BusinessException;
 import com.soomgil.global.error.ErrorCode;
-import com.soomgil.trip.application.command.dto.RevokeTripInviteCommand;
+import com.soomgil.trip.application.command.dto.UpdateTripCommand;
 import com.soomgil.trip.application.port.TripAccessSnapshot;
 import com.soomgil.trip.application.port.TripCommandRepository;
 import com.soomgil.trip.application.port.TripInviteReadModel;
@@ -25,39 +25,79 @@ import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
-class RevokeTripInviteHandlerTest {
+class UpdateTripHandlerTest {
 
 	private final UUID tripId = UUID.randomUUID();
-	private final UUID inviteId = UUID.randomUUID();
 	private final UUID ownerUserId = UUID.randomUUID();
+	private final UUID memberUserId = UUID.randomUUID();
 	private final CapturingTripCommandRepository commandRepository = new CapturingTripCommandRepository();
 	private final StubTripQueryRepository queryRepository = new StubTripQueryRepository();
-	private final RevokeTripInviteHandler handler = new RevokeTripInviteHandler(
+	private final UpdateTripHandler handler = new UpdateTripHandler(
 		commandRepository,
 		queryRepository,
 		fixedTime()
 	);
 
 	@Test
-	void ownerCanRevokeInvite() {
-		queryRepository.access = Optional.of(new TripAccessSnapshot(
+	void ownerCanUpdateTripSettings() {
+		queryRepository.access = ownerAccess();
+
+		handler.handle(new UpdateTripCommand(
 			tripId,
 			ownerUserId,
-			TripStatus.ACTIVE,
-			TripMemberStatus.ACTIVE,
-			ownerUserId
+			"  제주 여행  ",
+			"  제주  ",
+			List.of("5011010100", "5011010100", "5011010200"),
+			TripStatus.ARCHIVED
 		));
 
-		handler.handle(new RevokeTripInviteCommand(tripId, inviteId, ownerUserId));
-
-		assertThat(commandRepository.revokedInviteId).isEqualTo(inviteId);
-		assertThat(commandRepository.revokedByUserId).isEqualTo(ownerUserId);
-		assertThat(commandRepository.revokedAt).isEqualTo(Instant.parse("2026-06-16T00:00:00Z"));
+		assertThat(commandRepository.updated.tripId()).isEqualTo(tripId);
+		assertThat(commandRepository.updated.title()).isEqualTo("제주 여행");
+		assertThat(commandRepository.updated.displayDestinationProvided()).isTrue();
+		assertThat(commandRepository.updated.displayDestination()).isEqualTo("제주");
+		assertThat(commandRepository.updated.status()).isEqualTo(TripStatus.ARCHIVED);
+		assertThat(commandRepository.updated.updatedAt()).isEqualTo(now());
+		assertThat(commandRepository.replacedRegionCodes).containsExactly("5011010100", "5011010200");
 	}
 
 	@Test
-	void nonOwnerCannotRevokeInvite() {
-		UUID memberUserId = UUID.randomUUID();
+	void ownerCanClearDisplayDestinationAndRegions() {
+		queryRepository.access = ownerAccess();
+
+		handler.handle(new UpdateTripCommand(
+			tripId,
+			ownerUserId,
+			null,
+			"  ",
+			List.of(),
+			null
+		));
+
+		assertThat(commandRepository.updated.title()).isNull();
+		assertThat(commandRepository.updated.displayDestinationProvided()).isTrue();
+		assertThat(commandRepository.updated.displayDestination()).isNull();
+		assertThat(commandRepository.replacedRegionCodes).isEmpty();
+	}
+
+	@Test
+	void regionOnlyUpdateTouchesTripUpdatedAt() {
+		queryRepository.access = ownerAccess();
+
+		handler.handle(new UpdateTripCommand(
+			tripId,
+			ownerUserId,
+			null,
+			null,
+			List.of("5011010100"),
+			null
+		));
+
+		assertThat(commandRepository.updated.updatedAt()).isEqualTo(now());
+		assertThat(commandRepository.replacedRegionCodes).containsExactly("5011010100");
+	}
+
+	@Test
+	void nonOwnerCannotUpdateTripSettings() {
 		queryRepository.access = Optional.of(new TripAccessSnapshot(
 			tripId,
 			memberUserId,
@@ -66,21 +106,56 @@ class RevokeTripInviteHandlerTest {
 			ownerUserId
 		));
 
-		assertThatThrownBy(() -> handler.handle(new RevokeTripInviteCommand(tripId, inviteId, memberUserId)))
-			.isInstanceOfSatisfying(BusinessException.class, exception ->
-				assertThat(exception.errorCode()).isEqualTo(ErrorCode.FORBIDDEN)
-			);
+		assertThatThrownBy(() -> handler.handle(new UpdateTripCommand(
+			tripId,
+			memberUserId,
+			"제주 여행",
+			null,
+			null,
+			null
+		))).isInstanceOfSatisfying(BusinessException.class, exception ->
+			assertThat(exception.errorCode()).isEqualTo(ErrorCode.FORBIDDEN)
+		);
+	}
+
+	@Test
+	void patchCannotSetDeletedStatus() {
+		queryRepository.access = ownerAccess();
+
+		assertThatThrownBy(() -> handler.handle(new UpdateTripCommand(
+			tripId,
+			ownerUserId,
+			null,
+			null,
+			null,
+			TripStatus.DELETED
+		))).isInstanceOfSatisfying(BusinessException.class, exception ->
+			assertThat(exception.errorCode()).isEqualTo(ErrorCode.VALIDATION_FAILED)
+		);
+	}
+
+	private Optional<TripAccessSnapshot> ownerAccess() {
+		return Optional.of(new TripAccessSnapshot(
+			tripId,
+			ownerUserId,
+			TripStatus.ACTIVE,
+			TripMemberStatus.ACTIVE,
+			ownerUserId
+		));
+	}
+
+	private Instant now() {
+		return Instant.parse("2026-06-16T00:00:00Z");
 	}
 
 	private TimeProvider fixedTime() {
-		return () -> Instant.parse("2026-06-16T00:00:00Z");
+		return this::now;
 	}
 
 	private static class CapturingTripCommandRepository implements TripCommandRepository {
 
-		private UUID revokedInviteId;
-		private UUID revokedByUserId;
-		private Instant revokedAt;
+		private TripSettingsUpdate updated;
+		private List<String> replacedRegionCodes;
 
 		@Override
 		public void saveCreatedTrip(Trip trip, TripMember initialMember, List<String> legalRegionCodes) {
@@ -92,9 +167,6 @@ class RevokeTripInviteHandlerTest {
 
 		@Override
 		public void revokeTripInvite(UUID inviteId, UUID revokedByUserId, Instant revokedAt) {
-			this.revokedInviteId = inviteId;
-			this.revokedByUserId = revokedByUserId;
-			this.revokedAt = revokedAt;
 		}
 
 		@Override
@@ -107,10 +179,12 @@ class RevokeTripInviteHandlerTest {
 
 		@Override
 		public void updateTrip(TripSettingsUpdate update) {
+			this.updated = update;
 		}
 
 		@Override
 		public void replaceTripRegions(UUID tripId, List<String> legalRegionCodes, Instant createdAt) {
+			this.replacedRegionCodes = legalRegionCodes;
 		}
 
 		@Override

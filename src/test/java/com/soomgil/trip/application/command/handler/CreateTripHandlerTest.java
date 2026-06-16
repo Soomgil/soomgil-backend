@@ -8,13 +8,13 @@ import com.soomgil.global.error.BusinessException;
 import com.soomgil.trip.application.command.dto.CreateTripCommand;
 import com.soomgil.trip.application.command.dto.CreateTripResult;
 import com.soomgil.trip.application.port.TripCommandRepository;
+import com.soomgil.trip.application.port.TripSettingsUpdate;
 import com.soomgil.trip.domain.model.Trip;
 import com.soomgil.trip.domain.model.TripInvite;
 import com.soomgil.trip.domain.model.TripMember;
 import com.soomgil.trip.domain.model.TripMemberRole;
 import com.soomgil.trip.domain.model.TripMemberStatus;
 import com.soomgil.trip.domain.model.TripStatus;
-import java.time.Instant;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -114,6 +114,18 @@ class CreateTripHandlerTest {
 
 		@Override
 		public void acceptTripInvite(UUID inviteId, UUID acceptedByUserId, Instant acceptedAt) {
+		}
+
+		@Override
+		public void updateTrip(TripSettingsUpdate update) {
+		}
+
+		@Override
+		public void replaceTripRegions(UUID tripId, List<String> legalRegionCodes, Instant createdAt) {
+		}
+
+		@Override
+		public void softDeleteTrip(UUID tripId, Instant deletedAt) {
 		}
 	}
 }

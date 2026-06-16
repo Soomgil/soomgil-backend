@@ -9,7 +9,9 @@ import com.soomgil.trip.api.dto.TripDetail;
 import com.soomgil.trip.api.dto.TripStatus;
 import com.soomgil.trip.application.command.handler.CreateTripHandler;
 import com.soomgil.trip.application.command.handler.CreateTripInviteHandler;
+import com.soomgil.trip.application.command.handler.DeleteTripHandler;
 import com.soomgil.trip.application.command.handler.RevokeTripInviteHandler;
+import com.soomgil.trip.application.command.handler.UpdateTripHandler;
 import com.soomgil.trip.application.port.TripInviteCodeGenerator;
 import com.soomgil.trip.application.port.TripAccessSnapshot;
 import com.soomgil.trip.application.port.TripCommandRepository;
@@ -17,6 +19,7 @@ import com.soomgil.trip.application.port.TripInviteReadModel;
 import com.soomgil.trip.application.port.TripMemberReadModel;
 import com.soomgil.trip.application.port.TripQueryRepository;
 import com.soomgil.trip.application.port.TripReadModel;
+import com.soomgil.trip.application.port.TripSettingsUpdate;
 import com.soomgil.trip.application.port.TripSummaryPage;
 import com.soomgil.trip.application.query.handler.FindTripDetailHandler;
 import com.soomgil.trip.application.query.handler.ListTripInvitesHandler;
@@ -65,6 +68,8 @@ class TripControllerTest {
 			new CreateTripHandler(new NoopTripCommandRepository(), fixedTime()),
 			new CreateTripInviteHandler(new NoopTripCommandRepository(), queryRepository, fixedTime(), fixedCodeGenerator()),
 			new RevokeTripInviteHandler(new NoopTripCommandRepository(), queryRepository, fixedTime()),
+			new UpdateTripHandler(new NoopTripCommandRepository(), queryRepository, fixedTime()),
+			new DeleteTripHandler(new NoopTripCommandRepository(), queryRepository, fixedTime()),
 			new ListMyTripsHandler(queryRepository),
 			new FindTripDetailHandler(accessGuard, queryRepository),
 			new ListTripMembersHandler(accessGuard, queryRepository),
@@ -104,6 +109,18 @@ class TripControllerTest {
 
 		@Override
 		public void acceptTripInvite(UUID inviteId, UUID acceptedByUserId, Instant acceptedAt) {
+		}
+
+		@Override
+		public void updateTrip(TripSettingsUpdate update) {
+		}
+
+		@Override
+		public void replaceTripRegions(UUID tripId, List<String> legalRegionCodes, Instant createdAt) {
+		}
+
+		@Override
+		public void softDeleteTrip(UUID tripId, Instant deletedAt) {
 		}
 	}
 

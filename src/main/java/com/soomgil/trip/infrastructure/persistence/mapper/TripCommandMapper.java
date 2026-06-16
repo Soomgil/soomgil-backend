@@ -1,8 +1,9 @@
 package com.soomgil.trip.infrastructure.persistence.mapper;
 
+import com.soomgil.trip.application.port.TripSettingsUpdate;
+import com.soomgil.trip.infrastructure.persistence.row.TripInviteRow;
 import com.soomgil.trip.infrastructure.persistence.row.TripMemberRow;
 import com.soomgil.trip.infrastructure.persistence.row.TripRegionRow;
-import com.soomgil.trip.infrastructure.persistence.row.TripInviteRow;
 import com.soomgil.trip.infrastructure.persistence.row.TripRow;
 import java.time.Instant;
 import java.util.UUID;
@@ -65,4 +66,26 @@ public interface TripCommandMapper {
 		@Param("acceptedByUserId") UUID acceptedByUserId,
 		@Param("acceptedAt") Instant acceptedAt
 	);
+
+	/**
+	 * 여행방 기본 설정을 갱신한다.
+	 *
+	 * @param update 갱신할 설정 값
+	 */
+	void updateTrip(TripSettingsUpdate update);
+
+	/**
+	 * 여행방 법정동 code row를 모두 삭제한다.
+	 *
+	 * @param tripId 여행방 ID
+	 */
+	void deleteTripRegions(@Param("tripId") UUID tripId);
+
+	/**
+	 * 여행방을 soft delete 상태로 전환한다.
+	 *
+	 * @param tripId 여행방 ID
+	 * @param deletedAt 삭제 시각
+	 */
+	void softDeleteTrip(@Param("tripId") UUID tripId, @Param("deletedAt") Instant deletedAt);
 }

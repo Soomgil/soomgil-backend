@@ -1,6 +1,7 @@
 package com.soomgil.trip.infrastructure.persistence.repository;
 
 import com.soomgil.trip.application.port.TripCommandRepository;
+import com.soomgil.trip.application.port.TripSettingsUpdate;
 import com.soomgil.trip.domain.model.Trip;
 import com.soomgil.trip.domain.model.TripInvite;
 import com.soomgil.trip.domain.model.TripMember;
@@ -102,5 +103,24 @@ public class MyBatisTripCommandRepository implements TripCommandRepository {
 	@Override
 	public void acceptTripInvite(UUID inviteId, UUID acceptedByUserId, Instant acceptedAt) {
 		mapper.acceptTripInvite(inviteId, acceptedByUserId, acceptedAt);
+	}
+
+	@Override
+	public void updateTrip(TripSettingsUpdate update) {
+		mapper.updateTrip(update);
+	}
+
+	@Override
+	public void replaceTripRegions(UUID tripId, List<String> legalRegionCodes, Instant createdAt) {
+		mapper.deleteTripRegions(tripId);
+		int order = 0;
+		for (String legalRegionCode : new LinkedHashSet<>(legalRegionCodes)) {
+			mapper.insertTripRegion(new TripRegionRow(tripId, legalRegionCode, order++, createdAt));
+		}
+	}
+
+	@Override
+	public void softDeleteTrip(UUID tripId, Instant deletedAt) {
+		mapper.softDeleteTrip(tripId, deletedAt);
 	}
 }

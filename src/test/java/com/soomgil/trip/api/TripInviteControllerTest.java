@@ -13,6 +13,7 @@ import com.soomgil.trip.application.port.TripInviteReadModel;
 import com.soomgil.trip.application.port.TripMemberReadModel;
 import com.soomgil.trip.application.port.TripQueryRepository;
 import com.soomgil.trip.application.port.TripReadModel;
+import com.soomgil.trip.application.port.TripSettingsUpdate;
 import com.soomgil.trip.application.port.TripSummaryPage;
 import com.soomgil.trip.application.query.handler.FindTripDetailHandler;
 import com.soomgil.trip.application.query.handler.TripAccessGuard;
@@ -95,6 +96,18 @@ class TripInviteControllerTest {
 		@Override
 		public void acceptTripInvite(UUID inviteId, UUID acceptedByUserId, Instant acceptedAt) {
 			state.accepted = true;
+		}
+
+		@Override
+		public void updateTrip(TripSettingsUpdate update) {
+		}
+
+		@Override
+		public void replaceTripRegions(UUID tripId, List<String> legalRegionCodes, Instant createdAt) {
+		}
+
+		@Override
+		public void softDeleteTrip(UUID tripId, Instant deletedAt) {
 		}
 	}
 

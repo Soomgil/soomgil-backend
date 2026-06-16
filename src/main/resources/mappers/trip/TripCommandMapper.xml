@@ -119,4 +119,37 @@
     WHERE id = #{inviteId}
       AND status = 'PENDING'
   </update>
+
+  <update id="updateTrip" parameterType="com.soomgil.trip.application.port.TripSettingsUpdate">
+    UPDATE trip.trips
+    <set>
+      <if test="title != null">
+        title = #{title},
+      </if>
+      <if test="displayDestinationProvided">
+        display_destination = #{displayDestination},
+      </if>
+      <if test="status != null">
+        status = #{status},
+      </if>
+      updated_at = #{updatedAt}
+    </set>
+    WHERE id = #{tripId}
+      AND status != 'DELETED'
+  </update>
+
+  <delete id="deleteTripRegions">
+    DELETE FROM trip.trip_regions
+    WHERE trip_id = #{tripId}
+  </delete>
+
+  <update id="softDeleteTrip">
+    UPDATE trip.trips
+    SET
+      status = 'DELETED',
+      updated_at = #{deletedAt},
+      deleted_at = #{deletedAt}
+    WHERE id = #{tripId}
+      AND status != 'DELETED'
+  </update>
 </mapper>

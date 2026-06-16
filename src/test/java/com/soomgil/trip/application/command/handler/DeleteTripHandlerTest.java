@@ -6,7 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.soomgil.common.time.TimeProvider;
 import com.soomgil.global.error.BusinessException;
 import com.soomgil.global.error.ErrorCode;
-import com.soomgil.trip.application.command.dto.RevokeTripInviteCommand;
+import com.soomgil.trip.application.command.dto.DeleteTripCommand;
 import com.soomgil.trip.application.port.TripAccessSnapshot;
 import com.soomgil.trip.application.port.TripCommandRepository;
 import com.soomgil.trip.application.port.TripInviteReadModel;
@@ -25,21 +25,21 @@ import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
-class RevokeTripInviteHandlerTest {
+class DeleteTripHandlerTest {
 
 	private final UUID tripId = UUID.randomUUID();
-	private final UUID inviteId = UUID.randomUUID();
 	private final UUID ownerUserId = UUID.randomUUID();
+	private final UUID memberUserId = UUID.randomUUID();
 	private final CapturingTripCommandRepository commandRepository = new CapturingTripCommandRepository();
 	private final StubTripQueryRepository queryRepository = new StubTripQueryRepository();
-	private final RevokeTripInviteHandler handler = new RevokeTripInviteHandler(
+	private final DeleteTripHandler handler = new DeleteTripHandler(
 		commandRepository,
 		queryRepository,
 		fixedTime()
 	);
 
 	@Test
-	void ownerCanRevokeInvite() {
+	void ownerCanSoftDeleteTrip() {
 		queryRepository.access = Optional.of(new TripAccessSnapshot(
 			tripId,
 			ownerUserId,
@@ -48,16 +48,14 @@ class RevokeTripInviteHandlerTest {
 			ownerUserId
 		));
 
-		handler.handle(new RevokeTripInviteCommand(tripId, inviteId, ownerUserId));
+		handler.handle(new DeleteTripCommand(tripId, ownerUserId));
 
-		assertThat(commandRepository.revokedInviteId).isEqualTo(inviteId);
-		assertThat(commandRepository.revokedByUserId).isEqualTo(ownerUserId);
-		assertThat(commandRepository.revokedAt).isEqualTo(Instant.parse("2026-06-16T00:00:00Z"));
+		assertThat(commandRepository.deletedTripId).isEqualTo(tripId);
+		assertThat(commandRepository.deletedAt).isEqualTo(now());
 	}
 
 	@Test
-	void nonOwnerCannotRevokeInvite() {
-		UUID memberUserId = UUID.randomUUID();
+	void nonOwnerCannotSoftDeleteTrip() {
 		queryRepository.access = Optional.of(new TripAccessSnapshot(
 			tripId,
 			memberUserId,
@@ -66,21 +64,24 @@ class RevokeTripInviteHandlerTest {
 			ownerUserId
 		));
 
-		assertThatThrownBy(() -> handler.handle(new RevokeTripInviteCommand(tripId, inviteId, memberUserId)))
+		assertThatThrownBy(() -> handler.handle(new DeleteTripCommand(tripId, memberUserId)))
 			.isInstanceOfSatisfying(BusinessException.class, exception ->
 				assertThat(exception.errorCode()).isEqualTo(ErrorCode.FORBIDDEN)
 			);
 	}
 
+	private Instant now() {
+		return Instant.parse("2026-06-16T00:00:00Z");
+	}
+
 	private TimeProvider fixedTime() {
-		return () -> Instant.parse("2026-06-16T00:00:00Z");
+		return this::now;
 	}
 
 	private static class CapturingTripCommandRepository implements TripCommandRepository {
 
-		private UUID revokedInviteId;
-		private UUID revokedByUserId;
-		private Instant revokedAt;
+		private UUID deletedTripId;
+		private Instant deletedAt;
 
 		@Override
 		public void saveCreatedTrip(Trip trip, TripMember initialMember, List<String> legalRegionCodes) {
@@ -92,9 +93,6 @@ class RevokeTripInviteHandlerTest {
 
 		@Override
 		public void revokeTripInvite(UUID inviteId, UUID revokedByUserId, Instant revokedAt) {
-			this.revokedInviteId = inviteId;
-			this.revokedByUserId = revokedByUserId;
-			this.revokedAt = revokedAt;
 		}
 
 		@Override
@@ -115,6 +113,8 @@ class RevokeTripInviteHandlerTest {
 
 		@Override
 		public void softDeleteTrip(UUID tripId, Instant deletedAt) {
+			this.deletedTripId = tripId;
+			this.deletedAt = deletedAt;
 		}
 	}
 
