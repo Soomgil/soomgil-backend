@@ -10,6 +10,7 @@ import com.soomgil.trip.api.dto.TripStatus;
 import com.soomgil.trip.application.command.handler.CreateTripHandler;
 import com.soomgil.trip.application.command.handler.CreateTripInviteHandler;
 import com.soomgil.trip.application.command.handler.DeleteTripHandler;
+import com.soomgil.trip.application.command.handler.RemoveTripMemberHandler;
 import com.soomgil.trip.application.command.handler.RevokeTripInviteHandler;
 import com.soomgil.trip.application.command.handler.UpdateTripHandler;
 import com.soomgil.trip.application.port.TripInviteCodeGenerator;
@@ -70,6 +71,7 @@ class TripControllerTest {
 			new RevokeTripInviteHandler(new NoopTripCommandRepository(), queryRepository, fixedTime()),
 			new UpdateTripHandler(new NoopTripCommandRepository(), queryRepository, fixedTime()),
 			new DeleteTripHandler(new NoopTripCommandRepository(), queryRepository, fixedTime()),
+			new RemoveTripMemberHandler(new NoopTripCommandRepository(), queryRepository, fixedTime()),
 			new ListMyTripsHandler(queryRepository),
 			new FindTripDetailHandler(accessGuard, queryRepository),
 			new ListTripMembersHandler(accessGuard, queryRepository),
@@ -121,6 +123,10 @@ class TripControllerTest {
 
 		@Override
 		public void softDeleteTrip(UUID tripId, Instant deletedAt) {
+		}
+
+		@Override
+		public void removeTripMember(UUID tripId, UUID userId, UUID removedByUserId, Instant removedAt) {
 		}
 	}
 

@@ -116,6 +116,10 @@ class DeleteTripHandlerTest {
 			this.deletedTripId = tripId;
 			this.deletedAt = deletedAt;
 		}
+
+		@Override
+		public void removeTripMember(UUID tripId, UUID userId, UUID removedByUserId, Instant removedAt) {
+		}
 	}
 
 	private static class StubTripQueryRepository implements TripQueryRepository {

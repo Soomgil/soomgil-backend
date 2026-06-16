@@ -9,11 +9,13 @@ import com.soomgil.trip.application.command.dto.CreateTripResult;
 import com.soomgil.trip.application.command.dto.CreateTripInviteCommand;
 import com.soomgil.trip.application.command.dto.CreateTripInviteResult;
 import com.soomgil.trip.application.command.dto.DeleteTripCommand;
+import com.soomgil.trip.application.command.dto.RemoveTripMemberCommand;
 import com.soomgil.trip.application.command.dto.RevokeTripInviteCommand;
 import com.soomgil.trip.application.command.dto.UpdateTripCommand;
 import com.soomgil.trip.application.command.handler.CreateTripHandler;
 import com.soomgil.trip.application.command.handler.CreateTripInviteHandler;
 import com.soomgil.trip.application.command.handler.DeleteTripHandler;
+import com.soomgil.trip.application.command.handler.RemoveTripMemberHandler;
 import com.soomgil.trip.application.command.handler.RevokeTripInviteHandler;
 import com.soomgil.trip.application.command.handler.UpdateTripHandler;
 import com.soomgil.trip.application.query.dto.FindTripDetailQuery;
@@ -71,6 +73,7 @@ public class TripController extends ApiControllerSupport {
 	private final RevokeTripInviteHandler revokeTripInviteHandler;
 	private final UpdateTripHandler updateTripHandler;
 	private final DeleteTripHandler deleteTripHandler;
+	private final RemoveTripMemberHandler removeTripMemberHandler;
 	private final ListMyTripsHandler listMyTripsHandler;
 	private final FindTripDetailHandler findTripDetailHandler;
 	private final ListTripMembersHandler listTripMembersHandler;
@@ -82,6 +85,7 @@ public class TripController extends ApiControllerSupport {
 		RevokeTripInviteHandler revokeTripInviteHandler,
 		UpdateTripHandler updateTripHandler,
 		DeleteTripHandler deleteTripHandler,
+		RemoveTripMemberHandler removeTripMemberHandler,
 		ListMyTripsHandler listMyTripsHandler,
 		FindTripDetailHandler findTripDetailHandler,
 		ListTripMembersHandler listTripMembersHandler,
@@ -92,6 +96,7 @@ public class TripController extends ApiControllerSupport {
 		this.revokeTripInviteHandler = Objects.requireNonNull(revokeTripInviteHandler, "revokeTripInviteHandler must not be null");
 		this.updateTripHandler = Objects.requireNonNull(updateTripHandler, "updateTripHandler must not be null");
 		this.deleteTripHandler = Objects.requireNonNull(deleteTripHandler, "deleteTripHandler must not be null");
+		this.removeTripMemberHandler = Objects.requireNonNull(removeTripMemberHandler, "removeTripMemberHandler must not be null");
 		this.listMyTripsHandler = Objects.requireNonNull(listMyTripsHandler, "listMyTripsHandler must not be null");
 		this.findTripDetailHandler = Objects.requireNonNull(findTripDetailHandler, "findTripDetailHandler must not be null");
 		this.listTripMembersHandler = Objects.requireNonNull(listTripMembersHandler, "listTripMembersHandler must not be null");
@@ -179,10 +184,11 @@ public class TripController extends ApiControllerSupport {
 			.toList();
 	}
 
-	@DeleteMapping("/{tripId}/members/{memberId}")
+	@DeleteMapping("/{tripId}/members/{userId}")
 	@ResponseStatus(HttpStatus.NO_CONTENT)
-	public void removeTripMember(@PathVariable UUID tripId, @PathVariable UUID memberId) {
-		notImplemented();
+	public void removeTripMember(@PathVariable UUID tripId, @PathVariable UUID userId, Principal principal) {
+		UUID currentUserId = currentUserId(principal);
+		removeTripMemberHandler.handle(new RemoveTripMemberCommand(tripId, userId, currentUserId));
 	}
 
 	@GetMapping("/{tripId}/invites")

@@ -116,6 +116,10 @@ class RevokeTripInviteHandlerTest {
 		@Override
 		public void softDeleteTrip(UUID tripId, Instant deletedAt) {
 		}
+
+		@Override
+		public void removeTripMember(UUID tripId, UUID userId, UUID removedByUserId, Instant removedAt) {
+		}
 	}
 
 	private static class StubTripQueryRepository implements TripQueryRepository {

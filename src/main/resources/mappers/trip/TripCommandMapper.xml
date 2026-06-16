@@ -152,4 +152,15 @@
     WHERE id = #{tripId}
       AND status != 'DELETED'
   </update>
+
+  <update id="removeTripMember">
+    UPDATE trip.trip_members
+    SET
+      status = 'REMOVED',
+      left_at = #{removedAt},
+      removed_by_user_id = #{removedByUserId}
+    WHERE trip_id = #{tripId}
+      AND user_id = #{userId}
+      AND status = 'ACTIVE'
+  </update>
 </mapper>

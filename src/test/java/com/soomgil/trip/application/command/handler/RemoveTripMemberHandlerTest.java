@@ -6,11 +6,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.soomgil.common.time.TimeProvider;
 import com.soomgil.global.error.BusinessException;
 import com.soomgil.global.error.ErrorCode;
-import com.soomgil.trip.application.command.dto.CreateTripInviteCommand;
-import com.soomgil.trip.application.command.dto.CreateTripInviteResult;
+import com.soomgil.trip.application.command.dto.RemoveTripMemberCommand;
 import com.soomgil.trip.application.port.TripAccessSnapshot;
 import com.soomgil.trip.application.port.TripCommandRepository;
-import com.soomgil.trip.application.port.TripInviteCodeGenerator;
 import com.soomgil.trip.application.port.TripInviteReadModel;
 import com.soomgil.trip.application.port.TripQueryRepository;
 import com.soomgil.trip.application.port.TripSettingsUpdate;
@@ -27,65 +25,89 @@ import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
-class CreateTripInviteHandlerTest {
+class RemoveTripMemberHandlerTest {
 
 	private final UUID tripId = UUID.randomUUID();
 	private final UUID ownerUserId = UUID.randomUUID();
-	private final UUID inviteeUserId = UUID.randomUUID();
+	private final UUID memberUserId = UUID.randomUUID();
 	private final CapturingTripCommandRepository commandRepository = new CapturingTripCommandRepository();
 	private final StubTripQueryRepository queryRepository = new StubTripQueryRepository();
-	private final CreateTripInviteHandler handler = new CreateTripInviteHandler(
+	private final RemoveTripMemberHandler handler = new RemoveTripMemberHandler(
 		commandRepository,
 		queryRepository,
-		fixedTime(),
-		fixedCodeGenerator()
+		fixedTime()
 	);
 
 	@Test
-	void ownerCanCreatePendingInvite() {
-		queryRepository.access = Optional.of(new TripAccessSnapshot(
+	void ownerCanRemoveActiveMember() {
+		queryRepository.ownerAccess = ownerAccess();
+		queryRepository.targetAccess = Optional.of(new TripAccessSnapshot(
 			tripId,
-			ownerUserId,
+			memberUserId,
 			TripStatus.ACTIVE,
 			TripMemberStatus.ACTIVE,
 			ownerUserId
 		));
 
-		CreateTripInviteResult result = handler.handle(new CreateTripInviteCommand(
-			tripId,
-			ownerUserId,
-			inviteeUserId,
-			null
-		));
+		handler.handle(new RemoveTripMemberCommand(tripId, memberUserId, ownerUserId));
 
-		assertThat(result.tripId()).isEqualTo(tripId);
-		assertThat(result.inviteeUserId()).isEqualTo(inviteeUserId);
-		assertThat(result.inviteCode()).isEqualTo("ABCD1234");
-		assertThat(result.status()).isEqualTo(InviteStatus.PENDING);
-		assertThat(result.createdAt()).isEqualTo(now());
-		assertThat(result.expiresAt()).isNull();
-		assertThat(commandRepository.savedInvite.createdByUserId()).isEqualTo(ownerUserId);
-		assertThat(commandRepository.savedInvite.inviteTokenHash()).isNotBlank();
+		assertThat(commandRepository.removedTripId).isEqualTo(tripId);
+		assertThat(commandRepository.removedUserId).isEqualTo(memberUserId);
+		assertThat(commandRepository.removedByUserId).isEqualTo(ownerUserId);
+		assertThat(commandRepository.removedAt).isEqualTo(now());
 	}
 
 	@Test
-	void nonOwnerCannotCreateInvite() {
-		queryRepository.access = Optional.of(new TripAccessSnapshot(
+	void nonOwnerCannotRemoveMember() {
+		queryRepository.targetAccess = Optional.of(new TripAccessSnapshot(
 			tripId,
-			inviteeUserId,
+			memberUserId,
 			TripStatus.ACTIVE,
 			TripMemberStatus.ACTIVE,
 			ownerUserId
 		));
 
-		assertThatThrownBy(() -> handler.handle(new CreateTripInviteCommand(
+		assertThatThrownBy(() -> handler.handle(new RemoveTripMemberCommand(tripId, ownerUserId, memberUserId)))
+			.isInstanceOfSatisfying(BusinessException.class, exception ->
+				assertThat(exception.errorCode()).isEqualTo(ErrorCode.FORBIDDEN)
+			);
+	}
+
+	@Test
+	void ownerCannotRemoveSelf() {
+		queryRepository.ownerAccess = ownerAccess();
+
+		assertThatThrownBy(() -> handler.handle(new RemoveTripMemberCommand(tripId, ownerUserId, ownerUserId)))
+			.isInstanceOfSatisfying(BusinessException.class, exception ->
+				assertThat(exception.errorCode()).isEqualTo(ErrorCode.BUSINESS_RULE_VIOLATION)
+			);
+	}
+
+	@Test
+	void cannotRemoveInactiveMember() {
+		queryRepository.ownerAccess = ownerAccess();
+		queryRepository.targetAccess = Optional.of(new TripAccessSnapshot(
 			tripId,
-			inviteeUserId,
-			null,
-			null
-		))).isInstanceOfSatisfying(BusinessException.class, exception ->
-			assertThat(exception.errorCode()).isEqualTo(ErrorCode.FORBIDDEN)
-		);
+			memberUserId,
+			TripStatus.ACTIVE,
+			TripMemberStatus.REMOVED,
+			ownerUserId
+		));
+
+		assertThatThrownBy(() -> handler.handle(new RemoveTripMemberCommand(tripId, memberUserId, ownerUserId)))
+			.isInstanceOfSatisfying(BusinessException.class, exception ->
+				assertThat(exception.errorCode()).isEqualTo(ErrorCode.RESOURCE_NOT_FOUND)
+			);
+	}
+
+	private Optional<TripAccessSnapshot> ownerAccess() {
+		return Optional.of(new TripAccessSnapshot(
+			tripId,
+			ownerUserId,
+			TripStatus.ACTIVE,
+			TripMemberStatus.ACTIVE,
+			ownerUserId
+		));
 	}
 
 	private Instant now() {
@@ -96,13 +118,12 @@ class CreateTripInviteHandlerTest {
 		return this::now;
 	}
 
-	private TripInviteCodeGenerator fixedCodeGenerator() {
-		return () -> "ABCD1234";
-	}
+	private class CapturingTripCommandRepository implements TripCommandRepository {
 
-	private static class CapturingTripCommandRepository implements TripCommandRepository {
-
-		private TripInvite savedInvite;
+		private UUID removedTripId;
+		private UUID removedUserId;
+		private UUID removedByUserId;
+		private Instant removedAt;
 
 		@Override
 		public void saveCreatedTrip(Trip trip, TripMember initialMember, List<String> legalRegionCodes) {
@@ -110,7 +131,6 @@ class CreateTripInviteHandlerTest {
 
 		@Override
 		public void saveTripInvite(TripInvite invite) {
-			this.savedInvite = invite;
 		}
 
 		@Override
@@ -139,16 +159,21 @@ class CreateTripInviteHandlerTest {
 
 		@Override
 		public void removeTripMember(UUID tripId, UUID userId, UUID removedByUserId, Instant removedAt) {
+			this.removedTripId = tripId;
+			this.removedUserId = userId;
+			this.removedByUserId = removedByUserId;
+			this.removedAt = removedAt;
 		}
 	}
 
-	private static class StubTripQueryRepository implements TripQueryRepository {
+	private class StubTripQueryRepository implements TripQueryRepository {
 
-		private Optional<TripAccessSnapshot> access = Optional.empty();
+		private Optional<TripAccessSnapshot> ownerAccess = Optional.empty();
+		private Optional<TripAccessSnapshot> targetAccess = Optional.empty();
 
 		@Override
 		public Optional<TripAccessSnapshot> findTripAccess(UUID tripId, UUID userId) {
-			return access;
+			return userId.equals(ownerUserId) ? ownerAccess : targetAccess;
 		}
 
 		@Override

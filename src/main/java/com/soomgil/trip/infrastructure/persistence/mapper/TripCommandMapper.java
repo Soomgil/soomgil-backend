@@ -88,4 +88,19 @@ public interface TripCommandMapper {
 	 * @param deletedAt 삭제 시각
 	 */
 	void softDeleteTrip(@Param("tripId") UUID tripId, @Param("deletedAt") Instant deletedAt);
+
+	/**
+	 * active 멤버를 제거 상태로 전환한다.
+	 *
+	 * @param tripId 여행방 ID
+	 * @param userId 제거할 사용자 ID
+	 * @param removedByUserId 제거한 owner 사용자 ID
+	 * @param removedAt 제거 시각
+	 */
+	void removeTripMember(
+		@Param("tripId") UUID tripId,
+		@Param("userId") UUID userId,
+		@Param("removedByUserId") UUID removedByUserId,
+		@Param("removedAt") Instant removedAt
+	);
 }

@@ -123,4 +123,9 @@ public class MyBatisTripCommandRepository implements TripCommandRepository {
 	public void softDeleteTrip(UUID tripId, Instant deletedAt) {
 		mapper.softDeleteTrip(tripId, deletedAt);
 	}
+
+	@Override
+	public void removeTripMember(UUID tripId, UUID userId, UUID removedByUserId, Instant removedAt) {
+		mapper.removeTripMember(tripId, userId, removedByUserId, removedAt);
+	}
 }
