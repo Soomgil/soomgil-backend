@@ -109,4 +109,14 @@
     WHERE id = #{inviteId}
       AND status = 'PENDING'
   </update>
+
+  <update id="acceptTripInvite">
+    UPDATE trip.trip_invites
+    SET
+      status = 'ACCEPTED',
+      accepted_by_user_id = #{acceptedByUserId},
+      accepted_at = #{acceptedAt}
+    WHERE id = #{inviteId}
+      AND status = 'PENDING'
+  </update>
 </mapper>

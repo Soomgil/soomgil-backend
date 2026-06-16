@@ -38,4 +38,20 @@ public interface TripCommandRepository {
 	 * @param revokedAt 취소 시각
 	 */
 	void revokeTripInvite(UUID inviteId, UUID revokedByUserId, Instant revokedAt);
+
+	/**
+	 * 여행방 멤버십을 추가한다.
+	 *
+	 * @param member 추가할 active member
+	 */
+	void addTripMember(TripMember member);
+
+	/**
+	 * 초대를 수락 상태로 전환한다.
+	 *
+	 * @param inviteId 초대 ID
+	 * @param acceptedByUserId 수락한 사용자 ID
+	 * @param acceptedAt 수락 시각
+	 */
+	void acceptTripInvite(UUID inviteId, UUID acceptedByUserId, Instant acceptedAt);
 }

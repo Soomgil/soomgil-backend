@@ -119,4 +119,22 @@
     </if>
     ORDER BY created_at DESC, id DESC
   </select>
+
+  <select id="findTripInviteForAccept" resultType="com.soomgil.trip.infrastructure.persistence.row.TripInviteAcceptRow">
+    SELECT
+      i.id,
+      i.trip_id,
+      i.invite_code,
+      i.invitee_user_id,
+      i.status,
+      i.expires_at,
+      t.owner_user_id,
+      t.status AS trip_status
+    FROM trip.trip_invites i
+    JOIN trip.trips t
+      ON t.id = i.trip_id
+    WHERE i.invite_code = #{inviteCode}
+    ORDER BY i.created_at DESC, i.id DESC
+    LIMIT 1
+  </select>
 </mapper>

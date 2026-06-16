@@ -97,6 +97,14 @@ class TripControllerTest {
 		@Override
 		public void revokeTripInvite(UUID inviteId, UUID revokedByUserId, Instant revokedAt) {
 		}
+
+		@Override
+		public void addTripMember(TripMember member) {
+		}
+
+		@Override
+		public void acceptTripInvite(UUID inviteId, UUID acceptedByUserId, Instant acceptedAt) {
+		}
 	}
 
 	private static class EmptyTripQueryRepository implements TripQueryRepository {
@@ -131,6 +139,13 @@ class TripControllerTest {
 		@Override
 		public List<TripInviteReadModel> findTripInvites(UUID tripId, InviteStatus status) {
 			return List.of();
+		}
+
+		@Override
+		public Optional<com.soomgil.trip.application.port.TripInviteAcceptReadModel> findTripInviteForAccept(
+			String inviteCode
+		) {
+			return Optional.empty();
 		}
 	}
 }

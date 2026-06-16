@@ -2,6 +2,7 @@ package com.soomgil.trip.infrastructure.persistence.repository;
 
 import com.soomgil.trip.application.port.TripAccessSnapshot;
 import com.soomgil.trip.application.port.TripInviteReadModel;
+import com.soomgil.trip.application.port.TripInviteAcceptReadModel;
 import com.soomgil.trip.application.port.TripMemberReadModel;
 import com.soomgil.trip.application.port.TripQueryRepository;
 import com.soomgil.trip.application.port.TripReadModel;
@@ -14,6 +15,7 @@ import com.soomgil.trip.domain.model.TripStatus;
 import com.soomgil.trip.infrastructure.persistence.mapper.TripQueryMapper;
 import com.soomgil.trip.infrastructure.persistence.row.TripAccessRow;
 import com.soomgil.trip.infrastructure.persistence.row.TripInviteRow;
+import com.soomgil.trip.infrastructure.persistence.row.TripInviteAcceptRow;
 import com.soomgil.trip.infrastructure.persistence.row.TripMemberReadRow;
 import com.soomgil.trip.infrastructure.persistence.row.TripRow;
 import java.util.List;
@@ -97,6 +99,12 @@ public class MyBatisTripQueryRepository implements TripQueryRepository {
 			.toList();
 	}
 
+	@Override
+	public Optional<TripInviteAcceptReadModel> findTripInviteForAccept(String inviteCode) {
+		return Optional.ofNullable(mapper.findTripInviteForAccept(inviteCode))
+			.map(this::toTripInviteAcceptReadModel);
+	}
+
 	private TripReadModel toTripReadModel(TripRow row) {
 		return new TripReadModel(
 			row.id(),
@@ -131,6 +139,19 @@ public class MyBatisTripQueryRepository implements TripQueryRepository {
 			InviteStatus.valueOf(row.status()),
 			row.expiresAt(),
 			row.createdAt()
+		);
+	}
+
+	private TripInviteAcceptReadModel toTripInviteAcceptReadModel(TripInviteAcceptRow row) {
+		return new TripInviteAcceptReadModel(
+			row.id(),
+			row.tripId(),
+			row.inviteCode(),
+			row.inviteeUserId(),
+			InviteStatus.valueOf(row.status()),
+			row.expiresAt(),
+			row.ownerUserId(),
+			TripStatus.valueOf(row.tripStatus())
 		);
 	}
 }

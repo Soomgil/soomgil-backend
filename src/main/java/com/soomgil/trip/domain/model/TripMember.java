@@ -38,10 +38,23 @@ public record TripMember(
 	 * @return MEMBER role과 ACTIVE 상태의 멤버십
 	 */
 	public static TripMember initialOwnerMember(UUID id, UUID tripId, UUID creatorUserId, Instant joinedAt) {
+		return activeMember(id, tripId, creatorUserId, joinedAt);
+	}
+
+	/**
+	 * 일반 사용자를 active member로 등록하는 멤버십을 만든다.
+	 *
+	 * @param id 멤버십 ID
+	 * @param tripId 여행방 ID
+	 * @param userId 사용자 ID
+	 * @param joinedAt 가입 시각
+	 * @return MEMBER role과 ACTIVE 상태의 멤버십
+	 */
+	public static TripMember activeMember(UUID id, UUID tripId, UUID userId, Instant joinedAt) {
 		return new TripMember(
 			id,
 			tripId,
-			creatorUserId,
+			userId,
 			TripMemberRole.MEMBER,
 			TripMemberStatus.ACTIVE,
 			joinedAt

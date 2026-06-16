@@ -107,5 +107,13 @@ class CreateTripHandlerTest {
 		@Override
 		public void revokeTripInvite(UUID inviteId, UUID revokedByUserId, Instant revokedAt) {
 		}
+
+		@Override
+		public void addTripMember(TripMember member) {
+		}
+
+		@Override
+		public void acceptTripInvite(UUID inviteId, UUID acceptedByUserId, Instant acceptedAt) {
+		}
 	}
 }

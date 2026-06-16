@@ -113,5 +113,12 @@ class ListTripInvitesHandlerTest {
 		public List<TripInviteReadModel> findTripInvites(UUID tripId, InviteStatus status) {
 			return invites;
 		}
+
+		@Override
+		public Optional<com.soomgil.trip.application.port.TripInviteAcceptReadModel> findTripInviteForAccept(
+			String inviteCode
+		) {
+			return Optional.empty();
+		}
 	}
 }

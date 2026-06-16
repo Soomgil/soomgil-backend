@@ -2,6 +2,7 @@ package com.soomgil.trip.infrastructure.persistence.mapper;
 
 import com.soomgil.trip.infrastructure.persistence.row.TripAccessRow;
 import com.soomgil.trip.infrastructure.persistence.row.TripInviteRow;
+import com.soomgil.trip.infrastructure.persistence.row.TripInviteAcceptRow;
 import com.soomgil.trip.infrastructure.persistence.row.TripMemberReadRow;
 import com.soomgil.trip.infrastructure.persistence.row.TripRow;
 import java.util.List;
@@ -79,4 +80,12 @@ public interface TripQueryMapper {
 	 * @return 초대 목록
 	 */
 	List<TripInviteRow> findTripInvites(@Param("tripId") UUID tripId, @Param("status") String status);
+
+	/**
+	 * 초대 수락 검증에 필요한 초대와 여행방 상태를 조회한다.
+	 *
+	 * @param inviteCode 초대 code
+	 * @return 초대가 없으면 null
+	 */
+	TripInviteAcceptRow findTripInviteForAccept(@Param("inviteCode") String inviteCode);
 }

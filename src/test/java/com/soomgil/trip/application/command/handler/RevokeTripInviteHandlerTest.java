@@ -95,6 +95,14 @@ class RevokeTripInviteHandlerTest {
 			this.revokedByUserId = revokedByUserId;
 			this.revokedAt = revokedAt;
 		}
+
+		@Override
+		public void addTripMember(TripMember member) {
+		}
+
+		@Override
+		public void acceptTripInvite(UUID inviteId, UUID acceptedByUserId, Instant acceptedAt) {
+		}
 	}
 
 	private static class StubTripQueryRepository implements TripQueryRepository {
@@ -134,6 +142,13 @@ class RevokeTripInviteHandlerTest {
 		@Override
 		public List<TripInviteReadModel> findTripInvites(UUID tripId, InviteStatus status) {
 			return List.of();
+		}
+
+		@Override
+		public Optional<com.soomgil.trip.application.port.TripInviteAcceptReadModel> findTripInviteForAccept(
+			String inviteCode
+		) {
+			return Optional.empty();
 		}
 	}
 }

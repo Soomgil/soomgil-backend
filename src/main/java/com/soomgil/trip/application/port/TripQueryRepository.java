@@ -70,4 +70,12 @@ public interface TripQueryRepository {
 	 * @return 초대 목록
 	 */
 	List<TripInviteReadModel> findTripInvites(UUID tripId, InviteStatus status);
+
+	/**
+	 * 초대 수락에 필요한 초대와 여행방 상태를 조회한다.
+	 *
+	 * @param inviteCode 초대 code
+	 * @return 수락 검증용 read model
+	 */
+	Optional<TripInviteAcceptReadModel> findTripInviteForAccept(String inviteCode);
 }
