@@ -1,5 +1,9 @@
 package com.soomgil.trip.application.port;
 
+import com.soomgil.trip.domain.model.TripAccessRole;
+import com.soomgil.trip.domain.model.TripMemberStatus;
+import com.soomgil.trip.domain.model.TripStatus;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -19,4 +23,41 @@ public interface TripQueryRepository {
 	 * @return 여행방이 존재하면 snapshot, 없으면 empty
 	 */
 	Optional<TripAccessSnapshot> findTripAccess(UUID tripId, UUID userId);
+
+	/**
+	 * 여행방 상세 조회에 필요한 기본 정보를 조회한다.
+	 *
+	 * @param tripId 여행방 ID
+	 * @return 여행방이 존재하면 read model
+	 */
+	Optional<TripReadModel> findTrip(UUID tripId);
+
+	/**
+	 * 여행방 멤버 목록을 조회한다.
+	 *
+	 * @param tripId 여행방 ID
+	 * @param status 선택적 멤버 상태 필터
+	 * @return 멤버 목록
+	 */
+	List<TripMemberReadModel> findTripMembers(UUID tripId, TripMemberStatus status);
+
+	/**
+	 * 현재 사용자가 active member인 여행방 목록을 조회한다.
+	 *
+	 * @param userId 현재 사용자 ID
+	 * @param status 선택적 여행방 상태 필터
+	 * @param role 선택적 파생 access role 필터
+	 * @param page 0 기반 page
+	 * @param size page 크기
+	 * @param sort 정렬 문자열 목록
+	 * @return page 목록과 전체 개수
+	 */
+	TripSummaryPage findMyTrips(
+		UUID userId,
+		TripStatus status,
+		TripAccessRole role,
+		int page,
+		int size,
+		List<String> sort
+	);
 }

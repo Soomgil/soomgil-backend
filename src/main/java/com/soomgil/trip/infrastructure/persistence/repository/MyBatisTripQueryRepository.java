@@ -1,11 +1,19 @@
 package com.soomgil.trip.infrastructure.persistence.repository;
 
 import com.soomgil.trip.application.port.TripAccessSnapshot;
+import com.soomgil.trip.application.port.TripMemberReadModel;
 import com.soomgil.trip.application.port.TripQueryRepository;
+import com.soomgil.trip.application.port.TripReadModel;
+import com.soomgil.trip.application.port.TripSummaryPage;
+import com.soomgil.trip.domain.model.TripAccessRole;
+import com.soomgil.trip.domain.model.TripMemberRole;
 import com.soomgil.trip.domain.model.TripMemberStatus;
 import com.soomgil.trip.domain.model.TripStatus;
 import com.soomgil.trip.infrastructure.persistence.mapper.TripQueryMapper;
 import com.soomgil.trip.infrastructure.persistence.row.TripAccessRow;
+import com.soomgil.trip.infrastructure.persistence.row.TripMemberReadRow;
+import com.soomgil.trip.infrastructure.persistence.row.TripRow;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -41,5 +49,64 @@ public class MyBatisTripQueryRepository implements TripQueryRepository {
 			memberStatus,
 			row.ownerUserId()
 		));
+	}
+
+	@Override
+	public Optional<TripReadModel> findTrip(UUID tripId) {
+		return Optional.ofNullable(mapper.findTrip(tripId)).map(this::toTripReadModel);
+	}
+
+	@Override
+	public List<TripMemberReadModel> findTripMembers(UUID tripId, TripMemberStatus status) {
+		String statusValue = status == null ? null : status.name();
+		return mapper.findTripMembers(tripId, statusValue)
+			.stream()
+			.map(this::toTripMemberReadModel)
+			.toList();
+	}
+
+	@Override
+	public TripSummaryPage findMyTrips(
+		UUID userId,
+		TripStatus status,
+		TripAccessRole role,
+		int page,
+		int size,
+		List<String> sort
+	) {
+		String statusValue = status == null ? null : status.name();
+		String roleValue = role == null ? null : role.name();
+		int offset = page * size;
+		List<TripReadModel> items = mapper.findMyTrips(userId, statusValue, roleValue, size, offset)
+			.stream()
+			.map(this::toTripReadModel)
+			.toList();
+		long totalElements = mapper.countMyTrips(userId, statusValue, roleValue);
+		return new TripSummaryPage(items, totalElements);
+	}
+
+	private TripReadModel toTripReadModel(TripRow row) {
+		return new TripReadModel(
+			row.id(),
+			row.ownerUserId(),
+			row.title(),
+			row.displayDestination(),
+			TripStatus.valueOf(row.status()),
+			row.itineraryVersion(),
+			row.createdAt(),
+			row.retrippedFromPostId()
+		);
+	}
+
+	private TripMemberReadModel toTripMemberReadModel(TripMemberReadRow row) {
+		return new TripMemberReadModel(
+			row.id(),
+			row.tripId(),
+			row.userId(),
+			TripMemberRole.valueOf(row.role()),
+			TripMemberStatus.valueOf(row.status()),
+			row.joinedAt(),
+			row.ownerUserId()
+		);
 	}
 }

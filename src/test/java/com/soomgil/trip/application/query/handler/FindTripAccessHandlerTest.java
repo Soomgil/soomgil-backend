@@ -3,13 +3,17 @@ package com.soomgil.trip.application.query.handler;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.soomgil.trip.application.port.TripAccessSnapshot;
+import com.soomgil.trip.application.port.TripMemberReadModel;
 import com.soomgil.trip.application.port.TripQueryRepository;
+import com.soomgil.trip.application.port.TripReadModel;
+import com.soomgil.trip.application.port.TripSummaryPage;
 import com.soomgil.trip.application.query.dto.FindTripAccessQuery;
 import com.soomgil.trip.application.query.dto.TripAccessView;
 import com.soomgil.trip.domain.model.TripAccessRole;
 import com.soomgil.trip.domain.model.TripMemberStatus;
 import com.soomgil.trip.domain.model.TripStatus;
 import java.util.Optional;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
@@ -108,6 +112,28 @@ class FindTripAccessHandlerTest {
 		@Override
 		public Optional<TripAccessSnapshot> findTripAccess(UUID tripId, UUID userId) {
 			return snapshot;
+		}
+
+		@Override
+		public Optional<TripReadModel> findTrip(UUID tripId) {
+			return Optional.empty();
+		}
+
+		@Override
+		public List<TripMemberReadModel> findTripMembers(UUID tripId, TripMemberStatus status) {
+			return List.of();
+		}
+
+		@Override
+		public TripSummaryPage findMyTrips(
+			UUID userId,
+			TripStatus status,
+			TripAccessRole role,
+			int page,
+			int size,
+			List<String> sort
+		) {
+			return new TripSummaryPage(List.of(), 0);
 		}
 	}
 }
