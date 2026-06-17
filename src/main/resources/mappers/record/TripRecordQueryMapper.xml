@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.soomgil.record.infrastructure.persistence.mapper.TripRecordQueryMapper">
+  <sql id="entryColumns">
+    e.id,
+    e.trip_id,
+    t.title AS trip_title,
+    e.itinerary_day_id,
+    e.itinerary_item_id,
+    e.uploaded_by_user_id,
+    e.title,
+    e.caption,
+    e.location_name,
+    e.lat,
+    e.lng,
+    e.taken_at,
+    e.visibility,
+    e.status,
+    e.created_at
+  </sql>
+
+  <select id="findEntries" resultType="com.soomgil.record.application.port.TripRecordEntryReadModel">
+    SELECT
+      <include refid="entryColumns" />
+    FROM record.trip_record_entries e
+    JOIN trip.trips t ON t.id = e.trip_id
+    WHERE e.trip_id = #{tripId}
+      AND e.status = 'ACTIVE'
+    ORDER BY e.taken_at DESC NULLS LAST, e.created_at DESC, e.id DESC
+    LIMIT #{limit}
+    OFFSET #{offset}
+  </select>
+
+  <select id="countEntries" resultType="long">
+    SELECT count(*)
+    FROM record.trip_record_entries
+    WHERE trip_id = #{tripId}
+      AND status = 'ACTIVE'
+  </select>
+
+  <select id="findEntry" resultType="com.soomgil.record.application.port.TripRecordEntryReadModel">
+    SELECT
+      <include refid="entryColumns" />
+    FROM record.trip_record_entries e
+    JOIN trip.trips t ON t.id = e.trip_id
+    WHERE e.trip_id = #{tripId}
+      AND e.id = #{recordId}
+      AND e.status = 'ACTIVE'
+  </select>
+
+  <select id="findMedia" resultType="com.soomgil.record.application.port.TripRecordMediaReadModel">
+    SELECT
+      rm.record_entry_id,
+      m.id AS media_file_id,
+      m.public_url,
+      m.mime_type,
+      m.byte_size,
+      m.width,
+      m.height,
+      m.status,
+      m.created_at,
+      rm.sort_order
+    FROM record.trip_record_media rm
+    JOIN media.media_files m ON m.id = rm.media_file_id
+    WHERE rm.record_entry_id = #{recordId}
+      AND m.status = 'ACTIVE'
+    ORDER BY rm.sort_order ASC, rm.created_at ASC
+  </select>
+
+  <select id="findPhotos" resultType="com.soomgil.record.application.port.TripRecordPhotoReadModel">
+    SELECT
+      e.trip_id,
+      t.title AS trip_title,
+      e.id AS record_id,
+      e.itinerary_day_id,
+      e.itinerary_item_id,
+      e.uploaded_by_user_id,
+      m.id AS media_file_id,
+      m.public_url,
+      m.mime_type,
+      m.byte_size,
+      m.width,
+      m.height,
+      m.status AS media_status,
+      m.created_at AS media_created_at,
+      e.taken_at,
+      e.created_at
+    FROM record.trip_record_entries e
+    JOIN trip.trips t ON t.id = e.trip_id
+    JOIN record.trip_record_media rm ON rm.record_entry_id = e.id
+    JOIN media.media_files m ON m.id = rm.media_file_id
+    WHERE e.trip_id = #{tripId}
+      AND e.status = 'ACTIVE'
+      AND m.status = 'ACTIVE'
+      AND m.mime_type LIKE 'image/%'
+    ORDER BY e.taken_at DESC NULLS LAST, e.created_at DESC, rm.sort_order ASC
+    LIMIT #{limit}
+    OFFSET #{offset}
+  </select>
+
+  <select id="countPhotos" resultType="long">
+    SELECT count(*)
+    FROM record.trip_record_entries e
+    JOIN record.trip_record_media rm ON rm.record_entry_id = e.id
+    JOIN media.media_files m ON m.id = rm.media_file_id
+    WHERE e.trip_id = #{tripId}
+      AND e.status = 'ACTIVE'
+      AND m.status = 'ACTIVE'
+      AND m.mime_type LIKE 'image/%'
+  </select>
+</mapper>
