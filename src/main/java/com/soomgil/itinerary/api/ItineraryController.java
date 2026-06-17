@@ -21,14 +21,17 @@ import com.soomgil.itinerary.api.dto.UpdateMapDrawingRequest;
 import com.soomgil.itinerary.api.dto.UpdateRouteRequest;
 import com.soomgil.itinerary.application.command.dto.CreateItineraryDayCommand;
 import com.soomgil.itinerary.application.command.dto.CreateItineraryItemCommand;
+import com.soomgil.itinerary.application.command.dto.CreateMapDrawingCommand;
 import com.soomgil.itinerary.application.command.dto.ItineraryDayOrderCommand;
 import com.soomgil.itinerary.application.command.dto.ItineraryItemOrderCommand;
 import com.soomgil.itinerary.application.command.dto.ItineraryDayView;
 import com.soomgil.itinerary.application.command.dto.ItineraryItemView;
 import com.soomgil.itinerary.application.command.dto.ItineraryMutationResult;
+import com.soomgil.itinerary.application.command.dto.MapDrawingView;
 import com.soomgil.itinerary.application.command.dto.ReorderItineraryCommand;
 import com.soomgil.itinerary.application.command.handler.CreateItineraryDayHandler;
 import com.soomgil.itinerary.application.command.handler.CreateItineraryItemHandler;
+import com.soomgil.itinerary.application.command.handler.CreateMapDrawingHandler;
 import com.soomgil.itinerary.application.command.handler.ReorderItineraryHandler;
 import com.soomgil.place.api.dto.PlaceProvider;
 import com.soomgil.place.api.dto.PlaceRef;
@@ -59,11 +62,13 @@ public class ItineraryController extends ApiControllerSupport {
 	private final CreateItineraryDayHandler createItineraryDayHandler;
 	private final CreateItineraryItemHandler createItineraryItemHandler;
 	private final ReorderItineraryHandler reorderItineraryHandler;
+	private final CreateMapDrawingHandler createMapDrawingHandler;
 
 	public ItineraryController(
 		CreateItineraryDayHandler createItineraryDayHandler,
 		CreateItineraryItemHandler createItineraryItemHandler,
-		ReorderItineraryHandler reorderItineraryHandler
+		ReorderItineraryHandler reorderItineraryHandler,
+		CreateMapDrawingHandler createMapDrawingHandler
 	) {
 		this.createItineraryDayHandler = Objects.requireNonNull(
 			createItineraryDayHandler,
@@ -76,6 +81,10 @@ public class ItineraryController extends ApiControllerSupport {
 		this.reorderItineraryHandler = Objects.requireNonNull(
 			reorderItineraryHandler,
 			"reorderItineraryHandler must not be null"
+		);
+		this.createMapDrawingHandler = Objects.requireNonNull(
+			createMapDrawingHandler,
+			"createMapDrawingHandler must not be null"
 		);
 	}
 
@@ -215,9 +224,20 @@ public class ItineraryController extends ApiControllerSupport {
 	@ResponseStatus(HttpStatus.CREATED)
 	public ItineraryMutationResponse createDrawing(
 		@PathVariable UUID tripId,
-		@Valid @RequestBody CreateMapDrawingRequest request
+		@Valid @RequestBody CreateMapDrawingRequest request,
+		Principal principal
 	) {
-		return notImplemented();
+		return toResponse(createMapDrawingHandler.handle(new CreateMapDrawingCommand(
+			tripId,
+			currentUserId(principal),
+			request.baseVersion(),
+			request.itineraryDayId(),
+			com.soomgil.itinerary.domain.model.DrawingType.valueOf(request.drawingType().name()),
+			request.geometry(),
+			request.style(),
+			request.label(),
+			request.sortOrder()
+		)));
 	}
 
 	@PatchMapping("/drawings/{drawingId}")
@@ -257,7 +277,7 @@ public class ItineraryController extends ApiControllerSupport {
 			result.day() == null ? null : toDay(result.day()),
 			result.item() == null ? null : toItem(result.item()),
 			null,
-			null,
+			result.drawing() == null ? null : toDrawing(result.drawing()),
 			result.affectedRouteIds()
 		);
 	}
@@ -296,5 +316,19 @@ public class ItineraryController extends ApiControllerSupport {
 			return null;
 		}
 		return new PlaceRef(PlaceProvider.valueOf(provider), externalPlaceId);
+	}
+
+	private com.soomgil.itinerary.api.dto.MapDrawing toDrawing(MapDrawingView view) {
+		return new com.soomgil.itinerary.api.dto.MapDrawing(
+			view.id(),
+			view.itineraryDayId(),
+			com.soomgil.itinerary.api.dto.DrawingType.valueOf(view.drawingType().name()),
+			com.soomgil.itinerary.api.dto.GeometryFormat.valueOf(view.geometryFormat().name()),
+			view.geometry(),
+			view.style(),
+			view.label(),
+			view.sortOrder(),
+			view.version()
+		);
 	}
 }

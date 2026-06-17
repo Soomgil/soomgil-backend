@@ -78,7 +78,7 @@ public class ReorderItineraryHandler implements CommandHandler<ReorderItineraryC
 			command.days(),
 			now
 		));
-		return new ItineraryMutationResult(command.tripId(), newVersion, null, null, List.of());
+		return new ItineraryMutationResult(command.tripId(), newVersion, null, null, null, List.of());
 	}
 
 	private void validateSnapshot(ReorderItineraryCommand command) {

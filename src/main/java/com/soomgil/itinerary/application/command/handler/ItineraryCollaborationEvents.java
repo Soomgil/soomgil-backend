@@ -5,6 +5,7 @@ import com.soomgil.itinerary.application.command.dto.ItineraryDayOrderCommand;
 import com.soomgil.itinerary.application.command.dto.ItineraryItemOrderCommand;
 import com.soomgil.itinerary.application.port.ItineraryDayCreate;
 import com.soomgil.itinerary.application.port.ItineraryItemCreate;
+import com.soomgil.itinerary.application.port.MapDrawingCreate;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -18,6 +19,7 @@ final class ItineraryCollaborationEvents {
 	private static final String AGGREGATE_DAY = "ITINERARY_DAY";
 	private static final String AGGREGATE_ITEM = "ITINERARY_ITEM";
 	private static final String AGGREGATE_ITINERARY = "ITINERARY";
+	private static final String AGGREGATE_DRAWING = "MAP_DRAWING";
 
 	private ItineraryCollaborationEvents() {
 	}
@@ -89,6 +91,29 @@ final class ItineraryCollaborationEvents {
 			versionAfter,
 			"{\"days\":" + daysJson(days) + "}",
 			null,
+			null,
+			createdAt
+		);
+	}
+
+	static CollaborationCommandEvent mapDrawingCreated(
+		MapDrawingCreate drawing,
+		long versionBefore,
+		long versionAfter,
+		Instant createdAt
+	) {
+		return new CollaborationCommandEvent(
+			drawing.tripId(),
+			drawing.createdByUserId(),
+			null,
+			SOURCE_USER,
+			"CREATE_MAP_DRAWING",
+			AGGREGATE_DRAWING,
+			drawing.id(),
+			versionBefore,
+			versionAfter,
+			"{\"drawingId\":\"" + drawing.id() + "\",\"drawingType\":\"" + drawing.drawingType().name() + "\",\"sortOrder\":" + drawing.sortOrder() + "}",
+			"{\"action\":\"DELETE_MAP_DRAWING\",\"drawingId\":\"" + drawing.id() + "\"}",
 			null,
 			createdAt
 		);

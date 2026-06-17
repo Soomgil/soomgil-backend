@@ -53,6 +53,13 @@ public interface ItineraryCommandRepository {
 	void insertItem(ItineraryItemCreate item);
 
 	/**
+	 * 지도 도형을 저장한다.
+	 *
+	 * @param drawing 저장할 도형
+	 */
+	void insertMapDrawing(MapDrawingCreate drawing);
+
+	/**
 	 * day가 같은 trip에 존재하는지 확인한다.
 	 *
 	 * @param tripId 여행방 ID

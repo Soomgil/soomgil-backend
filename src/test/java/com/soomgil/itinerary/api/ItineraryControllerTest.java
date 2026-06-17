@@ -4,8 +4,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.soomgil.collaboration.application.port.CollaborationCommandEvent;
 import com.soomgil.collaboration.application.port.CollaborationCommandEventRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.soomgil.itinerary.api.dto.CreateItineraryDayRequest;
 import com.soomgil.itinerary.api.dto.CreateItineraryItemRequest;
+import com.soomgil.itinerary.api.dto.CreateMapDrawingRequest;
+import com.soomgil.itinerary.api.dto.DrawingType;
 import com.soomgil.itinerary.api.dto.ItineraryDayGroupType;
 import com.soomgil.itinerary.api.dto.ItineraryDayOrder;
 import com.soomgil.itinerary.api.dto.ItineraryItemType;
@@ -14,6 +17,7 @@ import com.soomgil.itinerary.api.dto.ItineraryMutationResponse;
 import com.soomgil.itinerary.api.dto.ReorderItineraryRequest;
 import com.soomgil.itinerary.application.command.handler.CreateItineraryDayHandler;
 import com.soomgil.itinerary.application.command.handler.CreateItineraryItemHandler;
+import com.soomgil.itinerary.application.command.handler.CreateMapDrawingHandler;
 import com.soomgil.itinerary.application.command.handler.ReorderItineraryHandler;
 import com.soomgil.itinerary.application.port.ItineraryCommandRepository;
 import com.soomgil.itinerary.application.port.ItineraryDayCreate;
@@ -21,6 +25,7 @@ import com.soomgil.itinerary.application.port.ItineraryDayOrderUpdate;
 import com.soomgil.itinerary.application.port.ItineraryDayReadModel;
 import com.soomgil.itinerary.application.port.ItineraryItemCreate;
 import com.soomgil.itinerary.application.port.ItineraryItemOrderUpdate;
+import com.soomgil.itinerary.application.port.MapDrawingCreate;
 import com.soomgil.place.api.dto.PlaceProvider;
 import com.soomgil.place.api.dto.PlaceRef;
 import com.soomgil.trip.application.port.TripAccessSnapshot;
@@ -115,6 +120,31 @@ class ItineraryControllerTest {
 		assertThat(repository.itemOrderUpdated).isTrue();
 	}
 
+	@Test
+	void createsMapDrawingResponse() {
+		StubItineraryCommandRepository repository = new StubItineraryCommandRepository();
+		ItineraryController controller = controller(repository);
+
+		ItineraryMutationResponse result = controller.createDrawing(
+			TRIP_ID,
+			new CreateMapDrawingRequest(
+				0L,
+				DAY_ID,
+				DrawingType.LINE,
+				java.util.Map.of("type", "LineString", "coordinates", List.of(List.of(127.0, 37.0), List.of(128.0, 38.0))),
+				java.util.Map.of("color", "#111111"),
+				"이동선",
+				2
+			),
+			principal()
+		);
+
+		assertThat(result.tripId()).isEqualTo(TRIP_ID);
+		assertThat(result.itineraryVersion()).isEqualTo(1);
+		assertThat(result.drawing().drawingType()).isEqualTo(DrawingType.LINE);
+		assertThat(repository.insertedDrawing.label()).isEqualTo("이동선");
+	}
+
 	private ItineraryController controller(StubItineraryCommandRepository repository) {
 		CapturingEventRepository eventRepository = new CapturingEventRepository();
 		return new ItineraryController(
@@ -135,6 +165,13 @@ class ItineraryControllerTest {
 				eventRepository,
 				new com.soomgil.trip.application.query.handler.TripAccessGuard(new StubTripQueryRepository()),
 				() -> Instant.parse("2026-06-17T00:00:00Z")
+			),
+			new CreateMapDrawingHandler(
+				repository,
+				eventRepository,
+				new com.soomgil.trip.application.query.handler.TripAccessGuard(new StubTripQueryRepository()),
+				() -> Instant.parse("2026-06-17T00:00:00Z"),
+				new ObjectMapper()
 			)
 		);
 	}
@@ -154,6 +191,7 @@ class ItineraryControllerTest {
 
 		private long currentVersion;
 		private boolean itemOrderUpdated;
+		private MapDrawingCreate insertedDrawing;
 
 		@Override
 		public OptionalLong incrementItineraryVersion(UUID tripId, long baseVersion, Instant updatedAt) {
@@ -180,6 +218,11 @@ class ItineraryControllerTest {
 
 		@Override
 		public void insertItem(ItineraryItemCreate item) {
+		}
+
+		@Override
+		public void insertMapDrawing(MapDrawingCreate drawing) {
+			this.insertedDrawing = drawing;
 		}
 
 		@Override

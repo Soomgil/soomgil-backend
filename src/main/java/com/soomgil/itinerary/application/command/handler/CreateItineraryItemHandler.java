@@ -102,6 +102,7 @@ public class CreateItineraryItemHandler implements CommandHandler<CreateItinerar
 				item.thumbnailUrl() == null ? null : java.net.URI.create(item.thumbnailUrl()),
 				item.sourceStatus()
 			),
+			null,
 			List.of()
 		);
 	}

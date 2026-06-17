@@ -13,6 +13,7 @@ public record ItineraryMutationResult(
 	long itineraryVersion,
 	ItineraryDayView day,
 	ItineraryItemView item,
+	MapDrawingView drawing,
 	List<UUID> affectedRouteIds
 ) {
 

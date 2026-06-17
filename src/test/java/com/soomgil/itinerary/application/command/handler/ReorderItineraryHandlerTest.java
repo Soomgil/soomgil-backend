@@ -17,6 +17,7 @@ import com.soomgil.itinerary.application.port.ItineraryDayOrderUpdate;
 import com.soomgil.itinerary.application.port.ItineraryDayReadModel;
 import com.soomgil.itinerary.application.port.ItineraryItemCreate;
 import com.soomgil.itinerary.application.port.ItineraryItemOrderUpdate;
+import com.soomgil.itinerary.application.port.MapDrawingCreate;
 import com.soomgil.trip.application.query.handler.TripAccessGuard;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -184,6 +185,10 @@ class ReorderItineraryHandlerTest {
 
 		@Override
 		public void insertItem(ItineraryItemCreate item) {
+		}
+
+		@Override
+		public void insertMapDrawing(MapDrawingCreate drawing) {
 		}
 
 		@Override
