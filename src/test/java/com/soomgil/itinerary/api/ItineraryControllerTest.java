@@ -24,6 +24,7 @@ import com.soomgil.itinerary.api.dto.UpdateItineraryItemRequest;
 import com.soomgil.itinerary.application.command.handler.CreateItineraryDayHandler;
 import com.soomgil.itinerary.application.command.handler.CreateItineraryItemHandler;
 import com.soomgil.itinerary.application.command.handler.CreateMapDrawingHandler;
+import com.soomgil.itinerary.application.command.handler.DeleteItineraryDayHandler;
 import com.soomgil.itinerary.application.command.handler.DeleteMapDrawingHandler;
 import com.soomgil.itinerary.application.command.handler.DeleteItineraryItemHandler;
 import com.soomgil.itinerary.application.command.handler.DeleteRouteSegmentHandler;
@@ -133,6 +134,23 @@ class ItineraryControllerTest {
 		assertThat(result.day().id()).isEqualTo(DAY_ID);
 		assertThat(result.day().dayNumber()).isEqualTo(2);
 		assertThat(result.day().title()).isEqualTo("둘째 날");
+	}
+
+	@Test
+	void deletesDayResponse() {
+		StubItineraryCommandRepository repository = new StubItineraryCommandRepository();
+		ItineraryController controller = controller(repository);
+
+		ItineraryMutationResponse result = controller.deleteDay(
+			TRIP_ID,
+			DAY_ID,
+			new com.soomgil.collaboration.api.dto.VersionedCommandRequest(0L),
+			principal()
+		);
+
+		assertThat(result.tripId()).isEqualTo(TRIP_ID);
+		assertThat(result.itineraryVersion()).isEqualTo(1);
+		assertThat(repository.deletedDayId).isEqualTo(DAY_ID);
 	}
 
 	@Test
@@ -429,6 +447,12 @@ class ItineraryControllerTest {
 				eventRepository,
 				new com.soomgil.trip.application.query.handler.TripAccessGuard(new StubTripQueryRepository()),
 				() -> Instant.parse("2026-06-17T00:00:00Z")
+			),
+			new DeleteItineraryDayHandler(
+				repository,
+				eventRepository,
+				new com.soomgil.trip.application.query.handler.TripAccessGuard(new StubTripQueryRepository()),
+				() -> Instant.parse("2026-06-17T00:00:00Z")
 			)
 		);
 	}
@@ -543,6 +567,7 @@ class ItineraryControllerTest {
 		private UUID deletedRouteId;
 		private UUID deletedDrawingId;
 		private UUID deletedItemId;
+		private UUID deletedDayId;
 
 		@Override
 		public OptionalLong incrementItineraryVersion(UUID tripId, long baseVersion, Instant updatedAt) {
@@ -591,6 +616,17 @@ class ItineraryControllerTest {
 				update.title(),
 				update.sortOrder()
 			));
+		}
+
+		@Override
+		public long countActiveItemsByDay(UUID tripId, UUID dayId) {
+			return 0;
+		}
+
+		@Override
+		public boolean deleteDay(UUID tripId, UUID dayId) {
+			this.deletedDayId = dayId;
+			return true;
 		}
 
 		@Override

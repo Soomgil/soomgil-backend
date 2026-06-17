@@ -75,6 +75,31 @@ final class ItineraryCollaborationEvents {
 		);
 	}
 
+	static CollaborationCommandEvent dayDeleted(
+		UUID tripId,
+		UUID dayId,
+		UUID actorUserId,
+		long versionBefore,
+		long versionAfter,
+		Instant deletedAt
+	) {
+		return new CollaborationCommandEvent(
+			tripId,
+			actorUserId,
+			null,
+			SOURCE_USER,
+			"DELETE_ITINERARY_DAY",
+			AGGREGATE_DAY,
+			dayId,
+			versionBefore,
+			versionAfter,
+			"{\"dayId\":\"" + dayId + "\"}",
+			null,
+			null,
+			deletedAt
+		);
+	}
+
 	static CollaborationCommandEvent itemCreated(
 		ItineraryItemCreate item,
 		long versionBefore,

@@ -95,6 +95,27 @@
       sort_order
   </select>
 
+  <select id="countActiveItemsByDay" resultType="long">
+    SELECT count(*)
+    FROM itinerary.itinerary_items
+    WHERE trip_id = #{tripId}
+      AND itinerary_day_id = #{dayId}
+      AND deleted_at IS NULL
+  </select>
+
+  <delete id="deleteDay">
+    DELETE FROM itinerary.itinerary_days
+    WHERE trip_id = #{tripId}
+      AND id = #{dayId}
+      AND NOT EXISTS (
+        SELECT 1
+        FROM itinerary.itinerary_items
+        WHERE trip_id = #{tripId}
+          AND itinerary_day_id = #{dayId}
+          AND deleted_at IS NULL
+      )
+  </delete>
+
   <insert id="insertItem">
     INSERT INTO itinerary.itinerary_items (
       id,

@@ -67,6 +67,16 @@ public class MyBatisItineraryCommandRepository implements ItineraryCommandReposi
 	}
 
 	@Override
+	public long countActiveItemsByDay(UUID tripId, UUID dayId) {
+		return mapper.countActiveItemsByDay(tripId, dayId);
+	}
+
+	@Override
+	public boolean deleteDay(UUID tripId, UUID dayId) {
+		return mapper.deleteDay(tripId, dayId) > 0;
+	}
+
+	@Override
 	public void insertItem(ItineraryItemCreate item) {
 		mapper.insertItem(item);
 	}

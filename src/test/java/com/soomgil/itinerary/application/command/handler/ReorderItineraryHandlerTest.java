@@ -198,6 +198,15 @@ class ReorderItineraryHandlerTest {
 		}
 
 		@Override
+		public long countActiveItemsByDay(UUID tripId, UUID dayId) {
+			return 0;
+		}
+
+		@Override
+		public boolean deleteDay(UUID tripId, UUID dayId) {
+			return false;
+		}
+		@Override
 		public void insertItem(ItineraryItemCreate item) {
 		}
 

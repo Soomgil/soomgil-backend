@@ -7,8 +7,8 @@ import com.soomgil.collaboration.application.port.CollaborationCommandEvent;
 import com.soomgil.collaboration.application.port.CollaborationCommandEventRepository;
 import com.soomgil.global.error.BusinessException;
 import com.soomgil.global.error.ErrorCode;
+import com.soomgil.itinerary.application.command.dto.DeleteItineraryDayCommand;
 import com.soomgil.itinerary.application.command.dto.ItineraryMutationResult;
-import com.soomgil.itinerary.application.command.dto.UpdateItineraryDayCommand;
 import com.soomgil.itinerary.application.port.ItineraryCommandRepository;
 import com.soomgil.itinerary.application.port.ItineraryDayCreate;
 import com.soomgil.itinerary.application.port.ItineraryDayOrderUpdate;
@@ -16,6 +16,8 @@ import com.soomgil.itinerary.application.port.ItineraryDayReadModel;
 import com.soomgil.itinerary.application.port.ItineraryDayUpdate;
 import com.soomgil.itinerary.application.port.ItineraryItemCreate;
 import com.soomgil.itinerary.application.port.ItineraryItemOrderUpdate;
+import com.soomgil.itinerary.application.port.ItineraryItemReadModel;
+import com.soomgil.itinerary.application.port.ItineraryItemUpdate;
 import com.soomgil.itinerary.application.port.MapDrawingCreate;
 import com.soomgil.itinerary.application.port.MapDrawingUpdate;
 import com.soomgil.itinerary.application.port.MapDrawingUpdateResult;
@@ -25,12 +27,13 @@ import com.soomgil.itinerary.domain.model.ItineraryDayGroupType;
 import com.soomgil.trip.application.query.handler.TripAccessGuard;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
-class UpdateItineraryDayHandlerTest {
+class DeleteItineraryDayHandlerTest {
 
 	private static final UUID TRIP_ID = UUID.fromString("10000000-0000-0000-0000-000000000001");
 	private static final UUID USER_ID = UUID.fromString("20000000-0000-0000-0000-000000000001");
@@ -38,7 +41,7 @@ class UpdateItineraryDayHandlerTest {
 
 	private final CapturingItineraryCommandRepository repository = new CapturingItineraryCommandRepository();
 	private final CapturingEventRepository eventRepository = new CapturingEventRepository();
-	private final UpdateItineraryDayHandler handler = new UpdateItineraryDayHandler(
+	private final DeleteItineraryDayHandler handler = new DeleteItineraryDayHandler(
 		repository,
 		eventRepository,
 		new TripAccessGuard(new CreateItineraryDayHandlerTest.StubTripQueryRepository()),
@@ -46,66 +49,35 @@ class UpdateItineraryDayHandlerTest {
 	);
 
 	@Test
-	void updatesDayAndRecordsEvent() {
-		ItineraryMutationResult result = handler.handle(new UpdateItineraryDayCommand(
-			TRIP_ID,
-			USER_ID,
-			0,
-			DAY_ID,
-			2,
-			LocalDate.parse("2026-07-02"),
-			"  둘째 날  ",
-			5
-		));
+	void deletesEmptyDayAndRecordsEvent() {
+		ItineraryMutationResult result = handler.handle(new DeleteItineraryDayCommand(TRIP_ID, USER_ID, 0, DAY_ID));
 
 		assertThat(result.itineraryVersion()).isEqualTo(1);
-		assertThat(result.day().id()).isEqualTo(DAY_ID);
-		assertThat(result.day().dayNumber()).isEqualTo(2);
-		assertThat(result.day().title()).isEqualTo("둘째 날");
-		assertThat(repository.lastUpdate.sortOrder()).isEqualTo(5);
-		assertThat(eventRepository.lastEvent.commandType()).isEqualTo("UPDATE_ITINERARY_DAY");
+		assertThat(result.day()).isNull();
+		assertThat(repository.deletedDayId).isEqualTo(DAY_ID);
+		assertThat(eventRepository.lastEvent.commandType()).isEqualTo("DELETE_ITINERARY_DAY");
 	}
 
 	@Test
-	void rejectsUnscheduledDate() {
-		repository.currentDay = new ItineraryDayReadModel(
-			DAY_ID,
-			TRIP_ID,
-			ItineraryDayGroupType.UNSCHEDULED,
-			null,
-			null,
-			"일차 미정",
-			0
-		);
+	void rejectsNonEmptyDay() {
+		repository.activeItemCount = 1;
 
-		assertThatThrownBy(() -> handler.handle(new UpdateItineraryDayCommand(
-			TRIP_ID,
-			USER_ID,
-			0,
-			DAY_ID,
-			null,
-			LocalDate.parse("2026-07-02"),
-			null,
-			null
-		))).isInstanceOfSatisfying(BusinessException.class, exception ->
-			assertThat(exception.errorCode()).isEqualTo(ErrorCode.BUSINESS_RULE_VIOLATION)
-		);
+		assertThatThrownBy(() -> handler.handle(new DeleteItineraryDayCommand(TRIP_ID, USER_ID, 0, DAY_ID)))
+			.isInstanceOfSatisfying(BusinessException.class, exception ->
+				assertThat(exception.errorCode()).isEqualTo(ErrorCode.BUSINESS_RULE_VIOLATION)
+			);
+
+		assertThat(repository.deletedDayId).isNull();
 	}
 
 	@Test
-	void rejectsMissingFields() {
-		assertThatThrownBy(() -> handler.handle(new UpdateItineraryDayCommand(
-			TRIP_ID,
-			USER_ID,
-			0,
-			DAY_ID,
-			null,
-			null,
-			null,
-			null
-		))).isInstanceOfSatisfying(BusinessException.class, exception ->
-			assertThat(exception.errorCode()).isEqualTo(ErrorCode.VALIDATION_FAILED)
-		);
+	void rejectsMissingDay() {
+		repository.currentDay = null;
+
+		assertThatThrownBy(() -> handler.handle(new DeleteItineraryDayCommand(TRIP_ID, USER_ID, 0, DAY_ID)))
+			.isInstanceOfSatisfying(BusinessException.class, exception ->
+				assertThat(exception.errorCode()).isEqualTo(ErrorCode.RESOURCE_NOT_FOUND)
+			);
 	}
 
 	private static class CapturingItineraryCommandRepository implements ItineraryCommandRepository {
@@ -120,7 +92,8 @@ class UpdateItineraryDayHandlerTest {
 			"첫째 날",
 			0
 		);
-		private ItineraryDayUpdate lastUpdate;
+		private long activeItemCount;
+		private UUID deletedDayId;
 
 		@Override
 		public OptionalLong incrementItineraryVersion(UUID tripId, long baseVersion, Instant updatedAt) {
@@ -152,41 +125,32 @@ class UpdateItineraryDayHandlerTest {
 
 		@Override
 		public Optional<ItineraryDayReadModel> updateDay(ItineraryDayUpdate update) {
-			this.lastUpdate = update;
-			currentDay = new ItineraryDayReadModel(
-				update.dayId(),
-				update.tripId(),
-				currentDay.groupType(),
-				update.dayNumber(),
-				update.date(),
-				update.title(),
-				update.sortOrder()
-			);
-			return Optional.of(currentDay);
+			return Optional.empty();
 		}
 
 		@Override
 		public long countActiveItemsByDay(UUID tripId, UUID dayId) {
-			return 0;
+			return activeItemCount;
 		}
 
 		@Override
 		public boolean deleteDay(UUID tripId, UUID dayId) {
-			return false;
+			deletedDayId = dayId;
+			currentDay = null;
+			return true;
 		}
+
 		@Override
 		public void insertItem(ItineraryItemCreate item) {
 		}
 
 		@Override
-		public Optional<com.soomgil.itinerary.application.port.ItineraryItemReadModel> findItem(UUID tripId, UUID itemId) {
+		public Optional<ItineraryItemReadModel> findItem(UUID tripId, UUID itemId) {
 			return Optional.empty();
 		}
 
 		@Override
-		public Optional<com.soomgil.itinerary.application.port.ItineraryItemReadModel> updateItem(
-			com.soomgil.itinerary.application.port.ItineraryItemUpdate update
-		) {
+		public Optional<ItineraryItemReadModel> updateItem(ItineraryItemUpdate update) {
 			return Optional.empty();
 		}
 
@@ -230,12 +194,12 @@ class UpdateItineraryDayHandlerTest {
 
 		@Override
 		public boolean existsDay(UUID tripId, UUID dayId) {
-			return false;
+			return currentDay != null;
 		}
 
 		@Override
 		public long countDays(UUID tripId) {
-			return 0;
+			return currentDay == null ? 0 : 1;
 		}
 
 		@Override
@@ -244,8 +208,8 @@ class UpdateItineraryDayHandlerTest {
 		}
 
 		@Override
-		public java.util.List<UUID> findActiveRouteIdsByItem(UUID tripId, UUID itemId) {
-			return java.util.List.of();
+		public List<UUID> findActiveRouteIdsByItem(UUID tripId, UUID itemId) {
+			return List.of();
 		}
 
 		@Override
@@ -255,7 +219,7 @@ class UpdateItineraryDayHandlerTest {
 
 		@Override
 		public long countActiveItems(UUID tripId) {
-			return 0;
+			return activeItemCount;
 		}
 
 		@Override

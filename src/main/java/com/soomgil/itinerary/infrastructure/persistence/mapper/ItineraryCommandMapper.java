@@ -79,6 +79,24 @@ public interface ItineraryCommandMapper {
 	ItineraryDayReadModel updateDay(@Param("update") ItineraryDayUpdate update);
 
 	/**
+	 * day에 남아 있는 active item 수를 조회한다.
+	 *
+	 * @param tripId 여행방 ID
+	 * @param dayId day ID
+	 * @return active item 수
+	 */
+	long countActiveItemsByDay(@Param("tripId") UUID tripId, @Param("dayId") UUID dayId);
+
+	/**
+	 * 비어 있는 itinerary day를 삭제한다.
+	 *
+	 * @param tripId 여행방 ID
+	 * @param dayId day ID
+	 * @return 삭제 row 수
+	 */
+	int deleteDay(@Param("tripId") UUID tripId, @Param("dayId") UUID dayId);
+
+	/**
 	 * 일정 item을 추가한다.
 	 *
 	 * @param item 저장할 item
