@@ -3,6 +3,8 @@ package com.soomgil.itinerary.application.command.handler;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.soomgil.collaboration.application.port.CollaborationCommandEvent;
+import com.soomgil.collaboration.application.port.CollaborationCommandEventRepository;
 import com.soomgil.itinerary.application.command.dto.CreateItineraryDayCommand;
 import com.soomgil.itinerary.application.command.dto.ItineraryMutationResult;
 import com.soomgil.itinerary.application.port.ItineraryCommandRepository;
@@ -42,8 +44,10 @@ class CreateItineraryDayHandlerTest {
 	private static final Instant NOW = Instant.parse("2026-06-17T00:00:00Z");
 
 	private final CapturingItineraryCommandRepository repository = new CapturingItineraryCommandRepository();
+	private final CapturingEventRepository eventRepository = new CapturingEventRepository();
 	private final CreateItineraryDayHandler handler = new CreateItineraryDayHandler(
 		repository,
+		eventRepository,
 		new TripAccessGuard(new StubTripQueryRepository()),
 		() -> NOW
 	);
@@ -66,6 +70,9 @@ class CreateItineraryDayHandlerTest {
 		assertThat(result.day().dayNumber()).isEqualTo(1);
 		assertThat(result.day().title()).isEqualTo("첫째 날");
 		assertThat(repository.insertedDay.sortOrder()).isEqualTo(3);
+		assertThat(eventRepository.lastEvent.commandType()).isEqualTo("CREATE_ITINERARY_DAY");
+		assertThat(eventRepository.lastEvent.versionBefore()).isEqualTo(0);
+		assertThat(eventRepository.lastEvent.versionAfter()).isEqualTo(1);
 	}
 
 	@Test
@@ -145,6 +152,7 @@ class CreateItineraryDayHandlerTest {
 		assertThat(result.itineraryVersion()).isEqualTo(5);
 		assertThat(result.day().id()).isEqualTo(UNSCHEDULED_DAY_ID);
 		assertThat(repository.insertedDay).isNull();
+		assertThat(eventRepository.lastEvent).isNull();
 	}
 
 	@Test
@@ -172,6 +180,16 @@ class CreateItineraryDayHandlerTest {
 		))).isInstanceOfSatisfying(BusinessException.class, exception ->
 			assertThat(exception.errorCode()).isEqualTo(ErrorCode.CONFLICT)
 		);
+	}
+
+	private static class CapturingEventRepository implements CollaborationCommandEventRepository {
+
+		private CollaborationCommandEvent lastEvent;
+
+		@Override
+		public void save(CollaborationCommandEvent event) {
+			this.lastEvent = event;
+		}
 	}
 
 	static class CapturingItineraryCommandRepository implements ItineraryCommandRepository {

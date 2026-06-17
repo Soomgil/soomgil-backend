@@ -3,6 +3,8 @@ package com.soomgil.itinerary.application.command.handler;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.soomgil.collaboration.application.port.CollaborationCommandEvent;
+import com.soomgil.collaboration.application.port.CollaborationCommandEventRepository;
 import com.soomgil.global.error.BusinessException;
 import com.soomgil.global.error.ErrorCode;
 import com.soomgil.itinerary.application.command.dto.ItineraryDayOrderCommand;
@@ -33,8 +35,10 @@ class ReorderItineraryHandlerTest {
 	private static final UUID ITEM_ID = UUID.fromString("40000000-0000-0000-0000-000000000001");
 
 	private final CapturingItineraryCommandRepository repository = new CapturingItineraryCommandRepository();
+	private final CapturingEventRepository eventRepository = new CapturingEventRepository();
 	private final ReorderItineraryHandler handler = new ReorderItineraryHandler(
 		repository,
+		eventRepository,
 		new TripAccessGuard(new CreateItineraryDayHandlerTest.StubTripQueryRepository()),
 		() -> Instant.parse("2026-06-17T00:00:00Z")
 	);
@@ -58,6 +62,8 @@ class ReorderItineraryHandlerTest {
 		assertThat(repository.itemUpdates.get(0).dayId()).isEqualTo(OTHER_DAY_ID);
 		assertThat(repository.itemUpdates.get(0).sortOrder()).isEqualTo(2);
 		assertThat(repository.itemUpdates.get(0).updatedByUserId()).isEqualTo(USER_ID);
+		assertThat(eventRepository.lastEvent.commandType()).isEqualTo("REORDER_ITINERARY");
+		assertThat(eventRepository.lastEvent.payload()).contains(ITEM_ID.toString());
 	}
 
 	@Test
@@ -73,6 +79,16 @@ class ReorderItineraryHandlerTest {
 		))).isInstanceOfSatisfying(BusinessException.class, exception ->
 			assertThat(exception.errorCode()).isEqualTo(ErrorCode.VALIDATION_FAILED)
 		);
+	}
+
+	private static class CapturingEventRepository implements CollaborationCommandEventRepository {
+
+		private CollaborationCommandEvent lastEvent;
+
+		@Override
+		public void save(CollaborationCommandEvent event) {
+			this.lastEvent = event;
+		}
 	}
 
 	@Test

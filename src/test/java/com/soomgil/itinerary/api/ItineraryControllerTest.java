@@ -2,6 +2,8 @@ package com.soomgil.itinerary.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.soomgil.collaboration.application.port.CollaborationCommandEvent;
+import com.soomgil.collaboration.application.port.CollaborationCommandEventRepository;
 import com.soomgil.itinerary.api.dto.CreateItineraryDayRequest;
 import com.soomgil.itinerary.api.dto.CreateItineraryItemRequest;
 import com.soomgil.itinerary.api.dto.ItineraryDayGroupType;
@@ -114,23 +116,34 @@ class ItineraryControllerTest {
 	}
 
 	private ItineraryController controller(StubItineraryCommandRepository repository) {
+		CapturingEventRepository eventRepository = new CapturingEventRepository();
 		return new ItineraryController(
 			new CreateItineraryDayHandler(
 				repository,
+				eventRepository,
 				new com.soomgil.trip.application.query.handler.TripAccessGuard(new StubTripQueryRepository()),
 				() -> Instant.parse("2026-06-17T00:00:00Z")
 			),
 			new CreateItineraryItemHandler(
 				repository,
+				eventRepository,
 				new com.soomgil.trip.application.query.handler.TripAccessGuard(new StubTripQueryRepository()),
 				() -> Instant.parse("2026-06-17T00:00:00Z")
 			),
 			new ReorderItineraryHandler(
 				repository,
+				eventRepository,
 				new com.soomgil.trip.application.query.handler.TripAccessGuard(new StubTripQueryRepository()),
 				() -> Instant.parse("2026-06-17T00:00:00Z")
 			)
 		);
+	}
+
+	private static class CapturingEventRepository implements CollaborationCommandEventRepository {
+
+		@Override
+		public void save(CollaborationCommandEvent event) {
+		}
 	}
 
 	private Principal principal() {

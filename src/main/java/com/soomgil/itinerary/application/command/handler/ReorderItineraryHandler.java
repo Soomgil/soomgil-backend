@@ -2,6 +2,7 @@ package com.soomgil.itinerary.application.command.handler;
 
 import com.soomgil.common.cqrs.CommandHandler;
 import com.soomgil.common.time.TimeProvider;
+import com.soomgil.collaboration.application.port.CollaborationCommandEventRepository;
 import com.soomgil.global.error.BusinessException;
 import com.soomgil.global.error.ErrorCode;
 import com.soomgil.itinerary.application.command.dto.ItineraryDayOrderCommand;
@@ -30,15 +31,18 @@ import org.springframework.transaction.annotation.Transactional;
 public class ReorderItineraryHandler implements CommandHandler<ReorderItineraryCommand, ItineraryMutationResult> {
 
 	private final ItineraryCommandRepository repository;
+	private final CollaborationCommandEventRepository eventRepository;
 	private final TripAccessGuard tripAccessGuard;
 	private final TimeProvider timeProvider;
 
 	public ReorderItineraryHandler(
 		ItineraryCommandRepository repository,
+		CollaborationCommandEventRepository eventRepository,
 		TripAccessGuard tripAccessGuard,
 		TimeProvider timeProvider
 	) {
 		this.repository = Objects.requireNonNull(repository, "repository must not be null");
+		this.eventRepository = Objects.requireNonNull(eventRepository, "eventRepository must not be null");
 		this.tripAccessGuard = Objects.requireNonNull(tripAccessGuard, "tripAccessGuard must not be null");
 		this.timeProvider = Objects.requireNonNull(timeProvider, "timeProvider must not be null");
 	}
@@ -66,6 +70,14 @@ public class ReorderItineraryHandler implements CommandHandler<ReorderItineraryC
 				));
 			}
 		}
+		eventRepository.save(ItineraryCollaborationEvents.itineraryReordered(
+			command.tripId(),
+			command.actorUserId(),
+			command.baseVersion(),
+			newVersion,
+			command.days(),
+			now
+		));
 		return new ItineraryMutationResult(command.tripId(), newVersion, null, null, List.of());
 	}
 

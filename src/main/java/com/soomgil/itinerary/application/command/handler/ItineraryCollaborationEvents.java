@@ -1,0 +1,130 @@
+package com.soomgil.itinerary.application.command.handler;
+
+import com.soomgil.collaboration.application.port.CollaborationCommandEvent;
+import com.soomgil.itinerary.application.command.dto.ItineraryDayOrderCommand;
+import com.soomgil.itinerary.application.command.dto.ItineraryItemOrderCommand;
+import com.soomgil.itinerary.application.port.ItineraryDayCreate;
+import com.soomgil.itinerary.application.port.ItineraryItemCreate;
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
+
+/**
+ * itinerary write 결과를 collaboration command event로 변환한다.
+ */
+final class ItineraryCollaborationEvents {
+
+	private static final String SOURCE_USER = "USER";
+	private static final String AGGREGATE_DAY = "ITINERARY_DAY";
+	private static final String AGGREGATE_ITEM = "ITINERARY_ITEM";
+	private static final String AGGREGATE_ITINERARY = "ITINERARY";
+
+	private ItineraryCollaborationEvents() {
+	}
+
+	static CollaborationCommandEvent dayCreated(
+		ItineraryDayCreate day,
+		UUID actorUserId,
+		long versionBefore,
+		long versionAfter,
+		Instant createdAt
+	) {
+		return new CollaborationCommandEvent(
+			day.tripId(),
+			actorUserId,
+			null,
+			SOURCE_USER,
+			"CREATE_ITINERARY_DAY",
+			AGGREGATE_DAY,
+			day.id(),
+			versionBefore,
+			versionAfter,
+			"{\"dayId\":\"" + day.id() + "\",\"groupType\":\"" + day.groupType().name() + "\",\"sortOrder\":" + day.sortOrder() + "}",
+			"{\"action\":\"DELETE_ITINERARY_DAY\",\"dayId\":\"" + day.id() + "\"}",
+			null,
+			createdAt
+		);
+	}
+
+	static CollaborationCommandEvent itemCreated(
+		ItineraryItemCreate item,
+		long versionBefore,
+		long versionAfter,
+		Instant createdAt
+	) {
+		return new CollaborationCommandEvent(
+			item.tripId(),
+			item.createdByUserId(),
+			null,
+			SOURCE_USER,
+			"CREATE_ITINERARY_ITEM",
+			AGGREGATE_ITEM,
+			item.id(),
+			versionBefore,
+			versionAfter,
+			"{\"itemId\":\"" + item.id() + "\",\"dayId\":\"" + item.itineraryDayId() + "\",\"sortOrder\":" + item.sortOrder() + "}",
+			"{\"action\":\"DELETE_ITINERARY_ITEM\",\"itemId\":\"" + item.id() + "\"}",
+			null,
+			createdAt
+		);
+	}
+
+	static CollaborationCommandEvent itineraryReordered(
+		UUID tripId,
+		UUID actorUserId,
+		long versionBefore,
+		long versionAfter,
+		List<ItineraryDayOrderCommand> days,
+		Instant createdAt
+	) {
+		return new CollaborationCommandEvent(
+			tripId,
+			actorUserId,
+			null,
+			SOURCE_USER,
+			"REORDER_ITINERARY",
+			AGGREGATE_ITINERARY,
+			tripId,
+			versionBefore,
+			versionAfter,
+			"{\"days\":" + daysJson(days) + "}",
+			null,
+			null,
+			createdAt
+		);
+	}
+
+	private static String daysJson(List<ItineraryDayOrderCommand> days) {
+		StringBuilder builder = new StringBuilder("[");
+		for (int index = 0; index < days.size(); index++) {
+			if (index > 0) {
+				builder.append(',');
+			}
+			ItineraryDayOrderCommand day = days.get(index);
+			builder.append("{\"dayId\":\"")
+				.append(day.dayId())
+				.append("\",\"sortOrder\":")
+				.append(day.sortOrder())
+				.append(",\"items\":")
+				.append(itemsJson(day.itemOrders()))
+				.append('}');
+		}
+		return builder.append(']').toString();
+	}
+
+	private static String itemsJson(List<ItineraryItemOrderCommand> items) {
+		StringBuilder builder = new StringBuilder("[");
+		for (int index = 0; index < items.size(); index++) {
+			if (index > 0) {
+				builder.append(',');
+			}
+			ItineraryItemOrderCommand item = items.get(index);
+			builder.append("{\"itemId\":\"")
+				.append(item.itemId())
+				.append("\",\"sortOrder\":")
+				.append(item.sortOrder())
+				.append('}');
+		}
+		return builder.append(']').toString();
+	}
+}
