@@ -190,6 +190,31 @@ public interface ItineraryCommandMapper {
 	boolean existsItem(@Param("tripId") UUID tripId, @Param("itemId") UUID itemId);
 
 	/**
+	 * item에 연결된 active route ID 목록을 조회한다.
+	 *
+	 * @param tripId 여행방 ID
+	 * @param itemId item ID
+	 * @return 연결 route ID 목록
+	 */
+	java.util.List<UUID> findActiveRouteIdsByItem(@Param("tripId") UUID tripId, @Param("itemId") UUID itemId);
+
+	/**
+	 * itinerary item을 soft delete 처리한다.
+	 *
+	 * @param tripId 여행방 ID
+	 * @param itemId item ID
+	 * @param deletedByUserId 삭제 사용자 ID
+	 * @param deletedAt 삭제 시각
+	 * @return 삭제 row 수
+	 */
+	int softDeleteItem(
+		@Param("tripId") UUID tripId,
+		@Param("itemId") UUID itemId,
+		@Param("deletedByUserId") UUID deletedByUserId,
+		@Param("deletedAt") Instant deletedAt
+	);
+
+	/**
 	 * 삭제되지 않은 일정 item 수를 조회한다.
 	 *
 	 * @param tripId 여행방 ID

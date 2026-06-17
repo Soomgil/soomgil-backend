@@ -125,6 +125,16 @@ public class MyBatisItineraryCommandRepository implements ItineraryCommandReposi
 	}
 
 	@Override
+	public java.util.List<UUID> findActiveRouteIdsByItem(UUID tripId, UUID itemId) {
+		return mapper.findActiveRouteIdsByItem(tripId, itemId);
+	}
+
+	@Override
+	public boolean softDeleteItem(UUID tripId, UUID itemId, UUID deletedByUserId, Instant deletedAt) {
+		return mapper.softDeleteItem(tripId, itemId, deletedByUserId, deletedAt) > 0;
+	}
+
+	@Override
 	public long countActiveItems(UUID tripId) {
 		return mapper.countActiveItems(tripId);
 	}

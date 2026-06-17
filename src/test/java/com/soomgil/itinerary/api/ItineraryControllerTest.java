@@ -24,6 +24,7 @@ import com.soomgil.itinerary.application.command.handler.CreateItineraryDayHandl
 import com.soomgil.itinerary.application.command.handler.CreateItineraryItemHandler;
 import com.soomgil.itinerary.application.command.handler.CreateMapDrawingHandler;
 import com.soomgil.itinerary.application.command.handler.DeleteMapDrawingHandler;
+import com.soomgil.itinerary.application.command.handler.DeleteItineraryItemHandler;
 import com.soomgil.itinerary.application.command.handler.DeleteRouteSegmentHandler;
 import com.soomgil.itinerary.application.command.handler.MapMatchRouteHandler;
 import com.soomgil.itinerary.application.command.handler.ReorderItineraryHandler;
@@ -79,6 +80,7 @@ class ItineraryControllerTest {
 	private static final UUID DAY_ID = UUID.fromString("30000000-0000-0000-0000-000000000001");
 	private static final UUID ROUTE_ID = UUID.fromString("50000000-0000-0000-0000-000000000001");
 	private static final UUID DRAWING_ID = UUID.fromString("60000000-0000-0000-0000-000000000001");
+	private static final UUID ITEM_ID = UUID.fromString("40000000-0000-0000-0000-000000000001");
 
 	@Test
 	void createsDayResponse() {
@@ -128,6 +130,24 @@ class ItineraryControllerTest {
 		assertThat(result.day().id()).isEqualTo(DAY_ID);
 		assertThat(result.day().dayNumber()).isEqualTo(2);
 		assertThat(result.day().title()).isEqualTo("둘째 날");
+	}
+
+	@Test
+	void deletesItemResponse() {
+		StubItineraryCommandRepository repository = new StubItineraryCommandRepository();
+		ItineraryController controller = controller(repository);
+
+		ItineraryMutationResponse result = controller.deleteItem(
+			TRIP_ID,
+			ITEM_ID,
+			new com.soomgil.collaboration.api.dto.VersionedCommandRequest(0L),
+			principal()
+		);
+
+		assertThat(result.tripId()).isEqualTo(TRIP_ID);
+		assertThat(result.itineraryVersion()).isEqualTo(1);
+		assertThat(result.affectedRouteIds()).containsExactly(ROUTE_ID);
+		assertThat(repository.deletedItemId).isEqualTo(ITEM_ID);
 	}
 
 	@Test
@@ -366,6 +386,12 @@ class ItineraryControllerTest {
 				eventRepository,
 				new com.soomgil.trip.application.query.handler.TripAccessGuard(new StubTripQueryRepository()),
 				() -> Instant.parse("2026-06-17T00:00:00Z")
+			),
+			new DeleteItineraryItemHandler(
+				repository,
+				eventRepository,
+				new com.soomgil.trip.application.query.handler.TripAccessGuard(new StubTripQueryRepository()),
+				() -> Instant.parse("2026-06-17T00:00:00Z")
 			)
 		);
 	}
@@ -479,6 +505,7 @@ class ItineraryControllerTest {
 		private MapDrawingCreate insertedDrawing;
 		private UUID deletedRouteId;
 		private UUID deletedDrawingId;
+		private UUID deletedItemId;
 
 		@Override
 		public OptionalLong incrementItineraryVersion(UUID tripId, long baseVersion, Instant updatedAt) {
@@ -596,6 +623,17 @@ class ItineraryControllerTest {
 
 		@Override
 		public boolean existsItem(UUID tripId, UUID itemId) {
+			return true;
+		}
+
+		@Override
+		public List<UUID> findActiveRouteIdsByItem(UUID tripId, UUID itemId) {
+			return List.of(ROUTE_ID);
+		}
+
+		@Override
+		public boolean softDeleteItem(UUID tripId, UUID itemId, UUID deletedByUserId, Instant deletedAt) {
+			this.deletedItemId = itemId;
 			return true;
 		}
 

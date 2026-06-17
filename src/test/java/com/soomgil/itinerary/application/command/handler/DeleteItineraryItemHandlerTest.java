@@ -7,8 +7,8 @@ import com.soomgil.collaboration.application.port.CollaborationCommandEvent;
 import com.soomgil.collaboration.application.port.CollaborationCommandEventRepository;
 import com.soomgil.global.error.BusinessException;
 import com.soomgil.global.error.ErrorCode;
+import com.soomgil.itinerary.application.command.dto.DeleteItineraryItemCommand;
 import com.soomgil.itinerary.application.command.dto.ItineraryMutationResult;
-import com.soomgil.itinerary.application.command.dto.UpdateItineraryDayCommand;
 import com.soomgil.itinerary.application.port.ItineraryCommandRepository;
 import com.soomgil.itinerary.application.port.ItineraryDayCreate;
 import com.soomgil.itinerary.application.port.ItineraryDayOrderUpdate;
@@ -21,24 +21,25 @@ import com.soomgil.itinerary.application.port.MapDrawingUpdate;
 import com.soomgil.itinerary.application.port.MapDrawingUpdateResult;
 import com.soomgil.itinerary.application.port.RouteMatchRequestLog;
 import com.soomgil.itinerary.application.port.RouteSegmentCreate;
-import com.soomgil.itinerary.domain.model.ItineraryDayGroupType;
 import com.soomgil.trip.application.query.handler.TripAccessGuard;
 import java.time.Instant;
-import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
-class UpdateItineraryDayHandlerTest {
+class DeleteItineraryItemHandlerTest {
 
 	private static final UUID TRIP_ID = UUID.fromString("10000000-0000-0000-0000-000000000001");
 	private static final UUID USER_ID = UUID.fromString("20000000-0000-0000-0000-000000000001");
-	private static final UUID DAY_ID = UUID.fromString("30000000-0000-0000-0000-000000000001");
+	private static final UUID ITEM_ID = UUID.fromString("40000000-0000-0000-0000-000000000001");
+	private static final UUID ROUTE_ID = UUID.fromString("50000000-0000-0000-0000-000000000001");
 
 	private final CapturingItineraryCommandRepository repository = new CapturingItineraryCommandRepository();
 	private final CapturingEventRepository eventRepository = new CapturingEventRepository();
-	private final UpdateItineraryDayHandler handler = new UpdateItineraryDayHandler(
+	private final DeleteItineraryItemHandler handler = new DeleteItineraryItemHandler(
 		repository,
 		eventRepository,
 		new TripAccessGuard(new CreateItineraryDayHandlerTest.StubTripQueryRepository()),
@@ -46,81 +47,35 @@ class UpdateItineraryDayHandlerTest {
 	);
 
 	@Test
-	void updatesDayAndRecordsEvent() {
-		ItineraryMutationResult result = handler.handle(new UpdateItineraryDayCommand(
-			TRIP_ID,
-			USER_ID,
-			0,
-			DAY_ID,
-			2,
-			LocalDate.parse("2026-07-02"),
-			"  둘째 날  ",
-			5
-		));
+	void softDeletesItemAndConnectedRoutes() {
+		ItineraryMutationResult result = handler.handle(new DeleteItineraryItemCommand(TRIP_ID, USER_ID, 0, ITEM_ID));
 
 		assertThat(result.itineraryVersion()).isEqualTo(1);
-		assertThat(result.day().id()).isEqualTo(DAY_ID);
-		assertThat(result.day().dayNumber()).isEqualTo(2);
-		assertThat(result.day().title()).isEqualTo("둘째 날");
-		assertThat(repository.lastUpdate.sortOrder()).isEqualTo(5);
-		assertThat(eventRepository.lastEvent.commandType()).isEqualTo("UPDATE_ITINERARY_DAY");
+		assertThat(result.affectedRouteIds()).containsExactly(ROUTE_ID);
+		assertThat(repository.deletedItemId).isEqualTo(ITEM_ID);
+		assertThat(repository.deletedRouteIds).containsExactly(ROUTE_ID);
+		assertThat(eventRepository.events)
+			.extracting(CollaborationCommandEvent::commandType)
+			.containsExactly("DELETE_ROUTE_SEGMENT", "DELETE_ITINERARY_ITEM");
 	}
 
 	@Test
-	void rejectsUnscheduledDate() {
-		repository.currentDay = new ItineraryDayReadModel(
-			DAY_ID,
-			TRIP_ID,
-			ItineraryDayGroupType.UNSCHEDULED,
-			null,
-			null,
-			"일차 미정",
-			0
-		);
+	void rejectsMissingItem() {
+		repository.itemExists = false;
 
-		assertThatThrownBy(() -> handler.handle(new UpdateItineraryDayCommand(
-			TRIP_ID,
-			USER_ID,
-			0,
-			DAY_ID,
-			null,
-			LocalDate.parse("2026-07-02"),
-			null,
-			null
-		))).isInstanceOfSatisfying(BusinessException.class, exception ->
-			assertThat(exception.errorCode()).isEqualTo(ErrorCode.BUSINESS_RULE_VIOLATION)
-		);
-	}
-
-	@Test
-	void rejectsMissingFields() {
-		assertThatThrownBy(() -> handler.handle(new UpdateItineraryDayCommand(
-			TRIP_ID,
-			USER_ID,
-			0,
-			DAY_ID,
-			null,
-			null,
-			null,
-			null
-		))).isInstanceOfSatisfying(BusinessException.class, exception ->
-			assertThat(exception.errorCode()).isEqualTo(ErrorCode.VALIDATION_FAILED)
-		);
+		assertThatThrownBy(() -> handler.handle(new DeleteItineraryItemCommand(TRIP_ID, USER_ID, 0, ITEM_ID)))
+			.isInstanceOfSatisfying(BusinessException.class, exception ->
+				assertThat(exception.errorCode()).isEqualTo(ErrorCode.RESOURCE_NOT_FOUND)
+			);
+		assertThat(repository.currentVersion).isZero();
 	}
 
 	private static class CapturingItineraryCommandRepository implements ItineraryCommandRepository {
 
 		private long currentVersion;
-		private ItineraryDayReadModel currentDay = new ItineraryDayReadModel(
-			DAY_ID,
-			TRIP_ID,
-			ItineraryDayGroupType.DAY,
-			1,
-			LocalDate.parse("2026-07-01"),
-			"첫째 날",
-			0
-		);
-		private ItineraryDayUpdate lastUpdate;
+		private boolean itemExists = true;
+		private UUID deletedItemId;
+		private final List<UUID> deletedRouteIds = new ArrayList<>();
 
 		@Override
 		public OptionalLong incrementItineraryVersion(UUID tripId, long baseVersion, Instant updatedAt) {
@@ -142,7 +97,7 @@ class UpdateItineraryDayHandlerTest {
 
 		@Override
 		public Optional<ItineraryDayReadModel> findDay(UUID tripId, UUID dayId) {
-			return Optional.ofNullable(currentDay);
+			return Optional.empty();
 		}
 
 		@Override
@@ -152,17 +107,7 @@ class UpdateItineraryDayHandlerTest {
 
 		@Override
 		public Optional<ItineraryDayReadModel> updateDay(ItineraryDayUpdate update) {
-			this.lastUpdate = update;
-			currentDay = new ItineraryDayReadModel(
-				update.dayId(),
-				update.tripId(),
-				currentDay.groupType(),
-				update.dayNumber(),
-				update.date(),
-				update.title(),
-				update.sortOrder()
-			);
-			return Optional.of(currentDay);
+			return Optional.empty();
 		}
 
 		@Override
@@ -189,7 +134,8 @@ class UpdateItineraryDayHandlerTest {
 
 		@Override
 		public boolean softDeleteRouteSegment(UUID tripId, UUID routeId, UUID deletedByUserId, Instant deletedAt) {
-			return false;
+			deletedRouteIds.add(routeId);
+			return true;
 		}
 
 		@Override
@@ -219,22 +165,27 @@ class UpdateItineraryDayHandlerTest {
 
 		@Override
 		public boolean existsItem(UUID tripId, UUID itemId) {
-			return false;
+			return itemExists;
 		}
 
 		@Override
-		public java.util.List<UUID> findActiveRouteIdsByItem(UUID tripId, UUID itemId) {
-			return java.util.List.of();
+		public List<UUID> findActiveRouteIdsByItem(UUID tripId, UUID itemId) {
+			return List.of(ROUTE_ID);
 		}
 
 		@Override
 		public boolean softDeleteItem(UUID tripId, UUID itemId, UUID deletedByUserId, Instant deletedAt) {
-			return false;
+			if (!itemExists) {
+				return false;
+			}
+			deletedItemId = itemId;
+			itemExists = false;
+			return true;
 		}
 
 		@Override
 		public long countActiveItems(UUID tripId) {
-			return 0;
+			return itemExists ? 1 : 0;
 		}
 
 		@Override
@@ -248,11 +199,11 @@ class UpdateItineraryDayHandlerTest {
 
 	private static class CapturingEventRepository implements CollaborationCommandEventRepository {
 
-		private CollaborationCommandEvent lastEvent;
+		private final List<CollaborationCommandEvent> events = new ArrayList<>();
 
 		@Override
 		public void save(CollaborationCommandEvent event) {
-			this.lastEvent = event;
+			events.add(event);
 		}
 	}
 }

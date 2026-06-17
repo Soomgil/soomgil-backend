@@ -98,6 +98,32 @@ final class ItineraryCollaborationEvents {
 		);
 	}
 
+	static CollaborationCommandEvent itemDeleted(
+		UUID tripId,
+		UUID itemId,
+		UUID actorUserId,
+		long versionBefore,
+		long versionAfter,
+		List<UUID> affectedRouteIds,
+		Instant deletedAt
+	) {
+		return new CollaborationCommandEvent(
+			tripId,
+			actorUserId,
+			null,
+			SOURCE_USER,
+			"DELETE_ITINERARY_ITEM",
+			AGGREGATE_ITEM,
+			itemId,
+			versionBefore,
+			versionAfter,
+			"{\"itemId\":\"" + itemId + "\",\"affectedRouteIds\":" + uuidArrayJson(affectedRouteIds) + "}",
+			null,
+			null,
+			deletedAt
+		);
+	}
+
 	static CollaborationCommandEvent itineraryReordered(
 		UUID tripId,
 		UUID actorUserId,
@@ -275,6 +301,17 @@ final class ItineraryCollaborationEvents {
 				.append("\",\"sortOrder\":")
 				.append(item.sortOrder())
 				.append('}');
+		}
+		return builder.append(']').toString();
+	}
+
+	private static String uuidArrayJson(List<UUID> ids) {
+		StringBuilder builder = new StringBuilder("[");
+		for (int index = 0; index < ids.size(); index++) {
+			if (index > 0) {
+				builder.append(',');
+			}
+			builder.append('"').append(ids.get(index)).append('"');
 		}
 		return builder.append(']').toString();
 	}

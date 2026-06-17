@@ -166,6 +166,26 @@ public interface ItineraryCommandRepository {
 	boolean existsItem(UUID tripId, UUID itemId);
 
 	/**
+	 * item에 연결된 active route ID 목록을 조회한다.
+	 *
+	 * @param tripId 여행방 ID
+	 * @param itemId item ID
+	 * @return 연결 route ID 목록
+	 */
+	java.util.List<UUID> findActiveRouteIdsByItem(UUID tripId, UUID itemId);
+
+	/**
+	 * itinerary item을 soft delete 처리한다.
+	 *
+	 * @param tripId 여행방 ID
+	 * @param itemId item ID
+	 * @param deletedByUserId 삭제 사용자 ID
+	 * @param deletedAt 삭제 시각
+	 * @return 삭제된 row가 있으면 true
+	 */
+	boolean softDeleteItem(UUID tripId, UUID itemId, UUID deletedByUserId, Instant deletedAt);
+
+	/**
 	 * 여행방의 삭제되지 않은 active item 수를 조회한다.
 	 *
 	 * @param tripId 여행방 ID

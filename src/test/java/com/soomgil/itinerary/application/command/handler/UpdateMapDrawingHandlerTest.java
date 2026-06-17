@@ -218,6 +218,16 @@ class UpdateMapDrawingHandlerTest {
 		}
 
 		@Override
+		public java.util.List<UUID> findActiveRouteIdsByItem(UUID tripId, UUID itemId) {
+			return java.util.List.of();
+		}
+
+		@Override
+		public boolean softDeleteItem(UUID tripId, UUID itemId, UUID deletedByUserId, Instant deletedAt) {
+			return false;
+		}
+
+		@Override
 		public long countActiveItems(UUID tripId) {
 			return 0;
 		}
