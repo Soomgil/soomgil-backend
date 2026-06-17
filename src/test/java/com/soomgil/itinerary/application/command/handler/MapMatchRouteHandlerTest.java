@@ -8,8 +8,8 @@ import com.soomgil.collaboration.application.port.CollaborationCommandEvent;
 import com.soomgil.collaboration.application.port.CollaborationCommandEventRepository;
 import com.soomgil.global.error.BusinessException;
 import com.soomgil.global.error.ErrorCode;
-import com.soomgil.itinerary.application.command.dto.ItineraryMutationResult;
-import com.soomgil.itinerary.application.command.dto.SaveRouteSegmentCommand;
+import com.soomgil.itinerary.application.command.dto.MapMatchRouteCommand;
+import com.soomgil.itinerary.application.command.dto.MapMatchRouteResult;
 import com.soomgil.itinerary.application.port.ItineraryCommandRepository;
 import com.soomgil.itinerary.application.port.ItineraryDayCreate;
 import com.soomgil.itinerary.application.port.ItineraryDayOrderUpdate;
@@ -17,11 +17,17 @@ import com.soomgil.itinerary.application.port.ItineraryDayReadModel;
 import com.soomgil.itinerary.application.port.ItineraryItemCreate;
 import com.soomgil.itinerary.application.port.ItineraryItemOrderUpdate;
 import com.soomgil.itinerary.application.port.MapDrawingCreate;
+import com.soomgil.itinerary.application.port.MapMatchClientRequest;
+import com.soomgil.itinerary.application.port.MapMatchClientResult;
+import com.soomgil.itinerary.application.port.MapMatchingClient;
+import com.soomgil.itinerary.application.port.MapMatchingException;
+import com.soomgil.itinerary.application.port.RouteCoordinate;
 import com.soomgil.itinerary.application.port.RouteMatchRequestLog;
 import com.soomgil.itinerary.application.port.RouteSegmentCreate;
 import com.soomgil.itinerary.domain.model.RouteMode;
 import com.soomgil.trip.application.query.handler.TripAccessGuard;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalLong;
@@ -29,7 +35,7 @@ import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
-class SaveRouteSegmentHandlerTest {
+class MapMatchRouteHandlerTest {
 
 	private static final UUID TRIP_ID = UUID.fromString("10000000-0000-0000-0000-000000000001");
 	private static final UUID USER_ID = UUID.fromString("20000000-0000-0000-0000-000000000001");
@@ -38,86 +44,80 @@ class SaveRouteSegmentHandlerTest {
 
 	private final CapturingItineraryCommandRepository repository = new CapturingItineraryCommandRepository();
 	private final CapturingEventRepository eventRepository = new CapturingEventRepository();
-	private final SaveRouteSegmentHandler handler = new SaveRouteSegmentHandler(
-		repository,
-		eventRepository,
-		new TripAccessGuard(new CreateItineraryDayHandlerTest.StubTripQueryRepository()),
-		() -> Instant.parse("2026-06-17T00:00:00Z"),
-		new ObjectMapper()
-	);
 
 	@Test
-	void savesRouteSegmentAndRecordsEvent() {
-		ItineraryMutationResult result = handler.handle(new SaveRouteSegmentCommand(
+	void matchesRouteAndStoresRequestLog() {
+		MapMatchRouteHandler handler = handler(request -> new MapMatchClientResult(
+			Map.of("type", "LineString", "coordinates", List.of(List.of(127.0, 37.0), List.of(127.1, 37.1))),
+			List.of(Map.of("waypoint_index", 0)),
+			Map.of("code", "Ok"),
+			120.0,
+			60.0,
+			0.98
+		));
+
+		MapMatchRouteResult result = handler.handle(command());
+
+		assertThat(result.matchRequestId()).isEqualTo(11L);
+		assertThat(result.mutation().route().providerProfile()).isEqualTo("mapbox/walking");
+		assertThat(repository.insertedRoute).isNotNull();
+		assertThat(repository.insertedLog.status()).isEqualTo("SUCCEEDED");
+		assertThat(repository.insertedLog.tripRouteId()).isEqualTo(repository.insertedRoute.id());
+	}
+
+	@Test
+	void recordsFailedRequestWhenProviderCannotMatch() {
+		MapMatchRouteHandler handler = handler(request -> {
+			throw new MapMatchingException("NoMatch", "No matching route found.");
+		});
+
+		assertThatThrownBy(() -> handler.handle(command()))
+			.isInstanceOfSatisfying(BusinessException.class, exception -> {
+				assertThat(exception.errorCode()).isEqualTo(ErrorCode.BUSINESS_RULE_VIOLATION);
+				assertThat(exception.getMessage()).contains("requestId=11");
+			});
+		assertThat(repository.insertedRoute).isNull();
+		assertThat(repository.insertedLog.status()).isEqualTo("FAILED");
+		assertThat(repository.insertedLog.errorCode()).isEqualTo("NoMatch");
+	}
+
+	private MapMatchRouteHandler handler(MapMatchingClient client) {
+		return new MapMatchRouteHandler(
+			repository,
+			new TripAccessGuard(new CreateItineraryDayHandlerTest.StubTripQueryRepository()),
+			client,
+			new SaveRouteSegmentHandler(
+				repository,
+				eventRepository,
+				new TripAccessGuard(new CreateItineraryDayHandlerTest.StubTripQueryRepository()),
+				() -> Instant.parse("2026-06-17T00:00:00Z"),
+				new ObjectMapper()
+			),
+			() -> Instant.parse("2026-06-17T00:00:00Z"),
+			new ObjectMapper()
+		);
+	}
+
+	private MapMatchRouteCommand command() {
+		return new MapMatchRouteCommand(
 			TRIP_ID,
 			USER_ID,
 			0,
 			ORIGIN_ITEM_ID,
 			DESTINATION_ITEM_ID,
 			RouteMode.WALKING,
+			List.of(new RouteCoordinate(127.0, 37.0), new RouteCoordinate(127.1, 37.1)),
 			null,
-			null,
-			Map.of("type", "LineString", "coordinates", java.util.List.of()),
-			123.4,
-			56.7,
-			0.91
-		));
-
-		assertThat(result.itineraryVersion()).isEqualTo(1);
-		assertThat(result.route().id()).isEqualTo(repository.insertedRoute.id());
-		assertThat(result.route().providerProfile()).isEqualTo("mapbox/walking");
-		assertThat(repository.insertedRoute.geometry()).contains("LineString");
-		assertThat(eventRepository.lastEvent.commandType()).isEqualTo("CREATE_ROUTE_SEGMENT");
-		assertThat(eventRepository.lastEvent.aggregateId()).isEqualTo(repository.insertedRoute.id());
-	}
-
-	@Test
-	void rejectsSameOriginAndDestination() {
-		assertThatThrownBy(() -> handler.handle(new SaveRouteSegmentCommand(
-			TRIP_ID,
-			USER_ID,
-			0,
-			ORIGIN_ITEM_ID,
-			ORIGIN_ITEM_ID,
-			RouteMode.DRIVING,
-			null,
-			null,
-			Map.of("type", "LineString"),
-			null,
-			null,
-			null
-		))).isInstanceOfSatisfying(BusinessException.class, exception ->
-			assertThat(exception.errorCode()).isEqualTo(ErrorCode.VALIDATION_FAILED)
-		);
-	}
-
-	@Test
-	void rejectsMissingItineraryItem() {
-		repository.itemIds = Set.of(ORIGIN_ITEM_ID);
-
-		assertThatThrownBy(() -> handler.handle(new SaveRouteSegmentCommand(
-			TRIP_ID,
-			USER_ID,
-			0,
-			ORIGIN_ITEM_ID,
-			DESTINATION_ITEM_ID,
-			RouteMode.DRIVING,
-			null,
-			null,
-			Map.of("type", "LineString"),
-			null,
-			null,
-			null
-		))).isInstanceOfSatisfying(BusinessException.class, exception ->
-			assertThat(exception.errorCode()).isEqualTo(ErrorCode.RESOURCE_NOT_FOUND)
+			true
 		);
 	}
 
 	private static class CapturingItineraryCommandRepository implements ItineraryCommandRepository {
 
 		private long currentVersion;
-		private Set<UUID> itemIds = Set.of(ORIGIN_ITEM_ID, DESTINATION_ITEM_ID);
+		private final Set<UUID> itemIds = Set.of(ORIGIN_ITEM_ID, DESTINATION_ITEM_ID);
 		private RouteSegmentCreate insertedRoute;
+		private RouteMatchRequestLog insertedLog;
 
 		@Override
 		public OptionalLong incrementItineraryVersion(UUID tripId, long baseVersion, Instant updatedAt) {
@@ -157,17 +157,18 @@ class SaveRouteSegmentHandlerTest {
 
 		@Override
 		public Long insertRouteMatchRequest(RouteMatchRequestLog request) {
-			return 1L;
+			this.insertedLog = request;
+			return 11L;
 		}
 
 		@Override
 		public boolean existsDay(UUID tripId, UUID dayId) {
-			return false;
+			return true;
 		}
 
 		@Override
 		public long countDays(UUID tripId) {
-			return 0;
+			return 1;
 		}
 
 		@Override
@@ -191,11 +192,8 @@ class SaveRouteSegmentHandlerTest {
 
 	private static class CapturingEventRepository implements CollaborationCommandEventRepository {
 
-		private CollaborationCommandEvent lastEvent;
-
 		@Override
 		public void save(CollaborationCommandEvent event) {
-			this.lastEvent = event;
 		}
 	}
 }

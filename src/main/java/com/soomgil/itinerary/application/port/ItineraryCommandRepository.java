@@ -67,6 +67,14 @@ public interface ItineraryCommandRepository {
 	void insertRouteSegment(RouteSegmentCreate route);
 
 	/**
+	 * route map matching 요청 이력을 저장한다.
+	 *
+	 * @param request 요청 이력
+	 * @return 저장된 요청 이력 ID
+	 */
+	Long insertRouteMatchRequest(RouteMatchRequestLog request);
+
+	/**
 	 * day가 같은 trip에 존재하는지 확인한다.
 	 *
 	 * @param tripId 여행방 ID

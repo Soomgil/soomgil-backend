@@ -6,6 +6,7 @@ import com.soomgil.itinerary.application.port.ItineraryDayReadModel;
 import com.soomgil.itinerary.application.port.ItineraryItemCreate;
 import com.soomgil.itinerary.application.port.ItineraryItemOrderUpdate;
 import com.soomgil.itinerary.application.port.MapDrawingCreate;
+import com.soomgil.itinerary.application.port.RouteMatchRequestLog;
 import com.soomgil.itinerary.application.port.RouteSegmentCreate;
 import java.time.Instant;
 import java.util.UUID;
@@ -75,6 +76,14 @@ public interface ItineraryCommandMapper {
 	 * @param route 저장할 route segment
 	 */
 	void insertRouteSegment(@Param("route") RouteSegmentCreate route);
+
+	/**
+	 * route map matching 요청 이력을 추가한다.
+	 *
+	 * @param request 저장할 요청 이력
+	 * @return 저장된 요청 이력 ID
+	 */
+	Long insertRouteMatchRequest(@Param("request") RouteMatchRequestLog request);
 
 	/**
 	 * 일정 day 존재 여부를 조회한다.

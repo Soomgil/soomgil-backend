@@ -176,6 +176,56 @@
     )
   </insert>
 
+  <select id="insertRouteMatchRequest" resultType="long">
+    INSERT INTO itinerary.route_match_requests (
+      trip_id,
+      trip_route_id,
+      origin_itinerary_item_id,
+      destination_itinerary_item_id,
+      requested_by_user_id,
+      provider,
+      provider_profile,
+      input_coordinates,
+      radiuses,
+      tidy,
+      request_hash,
+      status,
+      confidence,
+      distance_meters,
+      duration_seconds,
+      tracepoints,
+      matchings_metadata,
+      error_code,
+      error_message,
+      created_at,
+      completed_at
+    )
+    VALUES (
+      #{request.tripId},
+      #{request.tripRouteId,jdbcType=OTHER},
+      #{request.originItineraryItemId},
+      #{request.destinationItineraryItemId},
+      #{request.requestedByUserId},
+      #{request.provider},
+      #{request.providerProfile},
+      #{request.inputCoordinates}::jsonb,
+      #{request.radiuses,jdbcType=VARCHAR}::jsonb,
+      #{request.tidy},
+      #{request.requestHash},
+      #{request.status},
+      #{request.confidence,jdbcType=DOUBLE},
+      #{request.distanceMeters,jdbcType=DOUBLE},
+      #{request.durationSeconds,jdbcType=DOUBLE},
+      #{request.tracepoints,jdbcType=VARCHAR}::jsonb,
+      #{request.matchingsMetadata,jdbcType=VARCHAR}::jsonb,
+      #{request.errorCode,jdbcType=VARCHAR},
+      #{request.errorMessage,jdbcType=VARCHAR},
+      #{request.createdAt},
+      #{request.completedAt}
+    )
+    RETURNING id
+  </select>
+
   <select id="existsDay" resultType="boolean">
     SELECT EXISTS (
       SELECT 1

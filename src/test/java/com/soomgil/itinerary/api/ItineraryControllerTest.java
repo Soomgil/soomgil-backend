@@ -14,19 +14,29 @@ import com.soomgil.itinerary.api.dto.ItineraryDayOrder;
 import com.soomgil.itinerary.api.dto.ItineraryItemType;
 import com.soomgil.itinerary.api.dto.ItineraryItemOrder;
 import com.soomgil.itinerary.api.dto.ItineraryMutationResponse;
+import com.soomgil.itinerary.api.dto.MapMatchRouteRequest;
+import com.soomgil.itinerary.api.dto.MapMatchRouteResponse;
 import com.soomgil.itinerary.api.dto.ReorderItineraryRequest;
+import com.soomgil.itinerary.api.dto.RouteMode;
 import com.soomgil.itinerary.application.command.handler.CreateItineraryDayHandler;
 import com.soomgil.itinerary.application.command.handler.CreateItineraryItemHandler;
 import com.soomgil.itinerary.application.command.handler.CreateMapDrawingHandler;
+import com.soomgil.itinerary.application.command.handler.MapMatchRouteHandler;
 import com.soomgil.itinerary.application.command.handler.ReorderItineraryHandler;
+import com.soomgil.itinerary.application.command.handler.SaveRouteSegmentHandler;
 import com.soomgil.itinerary.application.port.ItineraryCommandRepository;
 import com.soomgil.itinerary.application.port.ItineraryDayCreate;
 import com.soomgil.itinerary.application.port.ItineraryDayOrderUpdate;
 import com.soomgil.itinerary.application.port.ItineraryDayReadModel;
 import com.soomgil.itinerary.application.port.ItineraryItemCreate;
 import com.soomgil.itinerary.application.port.ItineraryItemOrderUpdate;
+import com.soomgil.itinerary.application.port.MapMatchClientRequest;
+import com.soomgil.itinerary.application.port.MapMatchClientResult;
+import com.soomgil.itinerary.application.port.MapMatchingClient;
 import com.soomgil.itinerary.application.port.MapDrawingCreate;
+import com.soomgil.itinerary.application.port.RouteMatchRequestLog;
 import com.soomgil.itinerary.application.port.RouteSegmentCreate;
+import com.soomgil.geo.api.dto.LngLat;
 import com.soomgil.place.api.dto.PlaceProvider;
 import com.soomgil.place.api.dto.PlaceRef;
 import com.soomgil.trip.application.port.TripAccessSnapshot;
@@ -146,6 +156,35 @@ class ItineraryControllerTest {
 		assertThat(repository.insertedDrawing.label()).isEqualTo("이동선");
 	}
 
+	@Test
+	void mapMatchesRouteResponse() {
+		StubItineraryCommandRepository repository = new StubItineraryCommandRepository();
+		ItineraryController controller = controller(repository);
+		UUID originItemId = UUID.fromString("40000000-0000-0000-0000-000000000001");
+		UUID destinationItemId = UUID.fromString("40000000-0000-0000-0000-000000000002");
+
+		MapMatchRouteResponse result = controller.mapMatchRoute(
+			TRIP_ID,
+			new MapMatchRouteRequest(
+				0L,
+				originItemId,
+				destinationItemId,
+				RouteMode.WALKING,
+				List.of(new LngLat(127.0, 37.0), new LngLat(127.1, 37.1)),
+				null,
+				true
+			),
+			principal()
+		);
+
+		assertThat(result.tripId()).isEqualTo(TRIP_ID);
+		assertThat(result.itineraryVersion()).isEqualTo(1);
+		assertThat(result.route().provider()).isEqualTo("MAPBOX");
+		assertThat(result.route().providerProfile()).isEqualTo("mapbox/walking");
+		assertThat(result.matchRequestId()).isEqualTo(10L);
+		assertThat(result.matchingsMetadata()).containsEntry("code", "Ok");
+	}
+
 	private ItineraryController controller(StubItineraryCommandRepository repository) {
 		CapturingEventRepository eventRepository = new CapturingEventRepository();
 		return new ItineraryController(
@@ -173,8 +212,42 @@ class ItineraryControllerTest {
 				new com.soomgil.trip.application.query.handler.TripAccessGuard(new StubTripQueryRepository()),
 				() -> Instant.parse("2026-06-17T00:00:00Z"),
 				new ObjectMapper()
+			),
+			new MapMatchRouteHandler(
+				repository,
+				new com.soomgil.trip.application.query.handler.TripAccessGuard(new StubTripQueryRepository()),
+				new StubMapMatchingClient(),
+				new SaveRouteSegmentHandler(
+					repository,
+					eventRepository,
+					new com.soomgil.trip.application.query.handler.TripAccessGuard(new StubTripQueryRepository()),
+					() -> Instant.parse("2026-06-17T00:00:00Z"),
+					new ObjectMapper()
+				),
+				() -> Instant.parse("2026-06-17T00:00:00Z"),
+				new ObjectMapper()
 			)
 		);
+	}
+
+	private static class StubMapMatchingClient implements MapMatchingClient {
+
+		@Override
+		public MapMatchClientResult match(MapMatchClientRequest request) {
+			return new MapMatchClientResult(
+				java.util.Map.of(
+					"type",
+					"LineString",
+					"coordinates",
+					List.of(List.of(127.0, 37.0), List.of(127.1, 37.1))
+				),
+				List.of(java.util.Map.of("name", "tracepoint")),
+				java.util.Map.of("code", "Ok"),
+				120.5,
+				60.0,
+				0.98
+			);
+		}
 	}
 
 	private static class CapturingEventRepository implements CollaborationCommandEventRepository {
@@ -228,6 +301,11 @@ class ItineraryControllerTest {
 
 		@Override
 		public void insertRouteSegment(RouteSegmentCreate route) {
+		}
+
+		@Override
+		public Long insertRouteMatchRequest(RouteMatchRequestLog request) {
+			return 10L;
 		}
 
 		@Override

@@ -26,13 +26,17 @@ import com.soomgil.itinerary.application.command.dto.ItineraryDayOrderCommand;
 import com.soomgil.itinerary.application.command.dto.ItineraryItemOrderCommand;
 import com.soomgil.itinerary.application.command.dto.ItineraryDayView;
 import com.soomgil.itinerary.application.command.dto.ItineraryItemView;
+import com.soomgil.itinerary.application.command.dto.MapMatchRouteCommand;
+import com.soomgil.itinerary.application.command.dto.MapMatchRouteResult;
 import com.soomgil.itinerary.application.command.dto.ItineraryMutationResult;
 import com.soomgil.itinerary.application.command.dto.MapDrawingView;
 import com.soomgil.itinerary.application.command.dto.ReorderItineraryCommand;
 import com.soomgil.itinerary.application.command.dto.RouteSegmentView;
+import com.soomgil.itinerary.application.port.RouteCoordinate;
 import com.soomgil.itinerary.application.command.handler.CreateItineraryDayHandler;
 import com.soomgil.itinerary.application.command.handler.CreateItineraryItemHandler;
 import com.soomgil.itinerary.application.command.handler.CreateMapDrawingHandler;
+import com.soomgil.itinerary.application.command.handler.MapMatchRouteHandler;
 import com.soomgil.itinerary.application.command.handler.ReorderItineraryHandler;
 import com.soomgil.place.api.dto.PlaceProvider;
 import com.soomgil.place.api.dto.PlaceRef;
@@ -64,12 +68,14 @@ public class ItineraryController extends ApiControllerSupport {
 	private final CreateItineraryItemHandler createItineraryItemHandler;
 	private final ReorderItineraryHandler reorderItineraryHandler;
 	private final CreateMapDrawingHandler createMapDrawingHandler;
+	private final MapMatchRouteHandler mapMatchRouteHandler;
 
 	public ItineraryController(
 		CreateItineraryDayHandler createItineraryDayHandler,
 		CreateItineraryItemHandler createItineraryItemHandler,
 		ReorderItineraryHandler reorderItineraryHandler,
-		CreateMapDrawingHandler createMapDrawingHandler
+		CreateMapDrawingHandler createMapDrawingHandler,
+		MapMatchRouteHandler mapMatchRouteHandler
 	) {
 		this.createItineraryDayHandler = Objects.requireNonNull(
 			createItineraryDayHandler,
@@ -87,6 +93,7 @@ public class ItineraryController extends ApiControllerSupport {
 			createMapDrawingHandler,
 			"createMapDrawingHandler must not be null"
 		);
+		this.mapMatchRouteHandler = Objects.requireNonNull(mapMatchRouteHandler, "mapMatchRouteHandler must not be null");
 	}
 
 	@GetMapping
@@ -198,9 +205,35 @@ public class ItineraryController extends ApiControllerSupport {
 	@PostMapping("/routes/map-match")
 	public MapMatchRouteResponse mapMatchRoute(
 		@PathVariable UUID tripId,
-		@Valid @RequestBody MapMatchRouteRequest request
+		@Valid @RequestBody MapMatchRouteRequest request,
+		Principal principal
 	) {
-		return notImplemented();
+		MapMatchRouteResult result = mapMatchRouteHandler.handle(new MapMatchRouteCommand(
+			tripId,
+			currentUserId(principal),
+			request.baseVersion(),
+			request.originItineraryItemId(),
+			request.destinationItineraryItemId(),
+			com.soomgil.itinerary.domain.model.RouteMode.valueOf(request.mode().name()),
+			request.coordinates().stream()
+				.map(coordinate -> new RouteCoordinate(coordinate.lng(), coordinate.lat()))
+				.toList(),
+			request.radiuses(),
+			request.tidy()
+		));
+		ItineraryMutationResult mutation = result.mutation();
+		return new MapMatchRouteResponse(
+			mutation.tripId(),
+			mutation.itineraryVersion(),
+			mutation.day() == null ? null : toDay(mutation.day()),
+			mutation.item() == null ? null : toItem(mutation.item()),
+			mutation.route() == null ? null : toRoute(mutation.route()),
+			mutation.drawing() == null ? null : toDrawing(mutation.drawing()),
+			mutation.affectedRouteIds(),
+			result.matchRequestId(),
+			result.tracepoints(),
+			result.matchingsMetadata()
+		);
 	}
 
 	@PatchMapping("/routes/{routeId}")
