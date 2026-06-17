@@ -86,6 +86,31 @@ public interface ItineraryCommandMapper {
 	Long insertRouteMatchRequest(@Param("request") RouteMatchRequestLog request);
 
 	/**
+	 * active route segment 존재 여부를 조회한다.
+	 *
+	 * @param tripId 여행방 ID
+	 * @param routeId route ID
+	 * @return 존재 여부
+	 */
+	boolean existsActiveRouteSegment(@Param("tripId") UUID tripId, @Param("routeId") UUID routeId);
+
+	/**
+	 * route segment를 soft delete 처리한다.
+	 *
+	 * @param tripId 여행방 ID
+	 * @param routeId route ID
+	 * @param deletedByUserId 삭제 사용자 ID
+	 * @param deletedAt 삭제 시각
+	 * @return 삭제 row 수
+	 */
+	int softDeleteRouteSegment(
+		@Param("tripId") UUID tripId,
+		@Param("routeId") UUID routeId,
+		@Param("deletedByUserId") UUID deletedByUserId,
+		@Param("deletedAt") Instant deletedAt
+	);
+
+	/**
 	 * 일정 day 존재 여부를 조회한다.
 	 *
 	 * @param tripId 여행방 ID

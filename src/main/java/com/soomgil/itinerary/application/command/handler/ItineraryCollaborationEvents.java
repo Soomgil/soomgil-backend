@@ -145,6 +145,31 @@ final class ItineraryCollaborationEvents {
 		);
 	}
 
+	static CollaborationCommandEvent routeSegmentDeleted(
+		UUID tripId,
+		UUID routeId,
+		UUID actorUserId,
+		long versionBefore,
+		long versionAfter,
+		Instant deletedAt
+	) {
+		return new CollaborationCommandEvent(
+			tripId,
+			actorUserId,
+			null,
+			SOURCE_USER,
+			"DELETE_ROUTE_SEGMENT",
+			AGGREGATE_ROUTE,
+			routeId,
+			versionBefore,
+			versionAfter,
+			"{\"routeId\":\"" + routeId + "\"}",
+			null,
+			null,
+			deletedAt
+		);
+	}
+
 	private static String daysJson(List<ItineraryDayOrderCommand> days) {
 		StringBuilder builder = new StringBuilder("[");
 		for (int index = 0; index < days.size(); index++) {

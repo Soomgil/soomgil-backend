@@ -22,6 +22,7 @@ import com.soomgil.itinerary.api.dto.UpdateRouteRequest;
 import com.soomgil.itinerary.application.command.dto.CreateItineraryDayCommand;
 import com.soomgil.itinerary.application.command.dto.CreateItineraryItemCommand;
 import com.soomgil.itinerary.application.command.dto.CreateMapDrawingCommand;
+import com.soomgil.itinerary.application.command.dto.DeleteRouteSegmentCommand;
 import com.soomgil.itinerary.application.command.dto.ItineraryDayOrderCommand;
 import com.soomgil.itinerary.application.command.dto.ItineraryItemOrderCommand;
 import com.soomgil.itinerary.application.command.dto.ItineraryDayView;
@@ -36,6 +37,7 @@ import com.soomgil.itinerary.application.port.RouteCoordinate;
 import com.soomgil.itinerary.application.command.handler.CreateItineraryDayHandler;
 import com.soomgil.itinerary.application.command.handler.CreateItineraryItemHandler;
 import com.soomgil.itinerary.application.command.handler.CreateMapDrawingHandler;
+import com.soomgil.itinerary.application.command.handler.DeleteRouteSegmentHandler;
 import com.soomgil.itinerary.application.command.handler.MapMatchRouteHandler;
 import com.soomgil.itinerary.application.command.handler.ReorderItineraryHandler;
 import com.soomgil.itinerary.application.query.dto.FindItineraryQuery;
@@ -74,6 +76,7 @@ public class ItineraryController extends ApiControllerSupport {
 	private final CreateMapDrawingHandler createMapDrawingHandler;
 	private final MapMatchRouteHandler mapMatchRouteHandler;
 	private final FindItineraryHandler findItineraryHandler;
+	private final DeleteRouteSegmentHandler deleteRouteSegmentHandler;
 
 	public ItineraryController(
 		CreateItineraryDayHandler createItineraryDayHandler,
@@ -81,7 +84,8 @@ public class ItineraryController extends ApiControllerSupport {
 		ReorderItineraryHandler reorderItineraryHandler,
 		CreateMapDrawingHandler createMapDrawingHandler,
 		MapMatchRouteHandler mapMatchRouteHandler,
-		FindItineraryHandler findItineraryHandler
+		FindItineraryHandler findItineraryHandler,
+		DeleteRouteSegmentHandler deleteRouteSegmentHandler
 	) {
 		this.createItineraryDayHandler = Objects.requireNonNull(
 			createItineraryDayHandler,
@@ -101,6 +105,10 @@ public class ItineraryController extends ApiControllerSupport {
 		);
 		this.mapMatchRouteHandler = Objects.requireNonNull(mapMatchRouteHandler, "mapMatchRouteHandler must not be null");
 		this.findItineraryHandler = Objects.requireNonNull(findItineraryHandler, "findItineraryHandler must not be null");
+		this.deleteRouteSegmentHandler = Objects.requireNonNull(
+			deleteRouteSegmentHandler,
+			"deleteRouteSegmentHandler must not be null"
+		);
 	}
 
 	@GetMapping
@@ -256,9 +264,15 @@ public class ItineraryController extends ApiControllerSupport {
 	public ItineraryMutationResponse deleteRoute(
 		@PathVariable UUID tripId,
 		@PathVariable UUID routeId,
-		@Valid @RequestBody VersionedCommandRequest request
+		@Valid @RequestBody VersionedCommandRequest request,
+		Principal principal
 	) {
-		return notImplemented();
+		return toResponse(deleteRouteSegmentHandler.handle(new DeleteRouteSegmentCommand(
+			tripId,
+			currentUserId(principal),
+			request.baseVersion(),
+			routeId
+		)));
 	}
 
 	@PostMapping("/drawings")

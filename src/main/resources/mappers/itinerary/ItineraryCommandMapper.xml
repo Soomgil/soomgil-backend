@@ -251,6 +251,16 @@
     )
   </select>
 
+  <select id="existsActiveRouteSegment" resultType="boolean">
+    SELECT EXISTS (
+      SELECT 1
+      FROM itinerary.trip_routes
+      WHERE trip_id = #{tripId}
+        AND id = #{routeId}
+        AND deleted_at IS NULL
+    )
+  </select>
+
   <select id="countActiveItems" resultType="long">
     SELECT count(*)
     FROM itinerary.itinerary_items
@@ -276,6 +286,18 @@
       updated_at = #{update.updatedAt}
     WHERE trip_id = #{update.tripId}
       AND id = #{update.itemId}
+      AND deleted_at IS NULL
+  </update>
+
+  <update id="softDeleteRouteSegment">
+    UPDATE itinerary.trip_routes
+    SET
+      deleted_by_user_id = #{deletedByUserId},
+      deleted_at = #{deletedAt},
+      updated_by_user_id = #{deletedByUserId},
+      updated_at = #{deletedAt}
+    WHERE trip_id = #{tripId}
+      AND id = #{routeId}
       AND deleted_at IS NULL
   </update>
 </mapper>

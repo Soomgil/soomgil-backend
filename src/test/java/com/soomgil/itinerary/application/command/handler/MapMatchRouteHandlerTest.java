@@ -162,6 +162,16 @@ class MapMatchRouteHandlerTest {
 		}
 
 		@Override
+		public boolean existsActiveRouteSegment(UUID tripId, UUID routeId) {
+			return false;
+		}
+
+		@Override
+		public boolean softDeleteRouteSegment(UUID tripId, UUID routeId, UUID deletedByUserId, Instant deletedAt) {
+			return false;
+		}
+
+		@Override
 		public boolean existsDay(UUID tripId, UUID dayId) {
 			return true;
 		}

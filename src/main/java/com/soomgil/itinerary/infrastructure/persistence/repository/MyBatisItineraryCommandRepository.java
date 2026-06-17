@@ -72,6 +72,16 @@ public class MyBatisItineraryCommandRepository implements ItineraryCommandReposi
 	}
 
 	@Override
+	public boolean existsActiveRouteSegment(UUID tripId, UUID routeId) {
+		return mapper.existsActiveRouteSegment(tripId, routeId);
+	}
+
+	@Override
+	public boolean softDeleteRouteSegment(UUID tripId, UUID routeId, UUID deletedByUserId, Instant deletedAt) {
+		return mapper.softDeleteRouteSegment(tripId, routeId, deletedByUserId, deletedAt) > 0;
+	}
+
+	@Override
 	public boolean existsDay(UUID tripId, UUID dayId) {
 		return mapper.existsDay(tripId, dayId);
 	}
