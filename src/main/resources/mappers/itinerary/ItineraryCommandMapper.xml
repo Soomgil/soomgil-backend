@@ -88,4 +88,35 @@
         AND id = #{dayId}
     )
   </select>
+
+  <select id="existsItem" resultType="boolean">
+    SELECT EXISTS (
+      SELECT 1
+      FROM itinerary.itinerary_items
+      WHERE trip_id = #{tripId}
+        AND id = #{itemId}
+        AND deleted_at IS NULL
+    )
+  </select>
+
+  <update id="updateDayOrder">
+    UPDATE itinerary.itinerary_days
+    SET
+      sort_order = #{update.sortOrder},
+      updated_at = #{update.updatedAt}
+    WHERE trip_id = #{update.tripId}
+      AND id = #{update.dayId}
+  </update>
+
+  <update id="updateItemOrder">
+    UPDATE itinerary.itinerary_items
+    SET
+      itinerary_day_id = #{update.dayId},
+      sort_order = #{update.sortOrder},
+      updated_by_user_id = #{update.updatedByUserId},
+      updated_at = #{update.updatedAt}
+    WHERE trip_id = #{update.tripId}
+      AND id = #{update.itemId}
+      AND deleted_at IS NULL
+  </update>
 </mapper>

@@ -21,11 +21,15 @@ import com.soomgil.itinerary.api.dto.UpdateMapDrawingRequest;
 import com.soomgil.itinerary.api.dto.UpdateRouteRequest;
 import com.soomgil.itinerary.application.command.dto.CreateItineraryDayCommand;
 import com.soomgil.itinerary.application.command.dto.CreateItineraryItemCommand;
+import com.soomgil.itinerary.application.command.dto.ItineraryDayOrderCommand;
+import com.soomgil.itinerary.application.command.dto.ItineraryItemOrderCommand;
 import com.soomgil.itinerary.application.command.dto.ItineraryDayView;
 import com.soomgil.itinerary.application.command.dto.ItineraryItemView;
 import com.soomgil.itinerary.application.command.dto.ItineraryMutationResult;
+import com.soomgil.itinerary.application.command.dto.ReorderItineraryCommand;
 import com.soomgil.itinerary.application.command.handler.CreateItineraryDayHandler;
 import com.soomgil.itinerary.application.command.handler.CreateItineraryItemHandler;
+import com.soomgil.itinerary.application.command.handler.ReorderItineraryHandler;
 import com.soomgil.place.api.dto.PlaceProvider;
 import com.soomgil.place.api.dto.PlaceRef;
 import com.soomgil.place.api.dto.PlaceSourceStatus;
@@ -54,10 +58,12 @@ public class ItineraryController extends ApiControllerSupport {
 
 	private final CreateItineraryDayHandler createItineraryDayHandler;
 	private final CreateItineraryItemHandler createItineraryItemHandler;
+	private final ReorderItineraryHandler reorderItineraryHandler;
 
 	public ItineraryController(
 		CreateItineraryDayHandler createItineraryDayHandler,
-		CreateItineraryItemHandler createItineraryItemHandler
+		CreateItineraryItemHandler createItineraryItemHandler,
+		ReorderItineraryHandler reorderItineraryHandler
 	) {
 		this.createItineraryDayHandler = Objects.requireNonNull(
 			createItineraryDayHandler,
@@ -66,6 +72,10 @@ public class ItineraryController extends ApiControllerSupport {
 		this.createItineraryItemHandler = Objects.requireNonNull(
 			createItineraryItemHandler,
 			"createItineraryItemHandler must not be null"
+		);
+		this.reorderItineraryHandler = Objects.requireNonNull(
+			reorderItineraryHandler,
+			"reorderItineraryHandler must not be null"
 		);
 	}
 
@@ -156,9 +166,23 @@ public class ItineraryController extends ApiControllerSupport {
 	@PutMapping("/order")
 	public ItineraryMutationResponse reorderItinerary(
 		@PathVariable UUID tripId,
-		@Valid @RequestBody ReorderItineraryRequest request
+		@Valid @RequestBody ReorderItineraryRequest request,
+		Principal principal
 	) {
-		return notImplemented();
+		return toResponse(reorderItineraryHandler.handle(new ReorderItineraryCommand(
+			tripId,
+			currentUserId(principal),
+			request.baseVersion(),
+			request.days().stream()
+				.map(day -> new ItineraryDayOrderCommand(
+					day.dayId(),
+					day.sortOrder(),
+					day.itemOrders().stream()
+						.map(item -> new ItineraryItemOrderCommand(item.itemId(), item.sortOrder()))
+						.toList()
+				))
+				.toList()
+		)));
 	}
 
 	@PostMapping("/routes/map-match")

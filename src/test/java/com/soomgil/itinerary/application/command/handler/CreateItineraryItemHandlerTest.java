@@ -9,7 +9,9 @@ import com.soomgil.itinerary.application.command.dto.CreateItineraryItemCommand;
 import com.soomgil.itinerary.application.command.dto.ItineraryMutationResult;
 import com.soomgil.itinerary.application.port.ItineraryCommandRepository;
 import com.soomgil.itinerary.application.port.ItineraryDayCreate;
+import com.soomgil.itinerary.application.port.ItineraryDayOrderUpdate;
 import com.soomgil.itinerary.application.port.ItineraryItemCreate;
+import com.soomgil.itinerary.application.port.ItineraryItemOrderUpdate;
 import com.soomgil.itinerary.domain.model.ItineraryItemType;
 import com.soomgil.trip.application.query.handler.TripAccessGuard;
 import java.time.Instant;
@@ -125,6 +127,19 @@ class CreateItineraryItemHandlerTest {
 		@Override
 		public boolean existsDay(UUID tripId, UUID dayId) {
 			return dayExists;
+		}
+
+		@Override
+		public boolean existsItem(UUID tripId, UUID itemId) {
+			return false;
+		}
+
+		@Override
+		public void updateDayOrder(ItineraryDayOrderUpdate update) {
+		}
+
+		@Override
+		public void updateItemOrder(ItineraryItemOrderUpdate update) {
 		}
 	}
 }

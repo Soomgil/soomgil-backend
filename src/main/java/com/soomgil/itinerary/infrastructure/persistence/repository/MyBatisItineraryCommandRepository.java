@@ -2,7 +2,9 @@ package com.soomgil.itinerary.infrastructure.persistence.repository;
 
 import com.soomgil.itinerary.application.port.ItineraryCommandRepository;
 import com.soomgil.itinerary.application.port.ItineraryDayCreate;
+import com.soomgil.itinerary.application.port.ItineraryDayOrderUpdate;
 import com.soomgil.itinerary.application.port.ItineraryItemCreate;
+import com.soomgil.itinerary.application.port.ItineraryItemOrderUpdate;
 import com.soomgil.itinerary.infrastructure.persistence.mapper.ItineraryCommandMapper;
 import java.time.Instant;
 import java.util.Objects;
@@ -41,5 +43,20 @@ public class MyBatisItineraryCommandRepository implements ItineraryCommandReposi
 	@Override
 	public boolean existsDay(UUID tripId, UUID dayId) {
 		return mapper.existsDay(tripId, dayId);
+	}
+
+	@Override
+	public boolean existsItem(UUID tripId, UUID itemId) {
+		return mapper.existsItem(tripId, itemId);
+	}
+
+	@Override
+	public void updateDayOrder(ItineraryDayOrderUpdate update) {
+		mapper.updateDayOrder(update);
+	}
+
+	@Override
+	public void updateItemOrder(ItineraryItemOrderUpdate update) {
+		mapper.updateItemOrder(update);
 	}
 }

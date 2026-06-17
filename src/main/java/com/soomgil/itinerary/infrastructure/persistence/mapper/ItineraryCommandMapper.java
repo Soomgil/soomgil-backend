@@ -1,7 +1,9 @@
 package com.soomgil.itinerary.infrastructure.persistence.mapper;
 
 import com.soomgil.itinerary.application.port.ItineraryDayCreate;
+import com.soomgil.itinerary.application.port.ItineraryDayOrderUpdate;
 import com.soomgil.itinerary.application.port.ItineraryItemCreate;
+import com.soomgil.itinerary.application.port.ItineraryItemOrderUpdate;
 import java.time.Instant;
 import java.util.UUID;
 import org.apache.ibatis.annotations.Mapper;
@@ -49,4 +51,27 @@ public interface ItineraryCommandMapper {
 	 * @return 존재 여부
 	 */
 	boolean existsDay(@Param("tripId") UUID tripId, @Param("dayId") UUID dayId);
+
+	/**
+	 * 일정 item 존재 여부를 조회한다.
+	 *
+	 * @param tripId 여행방 ID
+	 * @param itemId 일정 item ID
+	 * @return 존재 여부
+	 */
+	boolean existsItem(@Param("tripId") UUID tripId, @Param("itemId") UUID itemId);
+
+	/**
+	 * 일정 day sort order를 갱신한다.
+	 *
+	 * @param update 갱신할 day 순서
+	 */
+	void updateDayOrder(@Param("update") ItineraryDayOrderUpdate update);
+
+	/**
+	 * 일정 item day 소속과 sort order를 갱신한다.
+	 *
+	 * @param update 갱신할 item 순서
+	 */
+	void updateItemOrder(@Param("update") ItineraryItemOrderUpdate update);
 }

@@ -5,13 +5,19 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.soomgil.itinerary.api.dto.CreateItineraryDayRequest;
 import com.soomgil.itinerary.api.dto.CreateItineraryItemRequest;
 import com.soomgil.itinerary.api.dto.ItineraryDayGroupType;
+import com.soomgil.itinerary.api.dto.ItineraryDayOrder;
 import com.soomgil.itinerary.api.dto.ItineraryItemType;
+import com.soomgil.itinerary.api.dto.ItineraryItemOrder;
 import com.soomgil.itinerary.api.dto.ItineraryMutationResponse;
+import com.soomgil.itinerary.api.dto.ReorderItineraryRequest;
 import com.soomgil.itinerary.application.command.handler.CreateItineraryDayHandler;
 import com.soomgil.itinerary.application.command.handler.CreateItineraryItemHandler;
+import com.soomgil.itinerary.application.command.handler.ReorderItineraryHandler;
 import com.soomgil.itinerary.application.port.ItineraryCommandRepository;
 import com.soomgil.itinerary.application.port.ItineraryDayCreate;
+import com.soomgil.itinerary.application.port.ItineraryDayOrderUpdate;
 import com.soomgil.itinerary.application.port.ItineraryItemCreate;
+import com.soomgil.itinerary.application.port.ItineraryItemOrderUpdate;
 import com.soomgil.place.api.dto.PlaceProvider;
 import com.soomgil.place.api.dto.PlaceRef;
 import com.soomgil.trip.application.port.TripAccessSnapshot;
@@ -83,6 +89,29 @@ class ItineraryControllerTest {
 		assertThat(result.item().placeName()).isEqualTo("성심당");
 	}
 
+	@Test
+	void reordersItineraryResponse() {
+		StubItineraryCommandRepository repository = new StubItineraryCommandRepository();
+		ItineraryController controller = controller(repository);
+
+		ItineraryMutationResponse result = controller.reorderItinerary(
+			TRIP_ID,
+			new ReorderItineraryRequest(
+				0L,
+				List.of(new ItineraryDayOrder(
+					DAY_ID,
+					0,
+					List.of(new ItineraryItemOrder(UUID.fromString("40000000-0000-0000-0000-000000000001"), 1))
+				))
+			),
+			principal()
+		);
+
+		assertThat(result.tripId()).isEqualTo(TRIP_ID);
+		assertThat(result.itineraryVersion()).isEqualTo(1);
+		assertThat(repository.itemOrderUpdated).isTrue();
+	}
+
 	private ItineraryController controller(StubItineraryCommandRepository repository) {
 		return new ItineraryController(
 			new CreateItineraryDayHandler(
@@ -91,6 +120,11 @@ class ItineraryControllerTest {
 				() -> Instant.parse("2026-06-17T00:00:00Z")
 			),
 			new CreateItineraryItemHandler(
+				repository,
+				new com.soomgil.trip.application.query.handler.TripAccessGuard(new StubTripQueryRepository()),
+				() -> Instant.parse("2026-06-17T00:00:00Z")
+			),
+			new ReorderItineraryHandler(
 				repository,
 				new com.soomgil.trip.application.query.handler.TripAccessGuard(new StubTripQueryRepository()),
 				() -> Instant.parse("2026-06-17T00:00:00Z")
@@ -105,6 +139,7 @@ class ItineraryControllerTest {
 	private static class StubItineraryCommandRepository implements ItineraryCommandRepository {
 
 		private long currentVersion;
+		private boolean itemOrderUpdated;
 
 		@Override
 		public OptionalLong incrementItineraryVersion(UUID tripId, long baseVersion, Instant updatedAt) {
@@ -126,6 +161,20 @@ class ItineraryControllerTest {
 		@Override
 		public boolean existsDay(UUID tripId, UUID dayId) {
 			return true;
+		}
+
+		@Override
+		public boolean existsItem(UUID tripId, UUID itemId) {
+			return true;
+		}
+
+		@Override
+		public void updateDayOrder(ItineraryDayOrderUpdate update) {
+		}
+
+		@Override
+		public void updateItemOrder(ItineraryItemOrderUpdate update) {
+			this.itemOrderUpdated = true;
 		}
 	}
 

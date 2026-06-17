@@ -43,4 +43,27 @@ public interface ItineraryCommandRepository {
 	 * @return 존재 여부
 	 */
 	boolean existsDay(UUID tripId, UUID dayId);
+
+	/**
+	 * item이 같은 trip에 존재하고 삭제되지 않았는지 확인한다.
+	 *
+	 * @param tripId 여행방 ID
+	 * @param itemId 일정 item ID
+	 * @return 존재 여부
+	 */
+	boolean existsItem(UUID tripId, UUID itemId);
+
+	/**
+	 * 일정 day sort order를 갱신한다.
+	 *
+	 * @param update 갱신할 day 순서
+	 */
+	void updateDayOrder(ItineraryDayOrderUpdate update);
+
+	/**
+	 * 일정 item day 소속과 sort order를 갱신한다.
+	 *
+	 * @param update 갱신할 item 순서
+	 */
+	void updateItemOrder(ItineraryItemOrderUpdate update);
 }
