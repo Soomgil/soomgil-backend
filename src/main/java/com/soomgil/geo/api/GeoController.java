@@ -3,15 +3,22 @@ package com.soomgil.geo.api;
 import com.soomgil.common.api.ApiControllerSupport;
 import com.soomgil.common.api.dto.PageMeta;
 import com.soomgil.geo.api.dto.LegalRegionLevel;
+import com.soomgil.geo.api.dto.SimplifiedCoordinates;
+import com.soomgil.geo.api.dto.SimplifyCoordinatesRequest;
+import com.soomgil.geo.api.dto.ViewportSummary;
 import com.soomgil.geo.api.dto.PagedLegalRegion;
 import com.soomgil.geo.application.query.dto.LegalRegionView;
 import com.soomgil.geo.application.query.dto.ListLegalRegionsQuery;
 import com.soomgil.geo.application.query.dto.PagedLegalRegionView;
+import com.soomgil.geo.application.query.handler.GeoCoordinateHandler;
 import com.soomgil.geo.application.query.handler.ListLegalRegionsHandler;
+import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Objects;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -22,12 +29,14 @@ import org.springframework.web.bind.annotation.RestController;
 public class GeoController extends ApiControllerSupport {
 
 	private final ListLegalRegionsHandler listLegalRegionsHandler;
+	private final GeoCoordinateHandler geoCoordinateHandler;
 
-	public GeoController(ListLegalRegionsHandler listLegalRegionsHandler) {
+	public GeoController(ListLegalRegionsHandler listLegalRegionsHandler, GeoCoordinateHandler geoCoordinateHandler) {
 		this.listLegalRegionsHandler = Objects.requireNonNull(
 			listLegalRegionsHandler,
 			"listLegalRegionsHandler must not be null"
 		);
+		this.geoCoordinateHandler = Objects.requireNonNull(geoCoordinateHandler, "geoCoordinateHandler must not be null");
 	}
 
 	@GetMapping("/legal-regions")
@@ -50,6 +59,25 @@ public class GeoController extends ApiControllerSupport {
 			sort
 		));
 		return toPagedLegalRegion(result);
+	}
+
+	@GetMapping("/viewport")
+	public ViewportSummary summarizeViewport(@RequestParam String bbox) {
+		return geoCoordinateHandler.summarizeViewport(bbox);
+	}
+
+	@PostMapping("/coordinates/simplify")
+	public SimplifiedCoordinates simplifyCoordinates(@Valid @RequestBody SimplifyCoordinatesRequest request) {
+		List<com.soomgil.geo.api.dto.LngLat> coordinates = geoCoordinateHandler.simplify(
+			request.coordinates(),
+			request.maxPoints()
+		);
+		return new SimplifiedCoordinates(
+			coordinates,
+			request.coordinates().size(),
+			coordinates.size(),
+			request.maxPoints() == null ? 100 : request.maxPoints()
+		);
 	}
 
 	private PagedLegalRegion toPagedLegalRegion(PagedLegalRegionView view) {
