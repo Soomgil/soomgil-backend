@@ -6,6 +6,8 @@ import com.soomgil.itinerary.application.port.ItineraryDayReadModel;
 import com.soomgil.itinerary.application.port.ItineraryDayUpdate;
 import com.soomgil.itinerary.application.port.ItineraryItemCreate;
 import com.soomgil.itinerary.application.port.ItineraryItemOrderUpdate;
+import com.soomgil.itinerary.application.port.ItineraryItemReadModel;
+import com.soomgil.itinerary.application.port.ItineraryItemUpdate;
 import com.soomgil.itinerary.application.port.MapDrawingCreate;
 import com.soomgil.itinerary.application.port.MapDrawingUpdate;
 import com.soomgil.itinerary.application.port.MapDrawingUpdateResult;
@@ -82,6 +84,23 @@ public interface ItineraryCommandMapper {
 	 * @param item 저장할 item
 	 */
 	void insertItem(@Param("item") ItineraryItemCreate item);
+
+	/**
+	 * itinerary item을 조회한다.
+	 *
+	 * @param tripId 여행방 ID
+	 * @param itemId item ID
+	 * @return item이 없으면 null
+	 */
+	ItineraryItemReadModel findItem(@Param("tripId") UUID tripId, @Param("itemId") UUID itemId);
+
+	/**
+	 * itinerary item을 수정하고 수정 후 값을 반환한다.
+	 *
+	 * @param update 수정 모델
+	 * @return 수정된 item, 없으면 null
+	 */
+	ItineraryItemReadModel updateItem(@Param("update") ItineraryItemUpdate update);
 
 	/**
 	 * 지도 도형을 추가한다.

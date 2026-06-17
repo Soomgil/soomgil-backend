@@ -202,6 +202,18 @@ class ReorderItineraryHandlerTest {
 		}
 
 		@Override
+		public java.util.Optional<com.soomgil.itinerary.application.port.ItineraryItemReadModel> findItem(UUID tripId, UUID itemId) {
+			return java.util.Optional.empty();
+		}
+
+		@Override
+		public java.util.Optional<com.soomgil.itinerary.application.port.ItineraryItemReadModel> updateItem(
+			com.soomgil.itinerary.application.port.ItineraryItemUpdate update
+		) {
+			return java.util.Optional.empty();
+		}
+
+		@Override
 		public void insertMapDrawing(MapDrawingCreate drawing) {
 		}
 

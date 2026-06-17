@@ -124,6 +124,31 @@ final class ItineraryCollaborationEvents {
 		);
 	}
 
+	static CollaborationCommandEvent itemUpdated(
+		UUID tripId,
+		UUID itemId,
+		UUID actorUserId,
+		long versionBefore,
+		long versionAfter,
+		Instant updatedAt
+	) {
+		return new CollaborationCommandEvent(
+			tripId,
+			actorUserId,
+			null,
+			SOURCE_USER,
+			"UPDATE_ITINERARY_ITEM",
+			AGGREGATE_ITEM,
+			itemId,
+			versionBefore,
+			versionAfter,
+			"{\"itemId\":\"" + itemId + "\"}",
+			null,
+			null,
+			updatedAt
+		);
+	}
+
 	static CollaborationCommandEvent itineraryReordered(
 		UUID tripId,
 		UUID actorUserId,

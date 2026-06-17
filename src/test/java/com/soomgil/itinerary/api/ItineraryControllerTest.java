@@ -20,6 +20,7 @@ import com.soomgil.itinerary.api.dto.ReorderItineraryRequest;
 import com.soomgil.itinerary.api.dto.RouteMode;
 import com.soomgil.itinerary.api.dto.UpdateMapDrawingRequest;
 import com.soomgil.itinerary.api.dto.UpdateItineraryDayRequest;
+import com.soomgil.itinerary.api.dto.UpdateItineraryItemRequest;
 import com.soomgil.itinerary.application.command.handler.CreateItineraryDayHandler;
 import com.soomgil.itinerary.application.command.handler.CreateItineraryItemHandler;
 import com.soomgil.itinerary.application.command.handler.CreateMapDrawingHandler;
@@ -31,6 +32,7 @@ import com.soomgil.itinerary.application.command.handler.ReorderItineraryHandler
 import com.soomgil.itinerary.application.command.handler.SaveRouteSegmentHandler;
 import com.soomgil.itinerary.application.command.handler.UpdateMapDrawingHandler;
 import com.soomgil.itinerary.application.command.handler.UpdateItineraryDayHandler;
+import com.soomgil.itinerary.application.command.handler.UpdateItineraryItemHandler;
 import com.soomgil.itinerary.application.port.ItineraryCommandRepository;
 import com.soomgil.itinerary.application.port.ItineraryDayCreate;
 import com.soomgil.itinerary.application.port.ItineraryDayOrderUpdate;
@@ -38,6 +40,7 @@ import com.soomgil.itinerary.application.port.ItineraryDayReadModel;
 import com.soomgil.itinerary.application.port.ItineraryItemCreate;
 import com.soomgil.itinerary.application.port.ItineraryItemOrderUpdate;
 import com.soomgil.itinerary.application.port.ItineraryItemReadModel;
+import com.soomgil.itinerary.application.port.ItineraryItemUpdate;
 import com.soomgil.itinerary.application.port.ItineraryQueryRepository;
 import com.soomgil.itinerary.application.port.MapMatchClientRequest;
 import com.soomgil.itinerary.application.port.MapMatchClientResult;
@@ -148,6 +151,34 @@ class ItineraryControllerTest {
 		assertThat(result.itineraryVersion()).isEqualTo(1);
 		assertThat(result.affectedRouteIds()).containsExactly(ROUTE_ID);
 		assertThat(repository.deletedItemId).isEqualTo(ITEM_ID);
+	}
+
+	@Test
+	void updatesItemResponse() {
+		StubItineraryCommandRepository repository = new StubItineraryCommandRepository();
+		ItineraryController controller = controller(repository);
+
+		ItineraryMutationResponse result = controller.updateItem(
+			TRIP_ID,
+			ITEM_ID,
+			new UpdateItineraryItemRequest(
+				0L,
+				null,
+				null,
+				"수정 장소",
+				"새 주소",
+				36.1,
+				127.1,
+				null
+			),
+			principal()
+		);
+
+		assertThat(result.tripId()).isEqualTo(TRIP_ID);
+		assertThat(result.itineraryVersion()).isEqualTo(1);
+		assertThat(result.item().id()).isEqualTo(ITEM_ID);
+		assertThat(result.item().placeName()).isEqualTo("수정 장소");
+		assertThat(result.item().sortOrder()).isEqualTo(0);
 	}
 
 	@Test
@@ -392,6 +423,12 @@ class ItineraryControllerTest {
 				eventRepository,
 				new com.soomgil.trip.application.query.handler.TripAccessGuard(new StubTripQueryRepository()),
 				() -> Instant.parse("2026-06-17T00:00:00Z")
+			),
+			new UpdateItineraryItemHandler(
+				repository,
+				eventRepository,
+				new com.soomgil.trip.application.query.handler.TripAccessGuard(new StubTripQueryRepository()),
+				() -> Instant.parse("2026-06-17T00:00:00Z")
 			)
 		);
 	}
@@ -558,6 +595,42 @@ class ItineraryControllerTest {
 
 		@Override
 		public void insertItem(ItineraryItemCreate item) {
+		}
+
+		@Override
+		public Optional<ItineraryItemReadModel> findItem(UUID tripId, UUID itemId) {
+			return Optional.of(new ItineraryItemReadModel(
+				itemId,
+				DAY_ID,
+				0,
+				com.soomgil.itinerary.domain.model.ItineraryItemType.PLACE,
+				"KTO",
+				"126508",
+				"성심당",
+				"대전",
+				36.0,
+				127.0,
+				null,
+				"AVAILABLE"
+			));
+		}
+
+		@Override
+		public Optional<ItineraryItemReadModel> updateItem(ItineraryItemUpdate update) {
+			return Optional.of(new ItineraryItemReadModel(
+				update.itemId(),
+				update.itineraryDayId(),
+				update.sortOrder(),
+				com.soomgil.itinerary.domain.model.ItineraryItemType.PLACE,
+				"KTO",
+				"126508",
+				update.placeName(),
+				update.address(),
+				update.lat(),
+				update.lng(),
+				update.thumbnailUrl() == null ? null : java.net.URI.create(update.thumbnailUrl()),
+				"AVAILABLE"
+			));
 		}
 
 		@Override

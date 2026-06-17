@@ -70,6 +70,23 @@ public interface ItineraryCommandRepository {
 	void insertItem(ItineraryItemCreate item);
 
 	/**
+	 * item ID로 itinerary item을 조회한다.
+	 *
+	 * @param tripId 여행방 ID
+	 * @param itemId item ID
+	 * @return 존재하면 item
+	 */
+	Optional<ItineraryItemReadModel> findItem(UUID tripId, UUID itemId);
+
+	/**
+	 * itinerary item을 수정하고 수정 후 값을 반환한다.
+	 *
+	 * @param update 수정 모델
+	 * @return 수정된 item, 없으면 empty
+	 */
+	Optional<ItineraryItemReadModel> updateItem(ItineraryItemUpdate update);
+
+	/**
 	 * 지도 도형을 저장한다.
 	 *
 	 * @param drawing 저장할 도형

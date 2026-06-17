@@ -136,6 +136,56 @@
     )
   </insert>
 
+  <select id="findItem" resultType="com.soomgil.itinerary.application.port.ItineraryItemReadModel">
+    SELECT
+      id,
+      itinerary_day_id,
+      sort_order,
+      item_type,
+      place_provider,
+      external_place_id,
+      place_name,
+      address,
+      lat,
+      lng,
+      thumbnail_url,
+      source_status
+    FROM itinerary.itinerary_items
+    WHERE trip_id = #{tripId}
+      AND id = #{itemId}
+      AND deleted_at IS NULL
+  </select>
+
+  <select id="updateItem" resultType="com.soomgil.itinerary.application.port.ItineraryItemReadModel">
+    UPDATE itinerary.itinerary_items
+    SET
+      itinerary_day_id = #{update.itineraryDayId},
+      sort_order = #{update.sortOrder},
+      place_name = #{update.placeName},
+      address = #{update.address,jdbcType=VARCHAR},
+      lat = #{update.lat,jdbcType=DOUBLE},
+      lng = #{update.lng,jdbcType=DOUBLE},
+      thumbnail_url = #{update.thumbnailUrl,jdbcType=VARCHAR},
+      updated_by_user_id = #{update.updatedByUserId},
+      updated_at = #{update.updatedAt}
+    WHERE trip_id = #{update.tripId}
+      AND id = #{update.itemId}
+      AND deleted_at IS NULL
+    RETURNING
+      id,
+      itinerary_day_id,
+      sort_order,
+      item_type,
+      place_provider,
+      external_place_id,
+      place_name,
+      address,
+      lat,
+      lng,
+      thumbnail_url,
+      source_status
+  </select>
+
   <insert id="insertMapDrawing">
     INSERT INTO itinerary.map_drawings (
       id,

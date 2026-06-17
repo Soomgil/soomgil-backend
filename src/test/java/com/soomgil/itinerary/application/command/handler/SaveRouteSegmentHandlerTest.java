@@ -159,6 +159,18 @@ class SaveRouteSegmentHandlerTest {
 		}
 
 		@Override
+		public Optional<com.soomgil.itinerary.application.port.ItineraryItemReadModel> findItem(UUID tripId, UUID itemId) {
+			return Optional.empty();
+		}
+
+		@Override
+		public Optional<com.soomgil.itinerary.application.port.ItineraryItemReadModel> updateItem(
+			com.soomgil.itinerary.application.port.ItineraryItemUpdate update
+		) {
+			return Optional.empty();
+		}
+
+		@Override
 		public void insertMapDrawing(MapDrawingCreate drawing) {
 		}
 
