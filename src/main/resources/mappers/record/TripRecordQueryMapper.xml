@@ -110,4 +110,67 @@
       AND m.status = 'ACTIVE'
       AND m.mime_type LIKE 'image/%'
   </select>
+
+  <select id="findPhotosByUser" resultType="com.soomgil.record.application.port.TripRecordPhotoReadModel">
+    SELECT
+      e.trip_id,
+      t.title AS trip_title,
+      e.id AS record_id,
+      e.itinerary_day_id,
+      e.itinerary_item_id,
+      e.uploaded_by_user_id,
+      m.id AS media_file_id,
+      m.public_url,
+      m.mime_type,
+      m.byte_size,
+      m.width,
+      m.height,
+      m.status AS media_status,
+      m.created_at AS media_created_at,
+      e.taken_at,
+      e.created_at
+    FROM record.trip_record_entries e
+    JOIN trip.trips t ON t.id = e.trip_id
+    JOIN record.trip_record_media rm ON rm.record_entry_id = e.id
+    JOIN media.media_files m ON m.id = rm.media_file_id
+    WHERE t.status != 'DELETED'
+      AND (
+        t.owner_user_id = #{userId}
+        OR EXISTS (
+          SELECT 1
+          FROM trip.trip_members tm
+          WHERE tm.trip_id = t.id
+            AND tm.user_id = #{userId}
+            AND tm.status = 'ACTIVE'
+        )
+      )
+      AND e.status = 'ACTIVE'
+      AND m.status = 'ACTIVE'
+      AND m.mime_type LIKE 'image/%'
+    ORDER BY e.taken_at DESC NULLS LAST, e.created_at DESC, rm.sort_order ASC
+    LIMIT #{limit}
+    OFFSET #{offset}
+  </select>
+
+  <select id="countPhotosByUser" resultType="long">
+    SELECT count(*)
+    FROM record.trip_record_entries e
+    JOIN trip.trips t ON t.id = e.trip_id
+    JOIN record.trip_record_media rm ON rm.record_entry_id = e.id
+    JOIN media.media_files m ON m.id = rm.media_file_id
+    WHERE t.status != 'DELETED'
+      AND (
+        t.owner_user_id = #{userId}
+        OR EXISTS (
+          SELECT 1
+          FROM trip.trip_members tm
+          WHERE tm.trip_id = t.id
+            AND tm.user_id = #{userId}
+            AND tm.status = 'ACTIVE'
+        )
+      )
+      AND e.status = 'ACTIVE'
+      AND m.status = 'ACTIVE'
+      AND m.mime_type LIKE 'image/%'
+  </select>
 </mapper>

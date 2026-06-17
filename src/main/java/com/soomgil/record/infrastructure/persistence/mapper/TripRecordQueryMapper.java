@@ -25,4 +25,12 @@ public interface TripRecordQueryMapper {
 	List<TripRecordPhotoReadModel> findPhotos(@Param("tripId") UUID tripId, @Param("limit") int limit, @Param("offset") int offset);
 
 	long countPhotos(@Param("tripId") UUID tripId);
+
+	List<TripRecordPhotoReadModel> findPhotosByUser(
+		@Param("userId") UUID userId,
+		@Param("limit") int limit,
+		@Param("offset") int offset
+	);
+
+	long countPhotosByUser(@Param("userId") UUID userId);
 }

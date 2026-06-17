@@ -43,4 +43,12 @@ public class MyBatisTripRecordQueryRepository implements TripRecordQueryReposito
 	public TripRecordPhotoPage findPhotos(UUID tripId, int page, int size) {
 		return new TripRecordPhotoPage(mapper.findPhotos(tripId, size, page * size), mapper.countPhotos(tripId));
 	}
+
+	@Override
+	public TripRecordPhotoPage findPhotosByUser(UUID userId, int page, int size) {
+		return new TripRecordPhotoPage(
+			mapper.findPhotosByUser(userId, size, page * size),
+			mapper.countPhotosByUser(userId)
+		);
+	}
 }

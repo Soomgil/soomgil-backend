@@ -151,6 +151,17 @@ public class TripRecordService {
 		);
 	}
 
+	@Transactional(readOnly = true)
+	public PagedTripRecordPhoto listPhotos(UUID userId, int page, int size, List<String> sort) {
+		int normalizedSize = normalizeSize(size);
+		int normalizedPage = normalizePage(page);
+		TripRecordPhotoPage result = queryRepository.findPhotosByUser(userId, normalizedPage, normalizedSize);
+		return new PagedTripRecordPhoto(
+			result.items().stream().map(this::toPhoto).toList(),
+			pageMeta(normalizedPage, normalizedSize, result.totalElements(), sort)
+		);
+	}
+
 	private TripRecordEntryReadModel findEntry(UUID tripId, UUID recordId) {
 		return queryRepository.findEntry(tripId, recordId)
 			.orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "Trip record was not found."));

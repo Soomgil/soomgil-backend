@@ -11,12 +11,15 @@ import com.soomgil.global.error.BusinessException;
 import com.soomgil.global.error.ErrorCode;
 import com.soomgil.record.api.dto.CreateTripRecordRequest;
 import com.soomgil.record.api.dto.PagedTripRecordEntry;
+import com.soomgil.record.api.dto.PagedTripRecordPhoto;
 import com.soomgil.record.api.dto.UpdateTripRecordRequest;
 import com.soomgil.record.application.port.TripRecordCommandRepository;
 import com.soomgil.record.application.port.TripRecordEntryCreate;
 import com.soomgil.record.application.port.TripRecordEntryReadModel;
 import com.soomgil.record.application.port.TripRecordMediaReadModel;
 import com.soomgil.record.application.port.TripRecordPage;
+import com.soomgil.record.application.port.TripRecordPhotoPage;
+import com.soomgil.record.application.port.TripRecordPhotoReadModel;
 import com.soomgil.record.application.port.TripRecordQueryRepository;
 import com.soomgil.trip.application.port.TripAccessSnapshot;
 import com.soomgil.trip.application.port.TripQueryRepository;
@@ -83,6 +86,18 @@ class TripRecordServiceTest {
 	}
 
 	@Test
+	void listsPhotosAcrossActiveTripsForCurrentUser() {
+		when(queryRepository.findPhotosByUser(USER_ID, 0, 20))
+			.thenReturn(new TripRecordPhotoPage(List.of(photo()), 1));
+
+		PagedTripRecordPhoto result = service.listPhotos(USER_ID, 0, 20, List.of("createdAt,desc"));
+
+		assertThat(result.items()).hasSize(1);
+		assertThat(result.items().getFirst().tripId()).isEqualTo(TRIP_ID);
+		assertThat(result.page().totalElements()).isEqualTo(1);
+	}
+
+	@Test
 	void rejectsUpdateByNonUploader() {
 		when(queryRepository.findEntry(TRIP_ID, RECORD_ID)).thenReturn(Optional.of(entry(OTHER_USER_ID)));
 
@@ -144,6 +159,27 @@ class TripRecordServiceTest {
 			"ACTIVE",
 			OffsetDateTime.parse("2026-06-18T00:00:00Z"),
 			0
+		);
+	}
+
+	private TripRecordPhotoReadModel photo() {
+		return new TripRecordPhotoReadModel(
+			TRIP_ID,
+			"부산 여행",
+			RECORD_ID,
+			null,
+			null,
+			USER_ID,
+			MEDIA_ID,
+			URI.create("https://example.com/a.jpg"),
+			"image/jpeg",
+			100L,
+			100,
+			100,
+			"ACTIVE",
+			OffsetDateTime.parse("2026-06-18T00:00:00Z"),
+			OffsetDateTime.parse("2026-06-18T10:00:00Z"),
+			OffsetDateTime.parse("2026-06-18T00:00:00Z")
 		);
 	}
 
