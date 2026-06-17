@@ -6,6 +6,7 @@ import com.soomgil.collaboration.application.command.dto.UndoRedoAction;
 import com.soomgil.collaboration.application.command.dto.UndoRedoCommand;
 import com.soomgil.collaboration.application.command.dto.UndoRedoResult;
 import com.soomgil.collaboration.application.command.handler.UndoRedoHandler;
+import com.soomgil.collaboration.infrastructure.web.HttpCollaborationSessionIdProvider;
 import com.soomgil.common.api.ApiControllerSupport;
 import com.soomgil.common.id.Ids;
 import com.soomgil.global.error.BusinessException;
@@ -27,8 +28,6 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/trips/{tripId}/collaboration")
 public class CollaborationController extends ApiControllerSupport {
 
-	private static final String WEBSOCKET_SESSION_HEADER = "X-Soomgil-WebSocket-Session-Id";
-
 	private final UndoRedoHandler undoRedoHandler;
 
 	public CollaborationController(UndoRedoHandler undoRedoHandler) {
@@ -39,7 +38,7 @@ public class CollaborationController extends ApiControllerSupport {
 	public CollaborationActionResponse undo(
 		@PathVariable UUID tripId,
 		@Valid @RequestBody UndoRedoRequest request,
-		@RequestHeader(name = WEBSOCKET_SESSION_HEADER, required = false) String websocketSessionId,
+		@RequestHeader(name = HttpCollaborationSessionIdProvider.SESSION_HEADER) String websocketSessionId,
 		Principal principal
 	) {
 		return toResponse(undoRedoHandler.handle(new UndoRedoCommand(
@@ -56,7 +55,7 @@ public class CollaborationController extends ApiControllerSupport {
 	public CollaborationActionResponse redo(
 		@PathVariable UUID tripId,
 		@Valid @RequestBody UndoRedoRequest request,
-		@RequestHeader(name = WEBSOCKET_SESSION_HEADER, required = false) String websocketSessionId,
+		@RequestHeader(name = HttpCollaborationSessionIdProvider.SESSION_HEADER) String websocketSessionId,
 		Principal principal
 	) {
 		return toResponse(undoRedoHandler.handle(new UndoRedoCommand(

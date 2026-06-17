@@ -4,6 +4,7 @@ import com.soomgil.collaboration.application.port.CollaborationCommandEvent;
 import com.soomgil.collaboration.application.port.CollaborationCommandEventReadModel;
 import com.soomgil.collaboration.application.port.CollaborationCommandEventRepository;
 import com.soomgil.collaboration.application.port.CollaborationEventBroadcaster;
+import com.soomgil.collaboration.application.port.CollaborationSessionIdProvider;
 import com.soomgil.collaboration.infrastructure.persistence.mapper.CollaborationCommandEventMapper;
 import java.util.Objects;
 import java.util.Optional;
@@ -18,13 +19,16 @@ public class MyBatisCollaborationCommandEventRepository implements Collaboration
 
 	private final CollaborationCommandEventMapper mapper;
 	private final CollaborationEventBroadcaster broadcaster;
+	private final CollaborationSessionIdProvider sessionIdProvider;
 
 	public MyBatisCollaborationCommandEventRepository(
 		CollaborationCommandEventMapper mapper,
-		CollaborationEventBroadcaster broadcaster
+		CollaborationEventBroadcaster broadcaster,
+		CollaborationSessionIdProvider sessionIdProvider
 	) {
 		this.mapper = Objects.requireNonNull(mapper, "mapper must not be null");
 		this.broadcaster = Objects.requireNonNull(broadcaster, "broadcaster must not be null");
+		this.sessionIdProvider = Objects.requireNonNull(sessionIdProvider, "sessionIdProvider must not be null");
 	}
 
 	@Override
@@ -34,9 +38,34 @@ public class MyBatisCollaborationCommandEventRepository implements Collaboration
 
 	@Override
 	public Long saveReturningId(CollaborationCommandEvent event) {
-		Long commandEventId = mapper.insertEventReturningId(event);
-		broadcaster.broadcast(commandEventId, event);
+		CollaborationCommandEvent persistedEvent = assignCurrentSession(event);
+		Long commandEventId = mapper.insertEventReturningId(persistedEvent);
+		broadcaster.broadcast(commandEventId, persistedEvent);
 		return commandEventId;
+	}
+
+	private CollaborationCommandEvent assignCurrentSession(CollaborationCommandEvent event) {
+		String sessionId = event.websocketSessionId() == null
+			? sessionIdProvider.currentSessionId()
+			: event.websocketSessionId();
+		if (Objects.equals(sessionId, event.websocketSessionId())) {
+			return event;
+		}
+		return new CollaborationCommandEvent(
+			event.tripId(),
+			event.actorUserId(),
+			sessionId,
+			event.source(),
+			event.commandType(),
+			event.aggregateType(),
+			event.aggregateId(),
+			event.versionBefore(),
+			event.versionAfter(),
+			event.payload(),
+			event.inversePayload(),
+			event.redoPayload(),
+			event.createdAt()
+		);
 	}
 
 	@Override

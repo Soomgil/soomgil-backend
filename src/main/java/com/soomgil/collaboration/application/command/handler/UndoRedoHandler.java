@@ -74,6 +74,9 @@ public class UndoRedoHandler implements CommandHandler<UndoRedoCommand, UndoRedo
 		if (command.action() == null) {
 			throw new BusinessException(ErrorCode.VALIDATION_FAILED, "Undo/redo action is required.");
 		}
+		if (command.websocketSessionId() == null || command.websocketSessionId().isBlank()) {
+			throw new BusinessException(ErrorCode.VALIDATION_FAILED, "WebSocket session ID is required.");
+		}
 	}
 
 	private CollaborationCommandEventReadModel findCandidate(UndoRedoCommand command) {

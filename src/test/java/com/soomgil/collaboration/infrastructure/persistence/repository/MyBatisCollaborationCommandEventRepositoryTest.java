@@ -6,6 +6,7 @@ import static org.mockito.Mockito.when;
 
 import com.soomgil.collaboration.application.port.CollaborationCommandEvent;
 import com.soomgil.collaboration.application.port.CollaborationEventBroadcaster;
+import com.soomgil.collaboration.application.port.CollaborationSessionIdProvider;
 import com.soomgil.collaboration.infrastructure.persistence.mapper.CollaborationCommandEventMapper;
 import java.time.Instant;
 import java.util.UUID;
@@ -18,8 +19,9 @@ class MyBatisCollaborationCommandEventRepositoryTest {
 
 	private final CollaborationCommandEventMapper mapper = mock(CollaborationCommandEventMapper.class);
 	private final CollaborationEventBroadcaster broadcaster = mock(CollaborationEventBroadcaster.class);
+	private final CollaborationSessionIdProvider sessionIdProvider = () -> "session-1";
 	private final MyBatisCollaborationCommandEventRepository repository =
-		new MyBatisCollaborationCommandEventRepository(mapper, broadcaster);
+		new MyBatisCollaborationCommandEventRepository(mapper, broadcaster, sessionIdProvider);
 
 	@Test
 	void savesReturningIdAndBroadcasts() {
@@ -41,11 +43,29 @@ class MyBatisCollaborationCommandEventRepositoryTest {
 		verify(broadcaster).broadcast(16L, event);
 	}
 
+	@Test
+	void assignsCurrentSessionToEventWithoutSessionId() {
+		CollaborationCommandEvent event = event(null);
+		when(mapper.insertEventReturningId(org.mockito.ArgumentMatchers.any())).thenReturn(17L);
+
+		repository.save(event);
+
+		org.mockito.ArgumentCaptor<CollaborationCommandEvent> captor =
+			org.mockito.ArgumentCaptor.forClass(CollaborationCommandEvent.class);
+		verify(mapper).insertEventReturningId(captor.capture());
+		org.assertj.core.api.Assertions.assertThat(captor.getValue().websocketSessionId()).isEqualTo("session-1");
+		verify(broadcaster).broadcast(17L, captor.getValue());
+	}
+
 	private CollaborationCommandEvent event() {
+		return event("session-1");
+	}
+
+	private CollaborationCommandEvent event(String websocketSessionId) {
 		return new CollaborationCommandEvent(
 			TRIP_ID,
 			USER_ID,
-			"session-1",
+			websocketSessionId,
 			"USER",
 			"UPDATE_ITINERARY_ITEM",
 			"ITINERARY_ITEM",

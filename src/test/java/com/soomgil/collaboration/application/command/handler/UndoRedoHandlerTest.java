@@ -109,6 +109,13 @@ class UndoRedoHandlerTest {
 			);
 	}
 
+	@Test
+	void rejectsMissingWebsocketSessionId() {
+		assertThatThrownBy(() -> handler.handle(new UndoRedoCommand(TRIP_ID, USER_ID, null, 10L, null, UndoRedoAction.UNDO)))
+			.isInstanceOfSatisfying(BusinessException.class, exception ->
+				assertThat(exception.errorCode()).isEqualTo(ErrorCode.VALIDATION_FAILED));
+	}
+
 	private CollaborationCommandEventReadModel candidate(
 		Long id,
 		String commandType,
