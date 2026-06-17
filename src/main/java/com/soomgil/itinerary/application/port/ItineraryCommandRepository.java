@@ -115,6 +115,14 @@ public interface ItineraryCommandRepository {
 	boolean softDeleteMapDrawing(UUID tripId, UUID drawingId, UUID deletedByUserId, Instant deletedAt);
 
 	/**
+	 * map drawing을 수정하고 수정 후 값을 반환한다.
+	 *
+	 * @param update 수정 모델
+	 * @return 수정된 drawing, version 조건 불일치 또는 미존재 시 empty
+	 */
+	Optional<MapDrawingUpdateResult> updateMapDrawing(MapDrawingUpdate update);
+
+	/**
 	 * day가 같은 trip에 존재하는지 확인한다.
 	 *
 	 * @param tripId 여행방 ID

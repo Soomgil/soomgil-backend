@@ -209,6 +209,13 @@ class CreateItineraryItemHandlerTest {
 		}
 
 		@Override
+		public java.util.Optional<com.soomgil.itinerary.application.port.MapDrawingUpdateResult> updateMapDrawing(
+			com.soomgil.itinerary.application.port.MapDrawingUpdate update
+		) {
+			return java.util.Optional.empty();
+		}
+
+		@Override
 		public boolean existsDay(UUID tripId, UUID dayId) {
 			return dayExists;
 		}

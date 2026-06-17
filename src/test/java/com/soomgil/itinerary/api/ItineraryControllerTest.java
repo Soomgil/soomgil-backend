@@ -18,6 +18,7 @@ import com.soomgil.itinerary.api.dto.MapMatchRouteRequest;
 import com.soomgil.itinerary.api.dto.MapMatchRouteResponse;
 import com.soomgil.itinerary.api.dto.ReorderItineraryRequest;
 import com.soomgil.itinerary.api.dto.RouteMode;
+import com.soomgil.itinerary.api.dto.UpdateMapDrawingRequest;
 import com.soomgil.itinerary.application.command.handler.CreateItineraryDayHandler;
 import com.soomgil.itinerary.application.command.handler.CreateItineraryItemHandler;
 import com.soomgil.itinerary.application.command.handler.CreateMapDrawingHandler;
@@ -26,6 +27,7 @@ import com.soomgil.itinerary.application.command.handler.DeleteRouteSegmentHandl
 import com.soomgil.itinerary.application.command.handler.MapMatchRouteHandler;
 import com.soomgil.itinerary.application.command.handler.ReorderItineraryHandler;
 import com.soomgil.itinerary.application.command.handler.SaveRouteSegmentHandler;
+import com.soomgil.itinerary.application.command.handler.UpdateMapDrawingHandler;
 import com.soomgil.itinerary.application.port.ItineraryCommandRepository;
 import com.soomgil.itinerary.application.port.ItineraryDayCreate;
 import com.soomgil.itinerary.application.port.ItineraryDayOrderUpdate;
@@ -39,6 +41,8 @@ import com.soomgil.itinerary.application.port.MapMatchClientResult;
 import com.soomgil.itinerary.application.port.MapMatchingClient;
 import com.soomgil.itinerary.application.port.MapDrawingCreate;
 import com.soomgil.itinerary.application.port.MapDrawingReadModel;
+import com.soomgil.itinerary.application.port.MapDrawingUpdate;
+import com.soomgil.itinerary.application.port.MapDrawingUpdateResult;
 import com.soomgil.itinerary.application.port.RouteMatchRequestLog;
 import com.soomgil.itinerary.application.port.RouteSegmentReadModel;
 import com.soomgil.itinerary.application.port.RouteSegmentCreate;
@@ -245,6 +249,32 @@ class ItineraryControllerTest {
 		assertThat(repository.deletedDrawingId).isEqualTo(DRAWING_ID);
 	}
 
+	@Test
+	void updatesMapDrawingResponse() {
+		StubItineraryCommandRepository repository = new StubItineraryCommandRepository();
+		ItineraryController controller = controller(repository);
+
+		ItineraryMutationResponse result = controller.updateDrawing(
+			TRIP_ID,
+			DRAWING_ID,
+			new UpdateMapDrawingRequest(
+				0L,
+				java.util.Map.of("type", "LineString"),
+				java.util.Map.of("color", "#222222"),
+				"수정된 선",
+				2,
+				0L
+			),
+			principal()
+		);
+
+		assertThat(result.tripId()).isEqualTo(TRIP_ID);
+		assertThat(result.itineraryVersion()).isEqualTo(1);
+		assertThat(result.drawing().id()).isEqualTo(DRAWING_ID);
+		assertThat(result.drawing().version()).isEqualTo(1);
+		assertThat(result.drawing().label()).isEqualTo("수정된 선");
+	}
+
 	private ItineraryController controller(StubItineraryCommandRepository repository) {
 		CapturingEventRepository eventRepository = new CapturingEventRepository();
 		return new ItineraryController(
@@ -302,6 +332,13 @@ class ItineraryControllerTest {
 				eventRepository,
 				new com.soomgil.trip.application.query.handler.TripAccessGuard(new StubTripQueryRepository()),
 				() -> Instant.parse("2026-06-17T00:00:00Z")
+			),
+			new UpdateMapDrawingHandler(
+				repository,
+				eventRepository,
+				new com.soomgil.trip.application.query.handler.TripAccessGuard(new StubTripQueryRepository()),
+				() -> Instant.parse("2026-06-17T00:00:00Z"),
+				new ObjectMapper()
 			)
 		);
 	}
@@ -477,6 +514,21 @@ class ItineraryControllerTest {
 		public boolean softDeleteMapDrawing(UUID tripId, UUID drawingId, UUID deletedByUserId, Instant deletedAt) {
 			this.deletedDrawingId = drawingId;
 			return true;
+		}
+
+		@Override
+		public Optional<MapDrawingUpdateResult> updateMapDrawing(MapDrawingUpdate update) {
+			return Optional.of(new MapDrawingUpdateResult(
+				update.drawingId(),
+				DAY_ID,
+				com.soomgil.itinerary.domain.model.DrawingType.LINE,
+				com.soomgil.itinerary.domain.model.GeometryFormat.GEOJSON,
+				update.geometry(),
+				update.style(),
+				update.label(),
+				update.sortOrder(),
+				1L
+			));
 		}
 
 		@Override

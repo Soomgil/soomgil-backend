@@ -322,4 +322,32 @@
       AND id = #{drawingId}
       AND deleted_at IS NULL
   </update>
+
+  <select id="updateMapDrawing" resultType="com.soomgil.itinerary.application.port.MapDrawingUpdateResult">
+    UPDATE itinerary.map_drawings
+    SET
+      geometry = COALESCE(#{update.geometry,jdbcType=VARCHAR}::jsonb, geometry),
+      style = COALESCE(#{update.style,jdbcType=VARCHAR}::jsonb, style),
+      label = COALESCE(#{update.label,jdbcType=VARCHAR}, label),
+      sort_order = COALESCE(#{update.sortOrder,jdbcType=INTEGER}, sort_order),
+      version = version + 1,
+      updated_by_user_id = #{update.updatedByUserId},
+      updated_at = #{update.updatedAt}
+    WHERE trip_id = #{update.tripId}
+      AND id = #{update.drawingId}
+      AND deleted_at IS NULL
+      <if test="update.expectedVersion != null">
+        AND version = #{update.expectedVersion}
+      </if>
+    RETURNING
+      id,
+      itinerary_day_id,
+      drawing_type,
+      geometry_format,
+      geometry::text AS geometry,
+      style::text AS style,
+      label,
+      sort_order,
+      version
+  </select>
 </mapper>

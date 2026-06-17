@@ -173,6 +173,13 @@ class CreateMapDrawingHandlerTest {
 		}
 
 		@Override
+		public Optional<com.soomgil.itinerary.application.port.MapDrawingUpdateResult> updateMapDrawing(
+			com.soomgil.itinerary.application.port.MapDrawingUpdate update
+		) {
+			return Optional.empty();
+		}
+
+		@Override
 		public boolean existsDay(UUID tripId, UUID dayId) {
 			return dayExists;
 		}

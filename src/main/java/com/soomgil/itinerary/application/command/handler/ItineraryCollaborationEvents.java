@@ -146,6 +146,31 @@ final class ItineraryCollaborationEvents {
 		);
 	}
 
+	static CollaborationCommandEvent mapDrawingUpdated(
+		UUID tripId,
+		UUID drawingId,
+		UUID actorUserId,
+		long versionBefore,
+		long versionAfter,
+		Instant updatedAt
+	) {
+		return new CollaborationCommandEvent(
+			tripId,
+			actorUserId,
+			null,
+			SOURCE_USER,
+			"UPDATE_MAP_DRAWING",
+			AGGREGATE_DRAWING,
+			drawingId,
+			versionBefore,
+			versionAfter,
+			"{\"drawingId\":\"" + drawingId + "\"}",
+			null,
+			null,
+			updatedAt
+		);
+	}
+
 	static CollaborationCommandEvent routeSegmentCreated(
 		RouteSegmentCreate route,
 		long versionBefore,

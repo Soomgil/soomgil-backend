@@ -6,6 +6,8 @@ import com.soomgil.itinerary.application.port.ItineraryDayReadModel;
 import com.soomgil.itinerary.application.port.ItineraryItemCreate;
 import com.soomgil.itinerary.application.port.ItineraryItemOrderUpdate;
 import com.soomgil.itinerary.application.port.MapDrawingCreate;
+import com.soomgil.itinerary.application.port.MapDrawingUpdate;
+import com.soomgil.itinerary.application.port.MapDrawingUpdateResult;
 import com.soomgil.itinerary.application.port.RouteMatchRequestLog;
 import com.soomgil.itinerary.application.port.RouteSegmentCreate;
 import java.time.Instant;
@@ -134,6 +136,14 @@ public interface ItineraryCommandMapper {
 		@Param("deletedByUserId") UUID deletedByUserId,
 		@Param("deletedAt") Instant deletedAt
 	);
+
+	/**
+	 * map drawing을 수정하고 수정 후 값을 반환한다.
+	 *
+	 * @param update 수정 모델
+	 * @return 수정된 drawing, 조건 불일치 시 null
+	 */
+	MapDrawingUpdateResult updateMapDrawing(@Param("update") MapDrawingUpdate update);
 
 	/**
 	 * 일정 day 존재 여부를 조회한다.
