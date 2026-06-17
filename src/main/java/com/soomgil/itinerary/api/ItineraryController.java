@@ -38,6 +38,10 @@ import com.soomgil.itinerary.application.command.handler.CreateItineraryItemHand
 import com.soomgil.itinerary.application.command.handler.CreateMapDrawingHandler;
 import com.soomgil.itinerary.application.command.handler.MapMatchRouteHandler;
 import com.soomgil.itinerary.application.command.handler.ReorderItineraryHandler;
+import com.soomgil.itinerary.application.query.dto.FindItineraryQuery;
+import com.soomgil.itinerary.application.query.dto.ItineraryDayDetailView;
+import com.soomgil.itinerary.application.query.dto.ItineraryView;
+import com.soomgil.itinerary.application.query.handler.FindItineraryHandler;
 import com.soomgil.place.api.dto.PlaceProvider;
 import com.soomgil.place.api.dto.PlaceRef;
 import com.soomgil.place.api.dto.PlaceSourceStatus;
@@ -69,13 +73,15 @@ public class ItineraryController extends ApiControllerSupport {
 	private final ReorderItineraryHandler reorderItineraryHandler;
 	private final CreateMapDrawingHandler createMapDrawingHandler;
 	private final MapMatchRouteHandler mapMatchRouteHandler;
+	private final FindItineraryHandler findItineraryHandler;
 
 	public ItineraryController(
 		CreateItineraryDayHandler createItineraryDayHandler,
 		CreateItineraryItemHandler createItineraryItemHandler,
 		ReorderItineraryHandler reorderItineraryHandler,
 		CreateMapDrawingHandler createMapDrawingHandler,
-		MapMatchRouteHandler mapMatchRouteHandler
+		MapMatchRouteHandler mapMatchRouteHandler,
+		FindItineraryHandler findItineraryHandler
 	) {
 		this.createItineraryDayHandler = Objects.requireNonNull(
 			createItineraryDayHandler,
@@ -94,11 +100,12 @@ public class ItineraryController extends ApiControllerSupport {
 			"createMapDrawingHandler must not be null"
 		);
 		this.mapMatchRouteHandler = Objects.requireNonNull(mapMatchRouteHandler, "mapMatchRouteHandler must not be null");
+		this.findItineraryHandler = Objects.requireNonNull(findItineraryHandler, "findItineraryHandler must not be null");
 	}
 
 	@GetMapping
-	public Itinerary getItinerary(@PathVariable UUID tripId) {
-		return notImplemented();
+	public Itinerary getItinerary(@PathVariable UUID tripId, Principal principal) {
+		return toItinerary(findItineraryHandler.handle(new FindItineraryQuery(tripId, currentUserId(principal))));
 	}
 
 	@PostMapping("/days")
@@ -313,6 +320,29 @@ public class ItineraryController extends ApiControllerSupport {
 			result.route() == null ? null : toRoute(result.route()),
 			result.drawing() == null ? null : toDrawing(result.drawing()),
 			result.affectedRouteIds()
+		);
+	}
+
+	private Itinerary toItinerary(ItineraryView view) {
+		return new Itinerary(
+			view.tripId(),
+			view.itineraryVersion(),
+			view.days().stream().map(this::toDay).toList(),
+			view.routes().stream().map(this::toRoute).toList(),
+			view.mapDrawings().stream().map(this::toDrawing).toList()
+		);
+	}
+
+	private ItineraryDay toDay(ItineraryDayDetailView view) {
+		return new ItineraryDay(
+			view.id(),
+			view.tripId(),
+			com.soomgil.itinerary.api.dto.ItineraryDayGroupType.valueOf(view.groupType().name()),
+			view.dayNumber(),
+			view.date(),
+			view.title(),
+			view.sortOrder(),
+			view.items().stream().map(this::toItem).toList()
 		);
 	}
 

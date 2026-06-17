@@ -30,12 +30,17 @@ import com.soomgil.itinerary.application.port.ItineraryDayOrderUpdate;
 import com.soomgil.itinerary.application.port.ItineraryDayReadModel;
 import com.soomgil.itinerary.application.port.ItineraryItemCreate;
 import com.soomgil.itinerary.application.port.ItineraryItemOrderUpdate;
+import com.soomgil.itinerary.application.port.ItineraryItemReadModel;
+import com.soomgil.itinerary.application.port.ItineraryQueryRepository;
 import com.soomgil.itinerary.application.port.MapMatchClientRequest;
 import com.soomgil.itinerary.application.port.MapMatchClientResult;
 import com.soomgil.itinerary.application.port.MapMatchingClient;
 import com.soomgil.itinerary.application.port.MapDrawingCreate;
+import com.soomgil.itinerary.application.port.MapDrawingReadModel;
 import com.soomgil.itinerary.application.port.RouteMatchRequestLog;
+import com.soomgil.itinerary.application.port.RouteSegmentReadModel;
 import com.soomgil.itinerary.application.port.RouteSegmentCreate;
+import com.soomgil.itinerary.application.query.handler.FindItineraryHandler;
 import com.soomgil.geo.api.dto.LngLat;
 import com.soomgil.place.api.dto.PlaceProvider;
 import com.soomgil.place.api.dto.PlaceRef;
@@ -79,6 +84,21 @@ class ItineraryControllerTest {
 		assertThat(result.tripId()).isEqualTo(TRIP_ID);
 		assertThat(result.itineraryVersion()).isEqualTo(1);
 		assertThat(result.day().dayNumber()).isEqualTo(1);
+	}
+
+	@Test
+	void getsItineraryResponse() {
+		StubItineraryCommandRepository repository = new StubItineraryCommandRepository();
+		ItineraryController controller = controller(repository);
+
+		com.soomgil.itinerary.api.dto.Itinerary result = controller.getItinerary(TRIP_ID, principal());
+
+		assertThat(result.tripId()).isEqualTo(TRIP_ID);
+		assertThat(result.itineraryVersion()).isEqualTo(7);
+		assertThat(result.days()).hasSize(1);
+		assertThat(result.days().get(0).items()).hasSize(1);
+		assertThat(result.routes()).hasSize(1);
+		assertThat(result.mapDrawings()).hasSize(1);
 	}
 
 	@Test
@@ -226,8 +246,83 @@ class ItineraryControllerTest {
 				),
 				() -> Instant.parse("2026-06-17T00:00:00Z"),
 				new ObjectMapper()
+			),
+			new FindItineraryHandler(
+				new com.soomgil.trip.application.query.handler.TripAccessGuard(new StubTripQueryRepository()),
+				new StubItineraryQueryRepository()
 			)
 		);
+	}
+
+	private static class StubItineraryQueryRepository implements ItineraryQueryRepository {
+
+		@Override
+		public OptionalLong findItineraryVersion(UUID tripId) {
+			return OptionalLong.of(7);
+		}
+
+		@Override
+		public List<ItineraryDayReadModel> findDays(UUID tripId) {
+			return List.of(new ItineraryDayReadModel(
+				DAY_ID,
+				TRIP_ID,
+				com.soomgil.itinerary.domain.model.ItineraryDayGroupType.DAY,
+				1,
+				LocalDate.parse("2026-07-01"),
+				"1일차",
+				0
+			));
+		}
+
+		@Override
+		public List<ItineraryItemReadModel> findItems(UUID tripId) {
+			return List.of(new ItineraryItemReadModel(
+				UUID.fromString("40000000-0000-0000-0000-000000000001"),
+				DAY_ID,
+				0,
+				com.soomgil.itinerary.domain.model.ItineraryItemType.PLACE,
+				"KTO",
+				"126508",
+				"성심당",
+				"대전",
+				36.327,
+				127.427,
+				null,
+				"AVAILABLE"
+			));
+		}
+
+		@Override
+		public List<RouteSegmentReadModel> findRoutes(UUID tripId) {
+			return List.of(new RouteSegmentReadModel(
+				UUID.fromString("50000000-0000-0000-0000-000000000001"),
+				UUID.fromString("40000000-0000-0000-0000-000000000001"),
+				UUID.fromString("40000000-0000-0000-0000-000000000002"),
+				com.soomgil.itinerary.domain.model.RouteMode.WALKING,
+				"MAPBOX",
+				"mapbox/walking",
+				com.soomgil.itinerary.domain.model.GeometryFormat.GEOJSON,
+				java.util.Map.of("type", "LineString"),
+				120.0,
+				60.0,
+				0.98
+			));
+		}
+
+		@Override
+		public List<MapDrawingReadModel> findMapDrawings(UUID tripId) {
+			return List.of(new MapDrawingReadModel(
+				UUID.fromString("60000000-0000-0000-0000-000000000001"),
+				DAY_ID,
+				com.soomgil.itinerary.domain.model.DrawingType.LINE,
+				com.soomgil.itinerary.domain.model.GeometryFormat.GEOJSON,
+				java.util.Map.of("type", "LineString"),
+				java.util.Map.of("color", "#111111"),
+				"이동선",
+				0,
+				1L
+			));
+		}
 	}
 
 	private static class StubMapMatchingClient implements MapMatchingClient {

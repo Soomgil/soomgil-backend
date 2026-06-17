@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.soomgil.itinerary.infrastructure.persistence.mapper.ItineraryQueryMapper">
+  <select id="findItineraryVersion" resultType="long">
+    SELECT itinerary_version
+    FROM trip.trips
+    WHERE id = #{tripId}
+      AND status != 'DELETED'
+  </select>
+
+  <select id="findDays" resultType="com.soomgil.itinerary.application.port.ItineraryDayReadModel">
+    SELECT
+      id,
+      trip_id,
+      group_type,
+      day_number,
+      date,
+      title,
+      sort_order
+    FROM itinerary.itinerary_days
+    WHERE trip_id = #{tripId}
+    ORDER BY sort_order ASC, day_number ASC NULLS LAST, id ASC
+  </select>
+
+  <select id="findItems" resultType="com.soomgil.itinerary.infrastructure.persistence.row.ItineraryItemRow">
+    SELECT
+      id,
+      itinerary_day_id,
+      sort_order,
+      item_type,
+      place_provider,
+      external_place_id,
+      place_name,
+      address,
+      lat,
+      lng,
+      thumbnail_url,
+      source_status
+    FROM itinerary.itinerary_items
+    WHERE trip_id = #{tripId}
+      AND deleted_at IS NULL
+    ORDER BY itinerary_day_id ASC, sort_order ASC, id ASC
+  </select>
+
+  <select id="findRoutes" resultType="com.soomgil.itinerary.infrastructure.persistence.row.RouteSegmentRow">
+    SELECT
+      id,
+      origin_itinerary_item_id,
+      destination_itinerary_item_id,
+      mode,
+      provider,
+      provider_profile,
+      geometry_format,
+      geometry::text AS geometry,
+      distance_meters,
+      duration_seconds,
+      confidence
+    FROM itinerary.trip_routes
+    WHERE trip_id = #{tripId}
+      AND deleted_at IS NULL
+    ORDER BY created_at ASC, id ASC
+  </select>
+
+  <select id="findMapDrawings" resultType="com.soomgil.itinerary.infrastructure.persistence.row.MapDrawingRow">
+    SELECT
+      id,
+      itinerary_day_id,
+      drawing_type,
+      geometry_format,
+      geometry::text AS geometry,
+      style::text AS style,
+      label,
+      sort_order,
+      version
+    FROM itinerary.map_drawings
+    WHERE trip_id = #{tripId}
+      AND deleted_at IS NULL
+    ORDER BY sort_order ASC, created_at ASC, id ASC
+  </select>
+</mapper>
