@@ -3,6 +3,7 @@ package com.soomgil.collaboration.infrastructure.persistence.repository;
 import com.soomgil.collaboration.application.port.CollaborationCommandEvent;
 import com.soomgil.collaboration.application.port.CollaborationCommandEventReadModel;
 import com.soomgil.collaboration.application.port.CollaborationCommandEventRepository;
+import com.soomgil.collaboration.application.port.CollaborationEventBroadcaster;
 import com.soomgil.collaboration.infrastructure.persistence.mapper.CollaborationCommandEventMapper;
 import java.util.Objects;
 import java.util.Optional;
@@ -16,19 +17,26 @@ import org.springframework.stereotype.Repository;
 public class MyBatisCollaborationCommandEventRepository implements CollaborationCommandEventRepository {
 
 	private final CollaborationCommandEventMapper mapper;
+	private final CollaborationEventBroadcaster broadcaster;
 
-	public MyBatisCollaborationCommandEventRepository(CollaborationCommandEventMapper mapper) {
+	public MyBatisCollaborationCommandEventRepository(
+		CollaborationCommandEventMapper mapper,
+		CollaborationEventBroadcaster broadcaster
+	) {
 		this.mapper = Objects.requireNonNull(mapper, "mapper must not be null");
+		this.broadcaster = Objects.requireNonNull(broadcaster, "broadcaster must not be null");
 	}
 
 	@Override
 	public void save(CollaborationCommandEvent event) {
-		mapper.insertEvent(event);
+		saveReturningId(event);
 	}
 
 	@Override
 	public Long saveReturningId(CollaborationCommandEvent event) {
-		return mapper.insertEventReturningId(event);
+		Long commandEventId = mapper.insertEventReturningId(event);
+		broadcaster.broadcast(commandEventId, event);
+		return commandEventId;
 	}
 
 	@Override
