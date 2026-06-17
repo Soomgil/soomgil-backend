@@ -100,15 +100,23 @@ public class ReorderItineraryHandler implements CommandHandler<ReorderItineraryC
 	}
 
 	private void ensureSnapshotExists(ReorderItineraryCommand command) {
+		int itemCount = 0;
 		for (ItineraryDayOrderCommand day : command.days()) {
 			if (!repository.existsDay(command.tripId(), day.dayId())) {
 				throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "Itinerary day was not found.");
 			}
 			for (ItineraryItemOrderCommand item : day.itemOrders()) {
+				itemCount++;
 				if (!repository.existsItem(command.tripId(), item.itemId())) {
 					throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "Itinerary item was not found.");
 				}
 			}
+		}
+		if (repository.countDays(command.tripId()) != command.days().size()) {
+			throw new BusinessException(ErrorCode.VALIDATION_FAILED, "Itinerary order snapshot must include all days.");
+		}
+		if (repository.countActiveItems(command.tripId()) != itemCount) {
+			throw new BusinessException(ErrorCode.VALIDATION_FAILED, "Itinerary order snapshot must include all active items.");
 		}
 	}
 }

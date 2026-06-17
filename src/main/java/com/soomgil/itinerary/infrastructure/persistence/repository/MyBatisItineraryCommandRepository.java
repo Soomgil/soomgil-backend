@@ -46,8 +46,18 @@ public class MyBatisItineraryCommandRepository implements ItineraryCommandReposi
 	}
 
 	@Override
+	public long countDays(UUID tripId) {
+		return mapper.countDays(tripId);
+	}
+
+	@Override
 	public boolean existsItem(UUID tripId, UUID itemId) {
 		return mapper.existsItem(tripId, itemId);
+	}
+
+	@Override
+	public long countActiveItems(UUID tripId) {
+		return mapper.countActiveItems(tripId);
 	}
 
 	@Override

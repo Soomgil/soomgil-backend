@@ -89,6 +89,35 @@ class ReorderItineraryHandlerTest {
 	}
 
 	@Test
+	void rejectsPartialDaySnapshot() {
+		assertThatThrownBy(() -> handler.handle(new ReorderItineraryCommand(
+			TRIP_ID,
+			USER_ID,
+			0,
+			List.of(new ItineraryDayOrderCommand(DAY_ID, 0, List.of(new ItineraryItemOrderCommand(ITEM_ID, 0))))
+		))).isInstanceOfSatisfying(BusinessException.class, exception ->
+			assertThat(exception.errorCode()).isEqualTo(ErrorCode.VALIDATION_FAILED)
+		);
+	}
+
+	@Test
+	void rejectsPartialItemSnapshot() {
+		repository.itemIds = Set.of(ITEM_ID, UUID.fromString("40000000-0000-0000-0000-000000000002"));
+
+		assertThatThrownBy(() -> handler.handle(new ReorderItineraryCommand(
+			TRIP_ID,
+			USER_ID,
+			0,
+			List.of(
+				new ItineraryDayOrderCommand(DAY_ID, 0, List.of(new ItineraryItemOrderCommand(ITEM_ID, 0))),
+				new ItineraryDayOrderCommand(OTHER_DAY_ID, 1, List.of())
+			)
+		))).isInstanceOfSatisfying(BusinessException.class, exception ->
+			assertThat(exception.errorCode()).isEqualTo(ErrorCode.VALIDATION_FAILED)
+		);
+	}
+
+	@Test
 	void rejectsVersionConflict() {
 		repository.currentVersion = 2;
 
@@ -96,7 +125,10 @@ class ReorderItineraryHandlerTest {
 			TRIP_ID,
 			USER_ID,
 			0,
-			List.of(new ItineraryDayOrderCommand(DAY_ID, 0, List.of()))
+			List.of(
+				new ItineraryDayOrderCommand(DAY_ID, 0, List.of(new ItineraryItemOrderCommand(ITEM_ID, 0))),
+				new ItineraryDayOrderCommand(OTHER_DAY_ID, 1, List.of())
+			)
 		))).isInstanceOfSatisfying(BusinessException.class, exception ->
 			assertThat(exception.errorCode()).isEqualTo(ErrorCode.CONFLICT)
 		);
@@ -133,8 +165,18 @@ class ReorderItineraryHandlerTest {
 		}
 
 		@Override
+		public long countDays(UUID tripId) {
+			return dayIds.size();
+		}
+
+		@Override
 		public boolean existsItem(UUID tripId, UUID itemId) {
 			return itemIds.contains(itemId);
+		}
+
+		@Override
+		public long countActiveItems(UUID tripId) {
+			return itemIds.size();
 		}
 
 		@Override

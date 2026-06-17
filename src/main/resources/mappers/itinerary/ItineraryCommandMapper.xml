@@ -89,6 +89,12 @@
     )
   </select>
 
+  <select id="countDays" resultType="long">
+    SELECT count(*)
+    FROM itinerary.itinerary_days
+    WHERE trip_id = #{tripId}
+  </select>
+
   <select id="existsItem" resultType="boolean">
     SELECT EXISTS (
       SELECT 1
@@ -97,6 +103,13 @@
         AND id = #{itemId}
         AND deleted_at IS NULL
     )
+  </select>
+
+  <select id="countActiveItems" resultType="long">
+    SELECT count(*)
+    FROM itinerary.itinerary_items
+    WHERE trip_id = #{tripId}
+      AND deleted_at IS NULL
   </select>
 
   <update id="updateDayOrder">

@@ -80,6 +80,9 @@ public class CreateItineraryDayHandler implements CommandHandler<CreateItinerary
 	}
 
 	private void validate(CreateItineraryDayCommand command) {
+		if (command.groupType() == null) {
+			throw new BusinessException(ErrorCode.VALIDATION_FAILED, "Day group type is required.");
+		}
 		if (command.groupType() == ItineraryDayGroupType.DAY && command.dayNumber() == null) {
 			throw new BusinessException(ErrorCode.VALIDATION_FAILED, "Day number is required for DAY group.");
 		}

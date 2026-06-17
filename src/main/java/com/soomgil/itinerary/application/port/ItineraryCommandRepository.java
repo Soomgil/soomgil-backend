@@ -45,6 +45,14 @@ public interface ItineraryCommandRepository {
 	boolean existsDay(UUID tripId, UUID dayId);
 
 	/**
+	 * 여행방의 전체 itinerary day 수를 조회한다.
+	 *
+	 * @param tripId 여행방 ID
+	 * @return 전체 day 수
+	 */
+	long countDays(UUID tripId);
+
+	/**
 	 * item이 같은 trip에 존재하고 삭제되지 않았는지 확인한다.
 	 *
 	 * @param tripId 여행방 ID
@@ -52,6 +60,14 @@ public interface ItineraryCommandRepository {
 	 * @return 존재 여부
 	 */
 	boolean existsItem(UUID tripId, UUID itemId);
+
+	/**
+	 * 여행방의 삭제되지 않은 active item 수를 조회한다.
+	 *
+	 * @param tripId 여행방 ID
+	 * @return active item 수
+	 */
+	long countActiveItems(UUID tripId);
 
 	/**
 	 * 일정 day sort order를 갱신한다.

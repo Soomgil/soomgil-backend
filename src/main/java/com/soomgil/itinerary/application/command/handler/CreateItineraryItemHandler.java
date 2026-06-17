@@ -97,6 +97,9 @@ public class CreateItineraryItemHandler implements CommandHandler<CreateItinerar
 	}
 
 	private void validate(CreateItineraryItemCommand command) {
+		if (command.itemType() == null) {
+			throw new BusinessException(ErrorCode.VALIDATION_FAILED, "Item type is required.");
+		}
 		if (command.sortOrder() < 0) {
 			throw new BusinessException(ErrorCode.VALIDATION_FAILED, "Sort order must be greater than or equal to 0.");
 		}

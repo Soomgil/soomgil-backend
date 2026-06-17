@@ -100,6 +100,27 @@ class CreateItineraryItemHandlerTest {
 		);
 	}
 
+	@Test
+	void rejectsMissingItemType() {
+		assertThatThrownBy(() -> handler.handle(new CreateItineraryItemCommand(
+			TRIP_ID,
+			USER_ID,
+			0,
+			DAY_ID,
+			0,
+			null,
+			null,
+			null,
+			"성심당",
+			null,
+			null,
+			null,
+			null
+		))).isInstanceOfSatisfying(BusinessException.class, exception ->
+			assertThat(exception.errorCode()).isEqualTo(ErrorCode.VALIDATION_FAILED)
+		);
+	}
+
 	private static class CapturingItineraryCommandRepository implements ItineraryCommandRepository {
 
 		private boolean dayExists = true;
@@ -130,8 +151,18 @@ class CreateItineraryItemHandlerTest {
 		}
 
 		@Override
+		public long countDays(UUID tripId) {
+			return 0;
+		}
+
+		@Override
 		public boolean existsItem(UUID tripId, UUID itemId) {
 			return false;
+		}
+
+		@Override
+		public long countActiveItems(UUID tripId) {
+			return 0;
 		}
 
 		@Override

@@ -53,6 +53,14 @@ public interface ItineraryCommandMapper {
 	boolean existsDay(@Param("tripId") UUID tripId, @Param("dayId") UUID dayId);
 
 	/**
+	 * 여행방 itinerary day 수를 조회한다.
+	 *
+	 * @param tripId 여행방 ID
+	 * @return day 수
+	 */
+	long countDays(@Param("tripId") UUID tripId);
+
+	/**
 	 * 일정 item 존재 여부를 조회한다.
 	 *
 	 * @param tripId 여행방 ID
@@ -60,6 +68,14 @@ public interface ItineraryCommandMapper {
 	 * @return 존재 여부
 	 */
 	boolean existsItem(@Param("tripId") UUID tripId, @Param("itemId") UUID itemId);
+
+	/**
+	 * 삭제되지 않은 일정 item 수를 조회한다.
+	 *
+	 * @param tripId 여행방 ID
+	 * @return active item 수
+	 */
+	long countActiveItems(@Param("tripId") UUID tripId);
 
 	/**
 	 * 일정 day sort order를 갱신한다.

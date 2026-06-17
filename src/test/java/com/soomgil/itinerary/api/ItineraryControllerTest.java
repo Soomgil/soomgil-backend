@@ -164,8 +164,18 @@ class ItineraryControllerTest {
 		}
 
 		@Override
+		public long countDays(UUID tripId) {
+			return 1;
+		}
+
+		@Override
 		public boolean existsItem(UUID tripId, UUID itemId) {
 			return true;
+		}
+
+		@Override
+		public long countActiveItems(UUID tripId) {
+			return 1;
 		}
 
 		@Override
