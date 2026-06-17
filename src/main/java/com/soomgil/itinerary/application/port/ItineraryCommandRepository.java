@@ -95,6 +95,26 @@ public interface ItineraryCommandRepository {
 	boolean softDeleteRouteSegment(UUID tripId, UUID routeId, UUID deletedByUserId, Instant deletedAt);
 
 	/**
+	 * active map drawing이 같은 trip에 존재하는지 확인한다.
+	 *
+	 * @param tripId 여행방 ID
+	 * @param drawingId drawing ID
+	 * @return 존재 여부
+	 */
+	boolean existsActiveMapDrawing(UUID tripId, UUID drawingId);
+
+	/**
+	 * map drawing을 soft delete 처리한다.
+	 *
+	 * @param tripId 여행방 ID
+	 * @param drawingId drawing ID
+	 * @param deletedByUserId 삭제 사용자 ID
+	 * @param deletedAt 삭제 시각
+	 * @return 삭제된 row가 있으면 true
+	 */
+	boolean softDeleteMapDrawing(UUID tripId, UUID drawingId, UUID deletedByUserId, Instant deletedAt);
+
+	/**
 	 * day가 같은 trip에 존재하는지 확인한다.
 	 *
 	 * @param tripId 여행방 ID

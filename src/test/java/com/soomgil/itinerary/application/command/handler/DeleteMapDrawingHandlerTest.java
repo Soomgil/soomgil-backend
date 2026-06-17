@@ -3,13 +3,12 @@ package com.soomgil.itinerary.application.command.handler;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.soomgil.collaboration.application.port.CollaborationCommandEvent;
 import com.soomgil.collaboration.application.port.CollaborationCommandEventRepository;
 import com.soomgil.global.error.BusinessException;
 import com.soomgil.global.error.ErrorCode;
+import com.soomgil.itinerary.application.command.dto.DeleteMapDrawingCommand;
 import com.soomgil.itinerary.application.command.dto.ItineraryMutationResult;
-import com.soomgil.itinerary.application.command.dto.SaveRouteSegmentCommand;
 import com.soomgil.itinerary.application.port.ItineraryCommandRepository;
 import com.soomgil.itinerary.application.port.ItineraryDayCreate;
 import com.soomgil.itinerary.application.port.ItineraryDayOrderUpdate;
@@ -19,105 +18,57 @@ import com.soomgil.itinerary.application.port.ItineraryItemOrderUpdate;
 import com.soomgil.itinerary.application.port.MapDrawingCreate;
 import com.soomgil.itinerary.application.port.RouteMatchRequestLog;
 import com.soomgil.itinerary.application.port.RouteSegmentCreate;
-import com.soomgil.itinerary.domain.model.RouteMode;
 import com.soomgil.trip.application.query.handler.TripAccessGuard;
 import java.time.Instant;
-import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalLong;
-import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
-class SaveRouteSegmentHandlerTest {
+class DeleteMapDrawingHandlerTest {
 
 	private static final UUID TRIP_ID = UUID.fromString("10000000-0000-0000-0000-000000000001");
 	private static final UUID USER_ID = UUID.fromString("20000000-0000-0000-0000-000000000001");
-	private static final UUID ORIGIN_ITEM_ID = UUID.fromString("40000000-0000-0000-0000-000000000001");
-	private static final UUID DESTINATION_ITEM_ID = UUID.fromString("40000000-0000-0000-0000-000000000002");
+	private static final UUID DRAWING_ID = UUID.fromString("60000000-0000-0000-0000-000000000001");
 
 	private final CapturingItineraryCommandRepository repository = new CapturingItineraryCommandRepository();
 	private final CapturingEventRepository eventRepository = new CapturingEventRepository();
-	private final SaveRouteSegmentHandler handler = new SaveRouteSegmentHandler(
+	private final DeleteMapDrawingHandler handler = new DeleteMapDrawingHandler(
 		repository,
 		eventRepository,
 		new TripAccessGuard(new CreateItineraryDayHandlerTest.StubTripQueryRepository()),
-		() -> Instant.parse("2026-06-17T00:00:00Z"),
-		new ObjectMapper()
+		() -> Instant.parse("2026-06-17T00:00:00Z")
 	);
 
 	@Test
-	void savesRouteSegmentAndRecordsEvent() {
-		ItineraryMutationResult result = handler.handle(new SaveRouteSegmentCommand(
-			TRIP_ID,
-			USER_ID,
-			0,
-			ORIGIN_ITEM_ID,
-			DESTINATION_ITEM_ID,
-			RouteMode.WALKING,
-			null,
-			null,
-			Map.of("type", "LineString", "coordinates", java.util.List.of()),
-			123.4,
-			56.7,
-			0.91
-		));
+	void softDeletesMapDrawingAndRecordsEvent() {
+		ItineraryMutationResult result = handler.handle(new DeleteMapDrawingCommand(TRIP_ID, USER_ID, 0, DRAWING_ID));
 
 		assertThat(result.itineraryVersion()).isEqualTo(1);
-		assertThat(result.route().id()).isEqualTo(repository.insertedRoute.id());
-		assertThat(result.route().providerProfile()).isEqualTo("mapbox/walking");
-		assertThat(repository.insertedRoute.geometry()).contains("LineString");
-		assertThat(eventRepository.lastEvent.commandType()).isEqualTo("CREATE_ROUTE_SEGMENT");
-		assertThat(eventRepository.lastEvent.aggregateId()).isEqualTo(repository.insertedRoute.id());
+		assertThat(result.affectedRouteIds()).isEmpty();
+		assertThat(repository.deletedDrawingId).isEqualTo(DRAWING_ID);
+		assertThat(repository.deletedByUserId).isEqualTo(USER_ID);
+		assertThat(eventRepository.lastEvent.commandType()).isEqualTo("DELETE_MAP_DRAWING");
+		assertThat(eventRepository.lastEvent.aggregateId()).isEqualTo(DRAWING_ID);
 	}
 
 	@Test
-	void rejectsSameOriginAndDestination() {
-		assertThatThrownBy(() -> handler.handle(new SaveRouteSegmentCommand(
-			TRIP_ID,
-			USER_ID,
-			0,
-			ORIGIN_ITEM_ID,
-			ORIGIN_ITEM_ID,
-			RouteMode.DRIVING,
-			null,
-			null,
-			Map.of("type", "LineString"),
-			null,
-			null,
-			null
-		))).isInstanceOfSatisfying(BusinessException.class, exception ->
-			assertThat(exception.errorCode()).isEqualTo(ErrorCode.VALIDATION_FAILED)
-		);
-	}
+	void rejectsMissingMapDrawing() {
+		repository.drawingExists = false;
 
-	@Test
-	void rejectsMissingItineraryItem() {
-		repository.itemIds = Set.of(ORIGIN_ITEM_ID);
-
-		assertThatThrownBy(() -> handler.handle(new SaveRouteSegmentCommand(
-			TRIP_ID,
-			USER_ID,
-			0,
-			ORIGIN_ITEM_ID,
-			DESTINATION_ITEM_ID,
-			RouteMode.DRIVING,
-			null,
-			null,
-			Map.of("type", "LineString"),
-			null,
-			null,
-			null
-		))).isInstanceOfSatisfying(BusinessException.class, exception ->
-			assertThat(exception.errorCode()).isEqualTo(ErrorCode.RESOURCE_NOT_FOUND)
-		);
+		assertThatThrownBy(() -> handler.handle(new DeleteMapDrawingCommand(TRIP_ID, USER_ID, 0, DRAWING_ID)))
+			.isInstanceOfSatisfying(BusinessException.class, exception ->
+				assertThat(exception.errorCode()).isEqualTo(ErrorCode.RESOURCE_NOT_FOUND)
+			);
+		assertThat(repository.currentVersion).isZero();
 	}
 
 	private static class CapturingItineraryCommandRepository implements ItineraryCommandRepository {
 
 		private long currentVersion;
-		private Set<UUID> itemIds = Set.of(ORIGIN_ITEM_ID, DESTINATION_ITEM_ID);
-		private RouteSegmentCreate insertedRoute;
+		private boolean drawingExists = true;
+		private UUID deletedDrawingId;
+		private UUID deletedByUserId;
 
 		@Override
 		public OptionalLong incrementItineraryVersion(UUID tripId, long baseVersion, Instant updatedAt) {
@@ -152,7 +103,6 @@ class SaveRouteSegmentHandlerTest {
 
 		@Override
 		public void insertRouteSegment(RouteSegmentCreate route) {
-			this.insertedRoute = route;
 		}
 
 		@Override
@@ -172,12 +122,18 @@ class SaveRouteSegmentHandlerTest {
 
 		@Override
 		public boolean existsActiveMapDrawing(UUID tripId, UUID drawingId) {
-			return false;
+			return drawingExists;
 		}
 
 		@Override
 		public boolean softDeleteMapDrawing(UUID tripId, UUID drawingId, UUID deletedByUserId, Instant deletedAt) {
-			return false;
+			if (!drawingExists) {
+				return false;
+			}
+			this.deletedDrawingId = drawingId;
+			this.deletedByUserId = deletedByUserId;
+			drawingExists = false;
+			return true;
 		}
 
 		@Override
@@ -192,12 +148,12 @@ class SaveRouteSegmentHandlerTest {
 
 		@Override
 		public boolean existsItem(UUID tripId, UUID itemId) {
-			return itemIds.contains(itemId);
+			return false;
 		}
 
 		@Override
 		public long countActiveItems(UUID tripId) {
-			return itemIds.size();
+			return 0;
 		}
 
 		@Override

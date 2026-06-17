@@ -21,6 +21,7 @@ import com.soomgil.itinerary.api.dto.RouteMode;
 import com.soomgil.itinerary.application.command.handler.CreateItineraryDayHandler;
 import com.soomgil.itinerary.application.command.handler.CreateItineraryItemHandler;
 import com.soomgil.itinerary.application.command.handler.CreateMapDrawingHandler;
+import com.soomgil.itinerary.application.command.handler.DeleteMapDrawingHandler;
 import com.soomgil.itinerary.application.command.handler.DeleteRouteSegmentHandler;
 import com.soomgil.itinerary.application.command.handler.MapMatchRouteHandler;
 import com.soomgil.itinerary.application.command.handler.ReorderItineraryHandler;
@@ -71,6 +72,7 @@ class ItineraryControllerTest {
 	private static final UUID USER_ID = UUID.fromString("20000000-0000-0000-0000-000000000001");
 	private static final UUID DAY_ID = UUID.fromString("30000000-0000-0000-0000-000000000001");
 	private static final UUID ROUTE_ID = UUID.fromString("50000000-0000-0000-0000-000000000001");
+	private static final UUID DRAWING_ID = UUID.fromString("60000000-0000-0000-0000-000000000001");
 
 	@Test
 	void createsDayResponse() {
@@ -225,6 +227,24 @@ class ItineraryControllerTest {
 		assertThat(repository.deletedRouteId).isEqualTo(ROUTE_ID);
 	}
 
+	@Test
+	void deletesMapDrawingResponse() {
+		StubItineraryCommandRepository repository = new StubItineraryCommandRepository();
+		ItineraryController controller = controller(repository);
+
+		ItineraryMutationResponse result = controller.deleteDrawing(
+			TRIP_ID,
+			DRAWING_ID,
+			new com.soomgil.collaboration.api.dto.VersionedCommandRequest(0L),
+			principal()
+		);
+
+		assertThat(result.tripId()).isEqualTo(TRIP_ID);
+		assertThat(result.itineraryVersion()).isEqualTo(1);
+		assertThat(result.affectedRouteIds()).isEmpty();
+		assertThat(repository.deletedDrawingId).isEqualTo(DRAWING_ID);
+	}
+
 	private ItineraryController controller(StubItineraryCommandRepository repository) {
 		CapturingEventRepository eventRepository = new CapturingEventRepository();
 		return new ItineraryController(
@@ -272,6 +292,12 @@ class ItineraryControllerTest {
 				new StubItineraryQueryRepository()
 			),
 			new DeleteRouteSegmentHandler(
+				repository,
+				eventRepository,
+				new com.soomgil.trip.application.query.handler.TripAccessGuard(new StubTripQueryRepository()),
+				() -> Instant.parse("2026-06-17T00:00:00Z")
+			),
+			new DeleteMapDrawingHandler(
 				repository,
 				eventRepository,
 				new com.soomgil.trip.application.query.handler.TripAccessGuard(new StubTripQueryRepository()),
@@ -388,6 +414,7 @@ class ItineraryControllerTest {
 		private boolean itemOrderUpdated;
 		private MapDrawingCreate insertedDrawing;
 		private UUID deletedRouteId;
+		private UUID deletedDrawingId;
 
 		@Override
 		public OptionalLong incrementItineraryVersion(UUID tripId, long baseVersion, Instant updatedAt) {
@@ -438,6 +465,17 @@ class ItineraryControllerTest {
 		@Override
 		public boolean softDeleteRouteSegment(UUID tripId, UUID routeId, UUID deletedByUserId, Instant deletedAt) {
 			this.deletedRouteId = routeId;
+			return true;
+		}
+
+		@Override
+		public boolean existsActiveMapDrawing(UUID tripId, UUID drawingId) {
+			return true;
+		}
+
+		@Override
+		public boolean softDeleteMapDrawing(UUID tripId, UUID drawingId, UUID deletedByUserId, Instant deletedAt) {
+			this.deletedDrawingId = drawingId;
 			return true;
 		}
 

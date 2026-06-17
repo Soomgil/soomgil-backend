@@ -261,6 +261,16 @@
     )
   </select>
 
+  <select id="existsActiveMapDrawing" resultType="boolean">
+    SELECT EXISTS (
+      SELECT 1
+      FROM itinerary.map_drawings
+      WHERE trip_id = #{tripId}
+        AND id = #{drawingId}
+        AND deleted_at IS NULL
+    )
+  </select>
+
   <select id="countActiveItems" resultType="long">
     SELECT count(*)
     FROM itinerary.itinerary_items
@@ -298,6 +308,18 @@
       updated_at = #{deletedAt}
     WHERE trip_id = #{tripId}
       AND id = #{routeId}
+      AND deleted_at IS NULL
+  </update>
+
+  <update id="softDeleteMapDrawing">
+    UPDATE itinerary.map_drawings
+    SET
+      deleted_by_user_id = #{deletedByUserId},
+      deleted_at = #{deletedAt},
+      updated_by_user_id = #{deletedByUserId},
+      updated_at = #{deletedAt}
+    WHERE trip_id = #{tripId}
+      AND id = #{drawingId}
       AND deleted_at IS NULL
   </update>
 </mapper>

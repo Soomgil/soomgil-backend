@@ -121,6 +121,31 @@ final class ItineraryCollaborationEvents {
 		);
 	}
 
+	static CollaborationCommandEvent mapDrawingDeleted(
+		UUID tripId,
+		UUID drawingId,
+		UUID actorUserId,
+		long versionBefore,
+		long versionAfter,
+		Instant deletedAt
+	) {
+		return new CollaborationCommandEvent(
+			tripId,
+			actorUserId,
+			null,
+			SOURCE_USER,
+			"DELETE_MAP_DRAWING",
+			AGGREGATE_DRAWING,
+			drawingId,
+			versionBefore,
+			versionAfter,
+			"{\"drawingId\":\"" + drawingId + "\"}",
+			null,
+			null,
+			deletedAt
+		);
+	}
+
 	static CollaborationCommandEvent routeSegmentCreated(
 		RouteSegmentCreate route,
 		long versionBefore,

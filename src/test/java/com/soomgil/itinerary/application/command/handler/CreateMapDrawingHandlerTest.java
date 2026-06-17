@@ -163,6 +163,16 @@ class CreateMapDrawingHandlerTest {
 		}
 
 		@Override
+		public boolean existsActiveMapDrawing(UUID tripId, UUID drawingId) {
+			return false;
+		}
+
+		@Override
+		public boolean softDeleteMapDrawing(UUID tripId, UUID drawingId, UUID deletedByUserId, Instant deletedAt) {
+			return false;
+		}
+
+		@Override
 		public boolean existsDay(UUID tripId, UUID dayId) {
 			return dayExists;
 		}
