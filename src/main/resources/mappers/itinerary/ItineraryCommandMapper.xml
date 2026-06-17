@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.soomgil.itinerary.infrastructure.persistence.mapper.ItineraryCommandMapper">
+  <select id="incrementItineraryVersion" resultType="long">
+    UPDATE trip.trips
+    SET
+      itinerary_version = itinerary_version + 1,
+      updated_at = #{updatedAt}
+    WHERE id = #{tripId}
+      AND status != 'DELETED'
+      AND itinerary_version = #{baseVersion}
+    RETURNING itinerary_version
+  </select>
+
+  <insert id="insertDay">
+    INSERT INTO itinerary.itinerary_days (
+      id,
+      trip_id,
+      group_type,
+      day_number,
+      date,
+      title,
+      sort_order,
+      created_at,
+      updated_at
+    )
+    VALUES (
+      #{day.id},
+      #{day.tripId},
+      #{day.groupType},
+      #{day.dayNumber},
+      #{day.date},
+      #{day.title},
+      #{day.sortOrder},
+      #{day.createdAt},
+      #{day.updatedAt}
+    )
+  </insert>
+
+  <insert id="insertItem">
+    INSERT INTO itinerary.itinerary_items (
+      id,
+      trip_id,
+      itinerary_day_id,
+      sort_order,
+      item_type,
+      place_provider,
+      external_place_id,
+      place_name,
+      address,
+      lat,
+      lng,
+      thumbnail_url,
+      source_status,
+      created_by_user_id,
+      updated_by_user_id,
+      created_at,
+      updated_at
+    )
+    VALUES (
+      #{item.id},
+      #{item.tripId},
+      #{item.itineraryDayId},
+      #{item.sortOrder},
+      #{item.itemType},
+      #{item.placeProvider},
+      #{item.externalPlaceId},
+      #{item.placeName},
+      #{item.address},
+      #{item.lat},
+      #{item.lng},
+      #{item.thumbnailUrl},
+      #{item.sourceStatus},
+      #{item.createdByUserId},
+      #{item.updatedByUserId},
+      #{item.createdAt},
+      #{item.updatedAt}
+    )
+  </insert>
+
+  <select id="existsDay" resultType="boolean">
+    SELECT EXISTS (
+      SELECT 1
+      FROM itinerary.itinerary_days
+      WHERE trip_id = #{tripId}
+        AND id = #{dayId}
+    )
+  </select>
+</mapper>
