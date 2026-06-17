@@ -4,6 +4,7 @@ import com.soomgil.itinerary.application.port.ItineraryCommandRepository;
 import com.soomgil.itinerary.application.port.ItineraryDayCreate;
 import com.soomgil.itinerary.application.port.ItineraryDayOrderUpdate;
 import com.soomgil.itinerary.application.port.ItineraryDayReadModel;
+import com.soomgil.itinerary.application.port.ItineraryDayUpdate;
 import com.soomgil.itinerary.application.port.ItineraryItemCreate;
 import com.soomgil.itinerary.application.port.ItineraryItemOrderUpdate;
 import com.soomgil.itinerary.application.port.MapDrawingCreate;
@@ -49,8 +50,18 @@ public class MyBatisItineraryCommandRepository implements ItineraryCommandReposi
 	}
 
 	@Override
+	public Optional<ItineraryDayReadModel> findDay(UUID tripId, UUID dayId) {
+		return Optional.ofNullable(mapper.findDay(tripId, dayId));
+	}
+
+	@Override
 	public Optional<ItineraryDayReadModel> findUnscheduledDay(UUID tripId) {
 		return Optional.ofNullable(mapper.findUnscheduledDay(tripId));
+	}
+
+	@Override
+	public Optional<ItineraryDayReadModel> updateDay(ItineraryDayUpdate update) {
+		return Optional.ofNullable(mapper.updateDay(update));
 	}
 
 	@Override

@@ -89,7 +89,19 @@ class DeleteRouteSegmentHandlerTest {
 		}
 
 		@Override
+		public Optional<ItineraryDayReadModel> findDay(UUID tripId, UUID dayId) {
+			return Optional.empty();
+		}
+
+		@Override
 		public Optional<ItineraryDayReadModel> findUnscheduledDay(UUID tripId) {
+			return Optional.empty();
+		}
+
+		@Override
+		public Optional<ItineraryDayReadModel> updateDay(
+			com.soomgil.itinerary.application.port.ItineraryDayUpdate update
+		) {
 			return Optional.empty();
 		}
 

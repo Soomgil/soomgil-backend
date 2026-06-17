@@ -166,7 +166,19 @@ class CreateItineraryItemHandlerTest {
 		}
 
 		@Override
+		public java.util.Optional<ItineraryDayReadModel> findDay(UUID tripId, UUID dayId) {
+			return java.util.Optional.empty();
+		}
+
+		@Override
 		public java.util.Optional<ItineraryDayReadModel> findUnscheduledDay(UUID tripId) {
+			return java.util.Optional.empty();
+		}
+
+		@Override
+		public java.util.Optional<ItineraryDayReadModel> updateDay(
+			com.soomgil.itinerary.application.port.ItineraryDayUpdate update
+		) {
 			return java.util.Optional.empty();
 		}
 

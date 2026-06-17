@@ -19,6 +19,7 @@ import com.soomgil.itinerary.api.dto.MapMatchRouteResponse;
 import com.soomgil.itinerary.api.dto.ReorderItineraryRequest;
 import com.soomgil.itinerary.api.dto.RouteMode;
 import com.soomgil.itinerary.api.dto.UpdateMapDrawingRequest;
+import com.soomgil.itinerary.api.dto.UpdateItineraryDayRequest;
 import com.soomgil.itinerary.application.command.handler.CreateItineraryDayHandler;
 import com.soomgil.itinerary.application.command.handler.CreateItineraryItemHandler;
 import com.soomgil.itinerary.application.command.handler.CreateMapDrawingHandler;
@@ -28,6 +29,7 @@ import com.soomgil.itinerary.application.command.handler.MapMatchRouteHandler;
 import com.soomgil.itinerary.application.command.handler.ReorderItineraryHandler;
 import com.soomgil.itinerary.application.command.handler.SaveRouteSegmentHandler;
 import com.soomgil.itinerary.application.command.handler.UpdateMapDrawingHandler;
+import com.soomgil.itinerary.application.command.handler.UpdateItineraryDayHandler;
 import com.soomgil.itinerary.application.port.ItineraryCommandRepository;
 import com.soomgil.itinerary.application.port.ItineraryDayCreate;
 import com.soomgil.itinerary.application.port.ItineraryDayOrderUpdate;
@@ -107,6 +109,25 @@ class ItineraryControllerTest {
 		assertThat(result.days().get(0).items()).hasSize(1);
 		assertThat(result.routes()).hasSize(1);
 		assertThat(result.mapDrawings()).hasSize(1);
+	}
+
+	@Test
+	void updatesDayResponse() {
+		StubItineraryCommandRepository repository = new StubItineraryCommandRepository();
+		ItineraryController controller = controller(repository);
+
+		ItineraryMutationResponse result = controller.updateDay(
+			TRIP_ID,
+			DAY_ID,
+			new UpdateItineraryDayRequest(0L, 2, LocalDate.parse("2026-07-02"), "둘째 날", 2),
+			principal()
+		);
+
+		assertThat(result.tripId()).isEqualTo(TRIP_ID);
+		assertThat(result.itineraryVersion()).isEqualTo(1);
+		assertThat(result.day().id()).isEqualTo(DAY_ID);
+		assertThat(result.day().dayNumber()).isEqualTo(2);
+		assertThat(result.day().title()).isEqualTo("둘째 날");
 	}
 
 	@Test
@@ -339,6 +360,12 @@ class ItineraryControllerTest {
 				new com.soomgil.trip.application.query.handler.TripAccessGuard(new StubTripQueryRepository()),
 				() -> Instant.parse("2026-06-17T00:00:00Z"),
 				new ObjectMapper()
+			),
+			new UpdateItineraryDayHandler(
+				repository,
+				eventRepository,
+				new com.soomgil.trip.application.query.handler.TripAccessGuard(new StubTripQueryRepository()),
+				() -> Instant.parse("2026-06-17T00:00:00Z")
 			)
 		);
 	}
@@ -472,8 +499,34 @@ class ItineraryControllerTest {
 		}
 
 		@Override
+		public Optional<ItineraryDayReadModel> findDay(UUID tripId, UUID dayId) {
+			return Optional.of(new ItineraryDayReadModel(
+				dayId,
+				tripId,
+				com.soomgil.itinerary.domain.model.ItineraryDayGroupType.DAY,
+				1,
+				LocalDate.parse("2026-07-01"),
+				"첫째 날",
+				0
+			));
+		}
+
+		@Override
 		public Optional<ItineraryDayReadModel> findUnscheduledDay(UUID tripId) {
 			return Optional.empty();
+		}
+
+		@Override
+		public Optional<ItineraryDayReadModel> updateDay(com.soomgil.itinerary.application.port.ItineraryDayUpdate update) {
+			return Optional.of(new ItineraryDayReadModel(
+				update.dayId(),
+				update.tripId(),
+				com.soomgil.itinerary.domain.model.ItineraryDayGroupType.DAY,
+				update.dayNumber(),
+				update.date(),
+				update.title(),
+				update.sortOrder()
+			));
 		}
 
 		@Override

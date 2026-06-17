@@ -38,12 +38,29 @@ public interface ItineraryCommandRepository {
 	void insertDay(ItineraryDayCreate day);
 
 	/**
+	 * day ID로 itinerary day를 조회한다.
+	 *
+	 * @param tripId 여행방 ID
+	 * @param dayId day ID
+	 * @return 존재하면 day
+	 */
+	Optional<ItineraryDayReadModel> findDay(UUID tripId, UUID dayId);
+
+	/**
 	 * 여행방의 일차 미정 day를 조회한다.
 	 *
 	 * @param tripId 여행방 ID
 	 * @return 존재하면 일차 미정 day
 	 */
 	Optional<ItineraryDayReadModel> findUnscheduledDay(UUID tripId);
+
+	/**
+	 * itinerary day를 수정하고 수정 후 값을 반환한다.
+	 *
+	 * @param update 수정 모델
+	 * @return 수정된 day, 없으면 empty
+	 */
+	Optional<ItineraryDayReadModel> updateDay(ItineraryDayUpdate update);
 
 	/**
 	 * 일정 item을 저장한다.

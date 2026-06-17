@@ -50,6 +50,31 @@ final class ItineraryCollaborationEvents {
 		);
 	}
 
+	static CollaborationCommandEvent dayUpdated(
+		UUID tripId,
+		UUID dayId,
+		UUID actorUserId,
+		long versionBefore,
+		long versionAfter,
+		Instant updatedAt
+	) {
+		return new CollaborationCommandEvent(
+			tripId,
+			actorUserId,
+			null,
+			SOURCE_USER,
+			"UPDATE_ITINERARY_DAY",
+			AGGREGATE_DAY,
+			dayId,
+			versionBefore,
+			versionAfter,
+			"{\"dayId\":\"" + dayId + "\"}",
+			null,
+			null,
+			updatedAt
+		);
+	}
+
 	static CollaborationCommandEvent itemCreated(
 		ItineraryItemCreate item,
 		long versionBefore,

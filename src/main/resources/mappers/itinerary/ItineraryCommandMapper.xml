@@ -46,6 +46,20 @@
     )
   </insert>
 
+  <select id="findDay" resultType="com.soomgil.itinerary.application.port.ItineraryDayReadModel">
+    SELECT
+      id,
+      trip_id,
+      group_type,
+      day_number,
+      date,
+      title,
+      sort_order
+    FROM itinerary.itinerary_days
+    WHERE trip_id = #{tripId}
+      AND id = #{dayId}
+  </select>
+
   <select id="findUnscheduledDay" resultType="com.soomgil.itinerary.application.port.ItineraryDayReadModel">
     SELECT
       id,
@@ -59,6 +73,26 @@
     WHERE trip_id = #{tripId}
       AND group_type = 'UNSCHEDULED'
     LIMIT 1
+  </select>
+
+  <select id="updateDay" resultType="com.soomgil.itinerary.application.port.ItineraryDayReadModel">
+    UPDATE itinerary.itinerary_days
+    SET
+      day_number = #{update.dayNumber,jdbcType=INTEGER},
+      date = #{update.date,jdbcType=DATE},
+      title = #{update.title,jdbcType=VARCHAR},
+      sort_order = #{update.sortOrder},
+      updated_at = #{update.updatedAt}
+    WHERE trip_id = #{update.tripId}
+      AND id = #{update.dayId}
+    RETURNING
+      id,
+      trip_id,
+      group_type,
+      day_number,
+      date,
+      title,
+      sort_order
   </select>
 
   <insert id="insertItem">

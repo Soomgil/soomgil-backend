@@ -3,86 +3,103 @@ package com.soomgil.itinerary.application.command.handler;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.soomgil.collaboration.application.port.CollaborationCommandEvent;
 import com.soomgil.collaboration.application.port.CollaborationCommandEventRepository;
 import com.soomgil.global.error.BusinessException;
 import com.soomgil.global.error.ErrorCode;
 import com.soomgil.itinerary.application.command.dto.ItineraryMutationResult;
-import com.soomgil.itinerary.application.command.dto.SaveRouteSegmentCommand;
+import com.soomgil.itinerary.application.command.dto.UpdateItineraryDayCommand;
 import com.soomgil.itinerary.application.port.ItineraryCommandRepository;
 import com.soomgil.itinerary.application.port.ItineraryDayCreate;
 import com.soomgil.itinerary.application.port.ItineraryDayOrderUpdate;
 import com.soomgil.itinerary.application.port.ItineraryDayReadModel;
+import com.soomgil.itinerary.application.port.ItineraryDayUpdate;
 import com.soomgil.itinerary.application.port.ItineraryItemCreate;
 import com.soomgil.itinerary.application.port.ItineraryItemOrderUpdate;
 import com.soomgil.itinerary.application.port.MapDrawingCreate;
+import com.soomgil.itinerary.application.port.MapDrawingUpdate;
+import com.soomgil.itinerary.application.port.MapDrawingUpdateResult;
 import com.soomgil.itinerary.application.port.RouteMatchRequestLog;
 import com.soomgil.itinerary.application.port.RouteSegmentCreate;
-import com.soomgil.itinerary.domain.model.RouteMode;
+import com.soomgil.itinerary.domain.model.ItineraryDayGroupType;
 import com.soomgil.trip.application.query.handler.TripAccessGuard;
 import java.time.Instant;
-import java.util.Map;
+import java.time.LocalDate;
 import java.util.Optional;
 import java.util.OptionalLong;
-import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
-class SaveRouteSegmentHandlerTest {
+class UpdateItineraryDayHandlerTest {
 
 	private static final UUID TRIP_ID = UUID.fromString("10000000-0000-0000-0000-000000000001");
 	private static final UUID USER_ID = UUID.fromString("20000000-0000-0000-0000-000000000001");
-	private static final UUID ORIGIN_ITEM_ID = UUID.fromString("40000000-0000-0000-0000-000000000001");
-	private static final UUID DESTINATION_ITEM_ID = UUID.fromString("40000000-0000-0000-0000-000000000002");
+	private static final UUID DAY_ID = UUID.fromString("30000000-0000-0000-0000-000000000001");
 
 	private final CapturingItineraryCommandRepository repository = new CapturingItineraryCommandRepository();
 	private final CapturingEventRepository eventRepository = new CapturingEventRepository();
-	private final SaveRouteSegmentHandler handler = new SaveRouteSegmentHandler(
+	private final UpdateItineraryDayHandler handler = new UpdateItineraryDayHandler(
 		repository,
 		eventRepository,
 		new TripAccessGuard(new CreateItineraryDayHandlerTest.StubTripQueryRepository()),
-		() -> Instant.parse("2026-06-17T00:00:00Z"),
-		new ObjectMapper()
+		() -> Instant.parse("2026-06-17T00:00:00Z")
 	);
 
 	@Test
-	void savesRouteSegmentAndRecordsEvent() {
-		ItineraryMutationResult result = handler.handle(new SaveRouteSegmentCommand(
+	void updatesDayAndRecordsEvent() {
+		ItineraryMutationResult result = handler.handle(new UpdateItineraryDayCommand(
 			TRIP_ID,
 			USER_ID,
 			0,
-			ORIGIN_ITEM_ID,
-			DESTINATION_ITEM_ID,
-			RouteMode.WALKING,
-			null,
-			null,
-			Map.of("type", "LineString", "coordinates", java.util.List.of()),
-			123.4,
-			56.7,
-			0.91
+			DAY_ID,
+			2,
+			LocalDate.parse("2026-07-02"),
+			"  둘째 날  ",
+			5
 		));
 
 		assertThat(result.itineraryVersion()).isEqualTo(1);
-		assertThat(result.route().id()).isEqualTo(repository.insertedRoute.id());
-		assertThat(result.route().providerProfile()).isEqualTo("mapbox/walking");
-		assertThat(repository.insertedRoute.geometry()).contains("LineString");
-		assertThat(eventRepository.lastEvent.commandType()).isEqualTo("CREATE_ROUTE_SEGMENT");
-		assertThat(eventRepository.lastEvent.aggregateId()).isEqualTo(repository.insertedRoute.id());
+		assertThat(result.day().id()).isEqualTo(DAY_ID);
+		assertThat(result.day().dayNumber()).isEqualTo(2);
+		assertThat(result.day().title()).isEqualTo("둘째 날");
+		assertThat(repository.lastUpdate.sortOrder()).isEqualTo(5);
+		assertThat(eventRepository.lastEvent.commandType()).isEqualTo("UPDATE_ITINERARY_DAY");
 	}
 
 	@Test
-	void rejectsSameOriginAndDestination() {
-		assertThatThrownBy(() -> handler.handle(new SaveRouteSegmentCommand(
+	void rejectsUnscheduledDate() {
+		repository.currentDay = new ItineraryDayReadModel(
+			DAY_ID,
+			TRIP_ID,
+			ItineraryDayGroupType.UNSCHEDULED,
+			null,
+			null,
+			"일차 미정",
+			0
+		);
+
+		assertThatThrownBy(() -> handler.handle(new UpdateItineraryDayCommand(
 			TRIP_ID,
 			USER_ID,
 			0,
-			ORIGIN_ITEM_ID,
-			ORIGIN_ITEM_ID,
-			RouteMode.DRIVING,
+			DAY_ID,
 			null,
+			LocalDate.parse("2026-07-02"),
 			null,
-			Map.of("type", "LineString"),
+			null
+		))).isInstanceOfSatisfying(BusinessException.class, exception ->
+			assertThat(exception.errorCode()).isEqualTo(ErrorCode.BUSINESS_RULE_VIOLATION)
+		);
+	}
+
+	@Test
+	void rejectsMissingFields() {
+		assertThatThrownBy(() -> handler.handle(new UpdateItineraryDayCommand(
+			TRIP_ID,
+			USER_ID,
+			0,
+			DAY_ID,
+			null,
 			null,
 			null,
 			null
@@ -91,33 +108,19 @@ class SaveRouteSegmentHandlerTest {
 		);
 	}
 
-	@Test
-	void rejectsMissingItineraryItem() {
-		repository.itemIds = Set.of(ORIGIN_ITEM_ID);
-
-		assertThatThrownBy(() -> handler.handle(new SaveRouteSegmentCommand(
-			TRIP_ID,
-			USER_ID,
-			0,
-			ORIGIN_ITEM_ID,
-			DESTINATION_ITEM_ID,
-			RouteMode.DRIVING,
-			null,
-			null,
-			Map.of("type", "LineString"),
-			null,
-			null,
-			null
-		))).isInstanceOfSatisfying(BusinessException.class, exception ->
-			assertThat(exception.errorCode()).isEqualTo(ErrorCode.RESOURCE_NOT_FOUND)
-		);
-	}
-
 	private static class CapturingItineraryCommandRepository implements ItineraryCommandRepository {
 
 		private long currentVersion;
-		private Set<UUID> itemIds = Set.of(ORIGIN_ITEM_ID, DESTINATION_ITEM_ID);
-		private RouteSegmentCreate insertedRoute;
+		private ItineraryDayReadModel currentDay = new ItineraryDayReadModel(
+			DAY_ID,
+			TRIP_ID,
+			ItineraryDayGroupType.DAY,
+			1,
+			LocalDate.parse("2026-07-01"),
+			"첫째 날",
+			0
+		);
+		private ItineraryDayUpdate lastUpdate;
 
 		@Override
 		public OptionalLong incrementItineraryVersion(UUID tripId, long baseVersion, Instant updatedAt) {
@@ -139,7 +142,7 @@ class SaveRouteSegmentHandlerTest {
 
 		@Override
 		public Optional<ItineraryDayReadModel> findDay(UUID tripId, UUID dayId) {
-			return Optional.empty();
+			return Optional.ofNullable(currentDay);
 		}
 
 		@Override
@@ -148,10 +151,18 @@ class SaveRouteSegmentHandlerTest {
 		}
 
 		@Override
-		public Optional<ItineraryDayReadModel> updateDay(
-			com.soomgil.itinerary.application.port.ItineraryDayUpdate update
-		) {
-			return Optional.empty();
+		public Optional<ItineraryDayReadModel> updateDay(ItineraryDayUpdate update) {
+			this.lastUpdate = update;
+			currentDay = new ItineraryDayReadModel(
+				update.dayId(),
+				update.tripId(),
+				currentDay.groupType(),
+				update.dayNumber(),
+				update.date(),
+				update.title(),
+				update.sortOrder()
+			);
+			return Optional.of(currentDay);
 		}
 
 		@Override
@@ -164,7 +175,6 @@ class SaveRouteSegmentHandlerTest {
 
 		@Override
 		public void insertRouteSegment(RouteSegmentCreate route) {
-			this.insertedRoute = route;
 		}
 
 		@Override
@@ -193,9 +203,7 @@ class SaveRouteSegmentHandlerTest {
 		}
 
 		@Override
-		public Optional<com.soomgil.itinerary.application.port.MapDrawingUpdateResult> updateMapDrawing(
-			com.soomgil.itinerary.application.port.MapDrawingUpdate update
-		) {
+		public Optional<MapDrawingUpdateResult> updateMapDrawing(MapDrawingUpdate update) {
 			return Optional.empty();
 		}
 
@@ -211,12 +219,12 @@ class SaveRouteSegmentHandlerTest {
 
 		@Override
 		public boolean existsItem(UUID tripId, UUID itemId) {
-			return itemIds.contains(itemId);
+			return false;
 		}
 
 		@Override
 		public long countActiveItems(UUID tripId) {
-			return itemIds.size();
+			return 0;
 		}
 
 		@Override
