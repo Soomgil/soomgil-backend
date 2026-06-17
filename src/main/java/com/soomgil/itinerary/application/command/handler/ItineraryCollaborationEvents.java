@@ -321,6 +321,31 @@ final class ItineraryCollaborationEvents {
 		);
 	}
 
+	static CollaborationCommandEvent routeSegmentUpdated(
+		UUID tripId,
+		UUID routeId,
+		UUID actorUserId,
+		long versionBefore,
+		long versionAfter,
+		Instant updatedAt
+	) {
+		return new CollaborationCommandEvent(
+			tripId,
+			actorUserId,
+			null,
+			SOURCE_USER,
+			"UPDATE_ROUTE_SEGMENT",
+			AGGREGATE_ROUTE,
+			routeId,
+			versionBefore,
+			versionAfter,
+			"{\"routeId\":\"" + routeId + "\"}",
+			null,
+			null,
+			updatedAt
+		);
+	}
+
 	private static String daysJson(List<ItineraryDayOrderCommand> days) {
 		StringBuilder builder = new StringBuilder("[");
 		for (int index = 0; index < days.size(); index++) {

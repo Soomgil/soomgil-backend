@@ -269,6 +269,12 @@ class CreateItineraryDayHandlerTest {
 		}
 
 		@Override
+		public java.util.Optional<com.soomgil.itinerary.application.port.RouteSegmentUpdateResult> updateRouteSegment(
+			com.soomgil.itinerary.application.port.RouteSegmentUpdate update
+		) {
+			return java.util.Optional.empty();
+		}
+		@Override
 		public Long insertRouteMatchRequest(RouteMatchRequestLog request) {
 			return 1L;
 		}

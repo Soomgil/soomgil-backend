@@ -14,6 +14,8 @@ import com.soomgil.itinerary.application.port.MapDrawingUpdate;
 import com.soomgil.itinerary.application.port.MapDrawingUpdateResult;
 import com.soomgil.itinerary.application.port.RouteMatchRequestLog;
 import com.soomgil.itinerary.application.port.RouteSegmentCreate;
+import com.soomgil.itinerary.application.port.RouteSegmentUpdate;
+import com.soomgil.itinerary.application.port.RouteSegmentUpdateResult;
 import com.soomgil.itinerary.infrastructure.persistence.mapper.ItineraryCommandMapper;
 import java.time.Instant;
 import java.util.Objects;
@@ -99,6 +101,11 @@ public class MyBatisItineraryCommandRepository implements ItineraryCommandReposi
 	@Override
 	public void insertRouteSegment(RouteSegmentCreate route) {
 		mapper.insertRouteSegment(route);
+	}
+
+	@Override
+	public Optional<RouteSegmentUpdateResult> updateRouteSegment(RouteSegmentUpdate update) {
+		return Optional.ofNullable(mapper.updateRouteSegment(update));
 	}
 
 	@Override

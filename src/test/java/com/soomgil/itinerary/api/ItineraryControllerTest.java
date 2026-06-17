@@ -34,6 +34,7 @@ import com.soomgil.itinerary.application.command.handler.SaveRouteSegmentHandler
 import com.soomgil.itinerary.application.command.handler.UpdateMapDrawingHandler;
 import com.soomgil.itinerary.application.command.handler.UpdateItineraryDayHandler;
 import com.soomgil.itinerary.application.command.handler.UpdateItineraryItemHandler;
+import com.soomgil.itinerary.application.command.handler.UpdateRouteSegmentHandler;
 import com.soomgil.itinerary.application.port.ItineraryCommandRepository;
 import com.soomgil.itinerary.application.port.ItineraryDayCreate;
 import com.soomgil.itinerary.application.port.ItineraryDayOrderUpdate;
@@ -53,6 +54,8 @@ import com.soomgil.itinerary.application.port.MapDrawingUpdateResult;
 import com.soomgil.itinerary.application.port.RouteMatchRequestLog;
 import com.soomgil.itinerary.application.port.RouteSegmentReadModel;
 import com.soomgil.itinerary.application.port.RouteSegmentCreate;
+import com.soomgil.itinerary.application.port.RouteSegmentUpdate;
+import com.soomgil.itinerary.application.port.RouteSegmentUpdateResult;
 import com.soomgil.itinerary.application.query.handler.FindItineraryHandler;
 import com.soomgil.geo.api.dto.LngLat;
 import com.soomgil.place.api.dto.PlaceProvider;
@@ -322,6 +325,32 @@ class ItineraryControllerTest {
 	}
 
 	@Test
+	void updatesRouteResponse() {
+		StubItineraryCommandRepository repository = new StubItineraryCommandRepository();
+		ItineraryController controller = controller(repository);
+
+		ItineraryMutationResponse result = controller.updateRoute(
+			TRIP_ID,
+			ROUTE_ID,
+			new com.soomgil.itinerary.api.dto.UpdateRouteRequest(
+				0L,
+				RouteMode.WALKING,
+				java.util.Map.of("type", "LineString"),
+				200.0,
+				120.0,
+				0.95
+			),
+			principal()
+		);
+
+		assertThat(result.tripId()).isEqualTo(TRIP_ID);
+		assertThat(result.itineraryVersion()).isEqualTo(1);
+		assertThat(result.route().id()).isEqualTo(ROUTE_ID);
+		assertThat(result.route().mode()).isEqualTo(RouteMode.WALKING);
+		assertThat(repository.updatedRouteId).isEqualTo(ROUTE_ID);
+	}
+
+	@Test
 	void deletesMapDrawingResponse() {
 		StubItineraryCommandRepository repository = new StubItineraryCommandRepository();
 		ItineraryController controller = controller(repository);
@@ -453,6 +482,13 @@ class ItineraryControllerTest {
 				eventRepository,
 				new com.soomgil.trip.application.query.handler.TripAccessGuard(new StubTripQueryRepository()),
 				() -> Instant.parse("2026-06-17T00:00:00Z")
+			),
+			new UpdateRouteSegmentHandler(
+				repository,
+				eventRepository,
+				new com.soomgil.trip.application.query.handler.TripAccessGuard(new StubTripQueryRepository()),
+				() -> Instant.parse("2026-06-17T00:00:00Z"),
+				new ObjectMapper()
 			)
 		);
 	}
@@ -568,6 +604,7 @@ class ItineraryControllerTest {
 		private UUID deletedDrawingId;
 		private UUID deletedItemId;
 		private UUID deletedDayId;
+		private UUID updatedRouteId;
 
 		@Override
 		public OptionalLong incrementItineraryVersion(UUID tripId, long baseVersion, Instant updatedAt) {
@@ -676,6 +713,24 @@ class ItineraryControllerTest {
 
 		@Override
 		public void insertRouteSegment(RouteSegmentCreate route) {
+		}
+
+		@Override
+		public Optional<RouteSegmentUpdateResult> updateRouteSegment(RouteSegmentUpdate update) {
+			this.updatedRouteId = update.routeId();
+			return Optional.of(new RouteSegmentUpdateResult(
+				update.routeId(),
+				UUID.fromString("40000000-0000-0000-0000-000000000001"),
+				UUID.fromString("40000000-0000-0000-0000-000000000002"),
+				update.mode(),
+				"MAPBOX",
+				update.providerProfile(),
+				com.soomgil.itinerary.domain.model.GeometryFormat.GEOJSON,
+				update.geometry(),
+				update.distanceMeters(),
+				update.durationSeconds(),
+				update.confidence()
+			));
 		}
 
 		@Override

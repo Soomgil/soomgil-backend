@@ -119,6 +119,14 @@ public interface ItineraryCommandRepository {
 	void insertRouteSegment(RouteSegmentCreate route);
 
 	/**
+	 * route segment를 수정하고 수정 후 값을 반환한다.
+	 *
+	 * @param update 수정 모델
+	 * @return 수정된 route, 없으면 empty
+	 */
+	Optional<RouteSegmentUpdateResult> updateRouteSegment(RouteSegmentUpdate update);
+
+	/**
 	 * route map matching 요청 이력을 저장한다.
 	 *
 	 * @param request 요청 이력

@@ -3,12 +3,13 @@ package com.soomgil.itinerary.application.command.handler;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.soomgil.collaboration.application.port.CollaborationCommandEvent;
 import com.soomgil.collaboration.application.port.CollaborationCommandEventRepository;
 import com.soomgil.global.error.BusinessException;
 import com.soomgil.global.error.ErrorCode;
 import com.soomgil.itinerary.application.command.dto.ItineraryMutationResult;
-import com.soomgil.itinerary.application.command.dto.UpdateItineraryDayCommand;
+import com.soomgil.itinerary.application.command.dto.UpdateRouteSegmentCommand;
 import com.soomgil.itinerary.application.port.ItineraryCommandRepository;
 import com.soomgil.itinerary.application.port.ItineraryDayCreate;
 import com.soomgil.itinerary.application.port.ItineraryDayOrderUpdate;
@@ -16,89 +17,75 @@ import com.soomgil.itinerary.application.port.ItineraryDayReadModel;
 import com.soomgil.itinerary.application.port.ItineraryDayUpdate;
 import com.soomgil.itinerary.application.port.ItineraryItemCreate;
 import com.soomgil.itinerary.application.port.ItineraryItemOrderUpdate;
+import com.soomgil.itinerary.application.port.ItineraryItemReadModel;
+import com.soomgil.itinerary.application.port.ItineraryItemUpdate;
 import com.soomgil.itinerary.application.port.MapDrawingCreate;
 import com.soomgil.itinerary.application.port.MapDrawingUpdate;
 import com.soomgil.itinerary.application.port.MapDrawingUpdateResult;
 import com.soomgil.itinerary.application.port.RouteMatchRequestLog;
 import com.soomgil.itinerary.application.port.RouteSegmentCreate;
-import com.soomgil.itinerary.domain.model.ItineraryDayGroupType;
+import com.soomgil.itinerary.application.port.RouteSegmentUpdate;
+import com.soomgil.itinerary.application.port.RouteSegmentUpdateResult;
+import com.soomgil.itinerary.domain.model.GeometryFormat;
+import com.soomgil.itinerary.domain.model.RouteMode;
 import com.soomgil.trip.application.query.handler.TripAccessGuard;
 import java.time.Instant;
-import java.time.LocalDate;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
-class UpdateItineraryDayHandlerTest {
+class UpdateRouteSegmentHandlerTest {
 
 	private static final UUID TRIP_ID = UUID.fromString("10000000-0000-0000-0000-000000000001");
 	private static final UUID USER_ID = UUID.fromString("20000000-0000-0000-0000-000000000001");
-	private static final UUID DAY_ID = UUID.fromString("30000000-0000-0000-0000-000000000001");
+	private static final UUID ROUTE_ID = UUID.fromString("50000000-0000-0000-0000-000000000001");
+	private static final UUID ORIGIN_ITEM_ID = UUID.fromString("40000000-0000-0000-0000-000000000001");
+	private static final UUID DESTINATION_ITEM_ID = UUID.fromString("40000000-0000-0000-0000-000000000002");
 
 	private final CapturingItineraryCommandRepository repository = new CapturingItineraryCommandRepository();
 	private final CapturingEventRepository eventRepository = new CapturingEventRepository();
-	private final UpdateItineraryDayHandler handler = new UpdateItineraryDayHandler(
+	private final UpdateRouteSegmentHandler handler = new UpdateRouteSegmentHandler(
 		repository,
 		eventRepository,
 		new TripAccessGuard(new CreateItineraryDayHandlerTest.StubTripQueryRepository()),
-		() -> Instant.parse("2026-06-17T00:00:00Z")
+		() -> Instant.parse("2026-06-17T00:00:00Z"),
+		new ObjectMapper()
 	);
 
 	@Test
-	void updatesDayAndRecordsEvent() {
-		ItineraryMutationResult result = handler.handle(new UpdateItineraryDayCommand(
+	void updatesRouteSegmentAndRecordsEvent() {
+		ItineraryMutationResult result = handler.handle(new UpdateRouteSegmentCommand(
 			TRIP_ID,
 			USER_ID,
 			0,
-			DAY_ID,
-			2,
-			LocalDate.parse("2026-07-02"),
-			"  둘째 날  ",
-			5
+			ROUTE_ID,
+			RouteMode.WALKING,
+			Map.of("type", "LineString", "coordinates", List.of(List.of(127.0, 37.0), List.of(127.1, 37.1))),
+			120.5,
+			80.0,
+			0.9
 		));
 
 		assertThat(result.itineraryVersion()).isEqualTo(1);
-		assertThat(result.day().id()).isEqualTo(DAY_ID);
-		assertThat(result.day().dayNumber()).isEqualTo(2);
-		assertThat(result.day().title()).isEqualTo("둘째 날");
-		assertThat(repository.lastUpdate.sortOrder()).isEqualTo(5);
-		assertThat(eventRepository.lastEvent.commandType()).isEqualTo("UPDATE_ITINERARY_DAY");
+		assertThat(result.route().id()).isEqualTo(ROUTE_ID);
+		assertThat(result.route().mode()).isEqualTo(RouteMode.WALKING);
+		assertThat(result.route().providerProfile()).isEqualTo("mapbox/walking");
+		assertThat(result.affectedRouteIds()).containsExactly(ROUTE_ID);
+		assertThat(repository.lastUpdate.providerProfile()).isEqualTo("mapbox/walking");
+		assertThat(eventRepository.lastEvent.commandType()).isEqualTo("UPDATE_ROUTE_SEGMENT");
 	}
 
 	@Test
-	void rejectsUnscheduledDate() {
-		repository.currentDay = new ItineraryDayReadModel(
-			DAY_ID,
-			TRIP_ID,
-			ItineraryDayGroupType.UNSCHEDULED,
-			null,
-			null,
-			"일차 미정",
-			0
-		);
-
-		assertThatThrownBy(() -> handler.handle(new UpdateItineraryDayCommand(
+	void rejectsMissingUpdateFields() {
+		assertThatThrownBy(() -> handler.handle(new UpdateRouteSegmentCommand(
 			TRIP_ID,
 			USER_ID,
 			0,
-			DAY_ID,
+			ROUTE_ID,
 			null,
-			LocalDate.parse("2026-07-02"),
-			null,
-			null
-		))).isInstanceOfSatisfying(BusinessException.class, exception ->
-			assertThat(exception.errorCode()).isEqualTo(ErrorCode.BUSINESS_RULE_VIOLATION)
-		);
-	}
-
-	@Test
-	void rejectsMissingFields() {
-		assertThatThrownBy(() -> handler.handle(new UpdateItineraryDayCommand(
-			TRIP_ID,
-			USER_ID,
-			0,
-			DAY_ID,
 			null,
 			null,
 			null,
@@ -108,19 +95,30 @@ class UpdateItineraryDayHandlerTest {
 		);
 	}
 
+	@Test
+	void rejectsMissingRoute() {
+		repository.existsRoute = false;
+
+		assertThatThrownBy(() -> handler.handle(new UpdateRouteSegmentCommand(
+			TRIP_ID,
+			USER_ID,
+			0,
+			ROUTE_ID,
+			RouteMode.DRIVING,
+			null,
+			null,
+			null,
+			null
+		))).isInstanceOfSatisfying(BusinessException.class, exception ->
+			assertThat(exception.errorCode()).isEqualTo(ErrorCode.RESOURCE_NOT_FOUND)
+		);
+	}
+
 	private static class CapturingItineraryCommandRepository implements ItineraryCommandRepository {
 
 		private long currentVersion;
-		private ItineraryDayReadModel currentDay = new ItineraryDayReadModel(
-			DAY_ID,
-			TRIP_ID,
-			ItineraryDayGroupType.DAY,
-			1,
-			LocalDate.parse("2026-07-01"),
-			"첫째 날",
-			0
-		);
-		private ItineraryDayUpdate lastUpdate;
+		private boolean existsRoute = true;
+		private RouteSegmentUpdate lastUpdate;
 
 		@Override
 		public OptionalLong incrementItineraryVersion(UUID tripId, long baseVersion, Instant updatedAt) {
@@ -142,7 +140,7 @@ class UpdateItineraryDayHandlerTest {
 
 		@Override
 		public Optional<ItineraryDayReadModel> findDay(UUID tripId, UUID dayId) {
-			return Optional.ofNullable(currentDay);
+			return Optional.empty();
 		}
 
 		@Override
@@ -152,17 +150,7 @@ class UpdateItineraryDayHandlerTest {
 
 		@Override
 		public Optional<ItineraryDayReadModel> updateDay(ItineraryDayUpdate update) {
-			this.lastUpdate = update;
-			currentDay = new ItineraryDayReadModel(
-				update.dayId(),
-				update.tripId(),
-				currentDay.groupType(),
-				update.dayNumber(),
-				update.date(),
-				update.title(),
-				update.sortOrder()
-			);
-			return Optional.of(currentDay);
+			return Optional.empty();
 		}
 
 		@Override
@@ -174,19 +162,18 @@ class UpdateItineraryDayHandlerTest {
 		public boolean deleteDay(UUID tripId, UUID dayId) {
 			return false;
 		}
+
 		@Override
 		public void insertItem(ItineraryItemCreate item) {
 		}
 
 		@Override
-		public Optional<com.soomgil.itinerary.application.port.ItineraryItemReadModel> findItem(UUID tripId, UUID itemId) {
+		public Optional<ItineraryItemReadModel> findItem(UUID tripId, UUID itemId) {
 			return Optional.empty();
 		}
 
 		@Override
-		public Optional<com.soomgil.itinerary.application.port.ItineraryItemReadModel> updateItem(
-			com.soomgil.itinerary.application.port.ItineraryItemUpdate update
-		) {
+		public Optional<ItineraryItemReadModel> updateItem(ItineraryItemUpdate update) {
 			return Optional.empty();
 		}
 
@@ -199,11 +186,23 @@ class UpdateItineraryDayHandlerTest {
 		}
 
 		@Override
-		public java.util.Optional<com.soomgil.itinerary.application.port.RouteSegmentUpdateResult> updateRouteSegment(
-			com.soomgil.itinerary.application.port.RouteSegmentUpdate update
-		) {
-			return java.util.Optional.empty();
+		public Optional<RouteSegmentUpdateResult> updateRouteSegment(RouteSegmentUpdate update) {
+			this.lastUpdate = update;
+			return Optional.of(new RouteSegmentUpdateResult(
+				update.routeId(),
+				ORIGIN_ITEM_ID,
+				DESTINATION_ITEM_ID,
+				update.mode() == null ? RouteMode.DRIVING : update.mode(),
+				"MAPBOX",
+				update.providerProfile() == null ? "mapbox/driving" : update.providerProfile(),
+				GeometryFormat.GEOJSON,
+				update.geometry() == null ? "{\"type\":\"LineString\"}" : update.geometry(),
+				update.distanceMeters(),
+				update.durationSeconds(),
+				update.confidence()
+			));
 		}
+
 		@Override
 		public Long insertRouteMatchRequest(RouteMatchRequestLog request) {
 			return 1L;
@@ -211,7 +210,7 @@ class UpdateItineraryDayHandlerTest {
 
 		@Override
 		public boolean existsActiveRouteSegment(UUID tripId, UUID routeId) {
-			return false;
+			return existsRoute;
 		}
 
 		@Override
@@ -250,8 +249,8 @@ class UpdateItineraryDayHandlerTest {
 		}
 
 		@Override
-		public java.util.List<UUID> findActiveRouteIdsByItem(UUID tripId, UUID itemId) {
-			return java.util.List.of();
+		public List<UUID> findActiveRouteIdsByItem(UUID tripId, UUID itemId) {
+			return List.of();
 		}
 
 		@Override

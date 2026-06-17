@@ -281,6 +281,34 @@
     )
   </insert>
 
+  <select id="updateRouteSegment" resultType="com.soomgil.itinerary.application.port.RouteSegmentUpdateResult">
+    UPDATE itinerary.trip_routes
+    SET
+      mode = COALESCE(#{update.mode,jdbcType=VARCHAR}, mode),
+      provider_profile = COALESCE(#{update.providerProfile,jdbcType=VARCHAR}, provider_profile),
+      geometry = COALESCE(#{update.geometry,jdbcType=VARCHAR}::jsonb, geometry),
+      distance_meters = COALESCE(#{update.distanceMeters,jdbcType=DOUBLE}, distance_meters),
+      duration_seconds = COALESCE(#{update.durationSeconds,jdbcType=DOUBLE}, duration_seconds),
+      confidence = COALESCE(#{update.confidence,jdbcType=DOUBLE}, confidence),
+      updated_by_user_id = #{update.updatedByUserId},
+      updated_at = #{update.updatedAt}
+    WHERE trip_id = #{update.tripId}
+      AND id = #{update.routeId}
+      AND deleted_at IS NULL
+    RETURNING
+      id,
+      origin_itinerary_item_id,
+      destination_itinerary_item_id,
+      mode,
+      provider,
+      provider_profile,
+      geometry_format,
+      geometry::text AS geometry,
+      distance_meters,
+      duration_seconds,
+      confidence
+  </select>
+
   <select id="insertRouteMatchRequest" resultType="long">
     INSERT INTO itinerary.route_match_requests (
       trip_id,

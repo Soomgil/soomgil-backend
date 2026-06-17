@@ -13,6 +13,8 @@ import com.soomgil.itinerary.application.port.MapDrawingUpdate;
 import com.soomgil.itinerary.application.port.MapDrawingUpdateResult;
 import com.soomgil.itinerary.application.port.RouteMatchRequestLog;
 import com.soomgil.itinerary.application.port.RouteSegmentCreate;
+import com.soomgil.itinerary.application.port.RouteSegmentUpdate;
+import com.soomgil.itinerary.application.port.RouteSegmentUpdateResult;
 import java.time.Instant;
 import java.util.UUID;
 import org.apache.ibatis.annotations.Mapper;
@@ -133,6 +135,14 @@ public interface ItineraryCommandMapper {
 	 * @param route 저장할 route segment
 	 */
 	void insertRouteSegment(@Param("route") RouteSegmentCreate route);
+
+	/**
+	 * route segment를 수정하고 수정 후 값을 반환한다.
+	 *
+	 * @param update 수정 모델
+	 * @return 수정된 route, 없으면 null
+	 */
+	RouteSegmentUpdateResult updateRouteSegment(@Param("update") RouteSegmentUpdate update);
 
 	/**
 	 * route map matching 요청 이력을 추가한다.

@@ -29,6 +29,7 @@ import com.soomgil.itinerary.application.command.dto.DeleteItineraryItemCommand;
 import com.soomgil.itinerary.application.command.dto.UpdateMapDrawingCommand;
 import com.soomgil.itinerary.application.command.dto.UpdateItineraryDayCommand;
 import com.soomgil.itinerary.application.command.dto.UpdateItineraryItemCommand;
+import com.soomgil.itinerary.application.command.dto.UpdateRouteSegmentCommand;
 import com.soomgil.itinerary.application.command.dto.ItineraryDayOrderCommand;
 import com.soomgil.itinerary.application.command.dto.ItineraryItemOrderCommand;
 import com.soomgil.itinerary.application.command.dto.ItineraryDayView;
@@ -52,6 +53,7 @@ import com.soomgil.itinerary.application.command.handler.ReorderItineraryHandler
 import com.soomgil.itinerary.application.command.handler.UpdateMapDrawingHandler;
 import com.soomgil.itinerary.application.command.handler.UpdateItineraryDayHandler;
 import com.soomgil.itinerary.application.command.handler.UpdateItineraryItemHandler;
+import com.soomgil.itinerary.application.command.handler.UpdateRouteSegmentHandler;
 import com.soomgil.itinerary.application.query.dto.FindItineraryQuery;
 import com.soomgil.itinerary.application.query.dto.ItineraryDayDetailView;
 import com.soomgil.itinerary.application.query.dto.ItineraryView;
@@ -95,6 +97,7 @@ public class ItineraryController extends ApiControllerSupport {
 	private final DeleteItineraryItemHandler deleteItineraryItemHandler;
 	private final UpdateItineraryItemHandler updateItineraryItemHandler;
 	private final DeleteItineraryDayHandler deleteItineraryDayHandler;
+	private final UpdateRouteSegmentHandler updateRouteSegmentHandler;
 
 	public ItineraryController(
 		CreateItineraryDayHandler createItineraryDayHandler,
@@ -109,7 +112,8 @@ public class ItineraryController extends ApiControllerSupport {
 		UpdateItineraryDayHandler updateItineraryDayHandler,
 		DeleteItineraryItemHandler deleteItineraryItemHandler,
 		UpdateItineraryItemHandler updateItineraryItemHandler,
-		DeleteItineraryDayHandler deleteItineraryDayHandler
+		DeleteItineraryDayHandler deleteItineraryDayHandler,
+		UpdateRouteSegmentHandler updateRouteSegmentHandler
 	) {
 		this.createItineraryDayHandler = Objects.requireNonNull(
 			createItineraryDayHandler,
@@ -139,6 +143,7 @@ public class ItineraryController extends ApiControllerSupport {
 		this.deleteItineraryItemHandler = Objects.requireNonNull(deleteItineraryItemHandler, "deleteItineraryItemHandler must not be null");
 		this.updateItineraryItemHandler = Objects.requireNonNull(updateItineraryItemHandler, "updateItineraryItemHandler must not be null");
 		this.deleteItineraryDayHandler = Objects.requireNonNull(deleteItineraryDayHandler, "deleteItineraryDayHandler must not be null");
+		this.updateRouteSegmentHandler = Objects.requireNonNull(updateRouteSegmentHandler, "updateRouteSegmentHandler must not be null");
 	}
 
 	@GetMapping
@@ -320,9 +325,20 @@ public class ItineraryController extends ApiControllerSupport {
 	public ItineraryMutationResponse updateRoute(
 		@PathVariable UUID tripId,
 		@PathVariable UUID routeId,
-		@Valid @RequestBody UpdateRouteRequest request
+		@Valid @RequestBody UpdateRouteRequest request,
+		Principal principal
 	) {
-		return notImplemented();
+		return toResponse(updateRouteSegmentHandler.handle(new UpdateRouteSegmentCommand(
+			tripId,
+			currentUserId(principal),
+			request.baseVersion(),
+			routeId,
+			request.mode() == null ? null : com.soomgil.itinerary.domain.model.RouteMode.valueOf(request.mode().name()),
+			request.geometry(),
+			request.distanceMeters(),
+			request.durationSeconds(),
+			request.confidence()
+		)));
 	}
 
 	@DeleteMapping("/routes/{routeId}")
