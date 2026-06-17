@@ -90,6 +90,7 @@ public class CreateMapDrawingHandler implements CommandHandler<CreateMapDrawingC
 			newVersion,
 			null,
 			null,
+			null,
 			new MapDrawingView(
 				drawing.id(),
 				drawing.itineraryDayId(),

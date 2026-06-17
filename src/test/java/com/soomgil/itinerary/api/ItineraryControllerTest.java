@@ -26,6 +26,7 @@ import com.soomgil.itinerary.application.port.ItineraryDayReadModel;
 import com.soomgil.itinerary.application.port.ItineraryItemCreate;
 import com.soomgil.itinerary.application.port.ItineraryItemOrderUpdate;
 import com.soomgil.itinerary.application.port.MapDrawingCreate;
+import com.soomgil.itinerary.application.port.RouteSegmentCreate;
 import com.soomgil.place.api.dto.PlaceProvider;
 import com.soomgil.place.api.dto.PlaceRef;
 import com.soomgil.trip.application.port.TripAccessSnapshot;
@@ -223,6 +224,10 @@ class ItineraryControllerTest {
 		@Override
 		public void insertMapDrawing(MapDrawingCreate drawing) {
 			this.insertedDrawing = drawing;
+		}
+
+		@Override
+		public void insertRouteSegment(RouteSegmentCreate route) {
 		}
 
 		@Override

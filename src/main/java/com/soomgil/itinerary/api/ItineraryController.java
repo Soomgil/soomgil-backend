@@ -29,6 +29,7 @@ import com.soomgil.itinerary.application.command.dto.ItineraryItemView;
 import com.soomgil.itinerary.application.command.dto.ItineraryMutationResult;
 import com.soomgil.itinerary.application.command.dto.MapDrawingView;
 import com.soomgil.itinerary.application.command.dto.ReorderItineraryCommand;
+import com.soomgil.itinerary.application.command.dto.RouteSegmentView;
 import com.soomgil.itinerary.application.command.handler.CreateItineraryDayHandler;
 import com.soomgil.itinerary.application.command.handler.CreateItineraryItemHandler;
 import com.soomgil.itinerary.application.command.handler.CreateMapDrawingHandler;
@@ -276,7 +277,7 @@ public class ItineraryController extends ApiControllerSupport {
 			result.itineraryVersion(),
 			result.day() == null ? null : toDay(result.day()),
 			result.item() == null ? null : toItem(result.item()),
-			null,
+			result.route() == null ? null : toRoute(result.route()),
 			result.drawing() == null ? null : toDrawing(result.drawing()),
 			result.affectedRouteIds()
 		);
@@ -329,6 +330,22 @@ public class ItineraryController extends ApiControllerSupport {
 			view.label(),
 			view.sortOrder(),
 			view.version()
+		);
+	}
+
+	private com.soomgil.itinerary.api.dto.RouteSegment toRoute(RouteSegmentView view) {
+		return new com.soomgil.itinerary.api.dto.RouteSegment(
+			view.id(),
+			view.originItineraryItemId(),
+			view.destinationItineraryItemId(),
+			com.soomgil.itinerary.api.dto.RouteMode.valueOf(view.mode().name()),
+			view.provider(),
+			view.providerProfile(),
+			com.soomgil.itinerary.api.dto.GeometryFormat.valueOf(view.geometryFormat().name()),
+			view.geometry(),
+			view.distanceMeters(),
+			view.durationSeconds(),
+			view.confidence()
 		);
 	}
 }

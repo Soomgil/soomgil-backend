@@ -7,6 +7,7 @@ import com.soomgil.itinerary.application.port.ItineraryDayReadModel;
 import com.soomgil.itinerary.application.port.ItineraryItemCreate;
 import com.soomgil.itinerary.application.port.ItineraryItemOrderUpdate;
 import com.soomgil.itinerary.application.port.MapDrawingCreate;
+import com.soomgil.itinerary.application.port.RouteSegmentCreate;
 import com.soomgil.itinerary.infrastructure.persistence.mapper.ItineraryCommandMapper;
 import java.time.Instant;
 import java.util.Objects;
@@ -57,6 +58,11 @@ public class MyBatisItineraryCommandRepository implements ItineraryCommandReposi
 	@Override
 	public void insertMapDrawing(MapDrawingCreate drawing) {
 		mapper.insertMapDrawing(drawing);
+	}
+
+	@Override
+	public void insertRouteSegment(RouteSegmentCreate route) {
+		mapper.insertRouteSegment(route);
 	}
 
 	@Override

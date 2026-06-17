@@ -6,6 +6,7 @@ import com.soomgil.itinerary.application.command.dto.ItineraryItemOrderCommand;
 import com.soomgil.itinerary.application.port.ItineraryDayCreate;
 import com.soomgil.itinerary.application.port.ItineraryItemCreate;
 import com.soomgil.itinerary.application.port.MapDrawingCreate;
+import com.soomgil.itinerary.application.port.RouteSegmentCreate;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -20,6 +21,7 @@ final class ItineraryCollaborationEvents {
 	private static final String AGGREGATE_ITEM = "ITINERARY_ITEM";
 	private static final String AGGREGATE_ITINERARY = "ITINERARY";
 	private static final String AGGREGATE_DRAWING = "MAP_DRAWING";
+	private static final String AGGREGATE_ROUTE = "ROUTE_SEGMENT";
 
 	private ItineraryCollaborationEvents() {
 	}
@@ -114,6 +116,30 @@ final class ItineraryCollaborationEvents {
 			versionAfter,
 			"{\"drawingId\":\"" + drawing.id() + "\",\"drawingType\":\"" + drawing.drawingType().name() + "\",\"sortOrder\":" + drawing.sortOrder() + "}",
 			"{\"action\":\"DELETE_MAP_DRAWING\",\"drawingId\":\"" + drawing.id() + "\"}",
+			null,
+			createdAt
+		);
+	}
+
+	static CollaborationCommandEvent routeSegmentCreated(
+		RouteSegmentCreate route,
+		long versionBefore,
+		long versionAfter,
+		Instant createdAt
+	) {
+		return new CollaborationCommandEvent(
+			route.tripId(),
+			route.createdByUserId(),
+			null,
+			SOURCE_USER,
+			"CREATE_ROUTE_SEGMENT",
+			AGGREGATE_ROUTE,
+			route.id(),
+			versionBefore,
+			versionAfter,
+			"{\"routeId\":\"" + route.id() + "\",\"originItemId\":\"" + route.originItineraryItemId()
+				+ "\",\"destinationItemId\":\"" + route.destinationItineraryItemId() + "\",\"mode\":\"" + route.mode().name() + "\"}",
+			"{\"action\":\"DELETE_ROUTE_SEGMENT\",\"routeId\":\"" + route.id() + "\"}",
 			null,
 			createdAt
 		);

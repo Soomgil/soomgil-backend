@@ -103,6 +103,7 @@ public class CreateItineraryItemHandler implements CommandHandler<CreateItinerar
 				item.sourceStatus()
 			),
 			null,
+			null,
 			List.of()
 		);
 	}

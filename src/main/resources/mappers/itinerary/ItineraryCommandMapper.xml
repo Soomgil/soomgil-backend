@@ -137,6 +137,45 @@
     )
   </insert>
 
+  <insert id="insertRouteSegment">
+    INSERT INTO itinerary.trip_routes (
+      id,
+      trip_id,
+      origin_itinerary_item_id,
+      destination_itinerary_item_id,
+      mode,
+      provider,
+      provider_profile,
+      geometry_format,
+      geometry,
+      distance_meters,
+      duration_seconds,
+      confidence,
+      created_by_user_id,
+      updated_by_user_id,
+      created_at,
+      updated_at
+    )
+    VALUES (
+      #{route.id},
+      #{route.tripId},
+      #{route.originItineraryItemId},
+      #{route.destinationItineraryItemId},
+      #{route.mode},
+      #{route.provider},
+      #{route.providerProfile},
+      #{route.geometryFormat},
+      #{route.geometry}::jsonb,
+      #{route.distanceMeters},
+      #{route.durationSeconds},
+      #{route.confidence},
+      #{route.createdByUserId},
+      #{route.updatedByUserId},
+      #{route.createdAt},
+      #{route.updatedAt}
+    )
+  </insert>
+
   <select id="existsDay" resultType="boolean">
     SELECT EXISTS (
       SELECT 1

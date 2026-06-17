@@ -60,6 +60,13 @@ public interface ItineraryCommandRepository {
 	void insertMapDrawing(MapDrawingCreate drawing);
 
 	/**
+	 * route segment를 저장한다.
+	 *
+	 * @param route 저장할 route segment
+	 */
+	void insertRouteSegment(RouteSegmentCreate route);
+
+	/**
 	 * day가 같은 trip에 존재하는지 확인한다.
 	 *
 	 * @param tripId 여행방 ID

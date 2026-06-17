@@ -17,6 +17,7 @@ import com.soomgil.itinerary.application.port.ItineraryDayReadModel;
 import com.soomgil.itinerary.application.port.ItineraryItemCreate;
 import com.soomgil.itinerary.application.port.ItineraryItemOrderUpdate;
 import com.soomgil.itinerary.application.port.MapDrawingCreate;
+import com.soomgil.itinerary.application.port.RouteSegmentCreate;
 import com.soomgil.itinerary.domain.model.DrawingType;
 import com.soomgil.itinerary.domain.model.GeometryFormat;
 import com.soomgil.trip.application.query.handler.TripAccessGuard;
@@ -139,6 +140,10 @@ class CreateMapDrawingHandlerTest {
 		@Override
 		public void insertMapDrawing(MapDrawingCreate drawing) {
 			this.insertedDrawing = drawing;
+		}
+
+		@Override
+		public void insertRouteSegment(RouteSegmentCreate route) {
 		}
 
 		@Override

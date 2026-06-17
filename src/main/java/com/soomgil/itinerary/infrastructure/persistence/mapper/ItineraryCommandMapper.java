@@ -6,6 +6,7 @@ import com.soomgil.itinerary.application.port.ItineraryDayReadModel;
 import com.soomgil.itinerary.application.port.ItineraryItemCreate;
 import com.soomgil.itinerary.application.port.ItineraryItemOrderUpdate;
 import com.soomgil.itinerary.application.port.MapDrawingCreate;
+import com.soomgil.itinerary.application.port.RouteSegmentCreate;
 import java.time.Instant;
 import java.util.UUID;
 import org.apache.ibatis.annotations.Mapper;
@@ -67,6 +68,13 @@ public interface ItineraryCommandMapper {
 	 * @param drawing 저장할 도형
 	 */
 	void insertMapDrawing(@Param("drawing") MapDrawingCreate drawing);
+
+	/**
+	 * route segment를 추가한다.
+	 *
+	 * @param route 저장할 route segment
+	 */
+	void insertRouteSegment(@Param("route") RouteSegmentCreate route);
 
 	/**
 	 * 일정 day 존재 여부를 조회한다.

@@ -126,6 +126,7 @@ public class CreateItineraryDayHandler implements CommandHandler<CreateItinerary
 			),
 			null,
 			null,
+			null,
 			List.of()
 		);
 	}
@@ -143,6 +144,7 @@ public class CreateItineraryDayHandler implements CommandHandler<CreateItinerary
 				day.title(),
 				day.sortOrder()
 			),
+			null,
 			null,
 			null,
 			List.of()
