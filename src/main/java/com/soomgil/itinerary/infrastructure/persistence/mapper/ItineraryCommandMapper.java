@@ -2,6 +2,7 @@ package com.soomgil.itinerary.infrastructure.persistence.mapper;
 
 import com.soomgil.itinerary.application.port.ItineraryDayCreate;
 import com.soomgil.itinerary.application.port.ItineraryDayOrderUpdate;
+import com.soomgil.itinerary.application.port.ItineraryDayReadModel;
 import com.soomgil.itinerary.application.port.ItineraryItemCreate;
 import com.soomgil.itinerary.application.port.ItineraryItemOrderUpdate;
 import java.time.Instant;
@@ -30,11 +31,27 @@ public interface ItineraryCommandMapper {
 	);
 
 	/**
+	 * trip itinerary version을 조회한다.
+	 *
+	 * @param tripId 여행방 ID
+	 * @return 여행방이 없으면 null
+	 */
+	Long findItineraryVersion(@Param("tripId") UUID tripId);
+
+	/**
 	 * 일정 day를 추가한다.
 	 *
 	 * @param day 저장할 day
 	 */
 	void insertDay(@Param("day") ItineraryDayCreate day);
+
+	/**
+	 * 일차 미정 day를 조회한다.
+	 *
+	 * @param tripId 여행방 ID
+	 * @return 존재하지 않으면 null
+	 */
+	ItineraryDayReadModel findUnscheduledDay(@Param("tripId") UUID tripId);
 
 	/**
 	 * 일정 item을 추가한다.

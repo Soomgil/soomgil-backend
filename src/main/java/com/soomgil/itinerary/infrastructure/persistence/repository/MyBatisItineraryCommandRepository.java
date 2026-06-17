@@ -3,11 +3,13 @@ package com.soomgil.itinerary.infrastructure.persistence.repository;
 import com.soomgil.itinerary.application.port.ItineraryCommandRepository;
 import com.soomgil.itinerary.application.port.ItineraryDayCreate;
 import com.soomgil.itinerary.application.port.ItineraryDayOrderUpdate;
+import com.soomgil.itinerary.application.port.ItineraryDayReadModel;
 import com.soomgil.itinerary.application.port.ItineraryItemCreate;
 import com.soomgil.itinerary.application.port.ItineraryItemOrderUpdate;
 import com.soomgil.itinerary.infrastructure.persistence.mapper.ItineraryCommandMapper;
 import java.time.Instant;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.UUID;
 import org.springframework.stereotype.Repository;
@@ -31,8 +33,19 @@ public class MyBatisItineraryCommandRepository implements ItineraryCommandReposi
 	}
 
 	@Override
+	public OptionalLong findItineraryVersion(UUID tripId) {
+		Long version = mapper.findItineraryVersion(tripId);
+		return version == null ? OptionalLong.empty() : OptionalLong.of(version);
+	}
+
+	@Override
 	public void insertDay(ItineraryDayCreate day) {
 		mapper.insertDay(day);
+	}
+
+	@Override
+	public Optional<ItineraryDayReadModel> findUnscheduledDay(UUID tripId) {
+		return Optional.ofNullable(mapper.findUnscheduledDay(tripId));
 	}
 
 	@Override

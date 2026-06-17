@@ -1,6 +1,7 @@
 package com.soomgil.itinerary.application.port;
 
 import java.time.Instant;
+import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.UUID;
 
@@ -22,11 +23,27 @@ public interface ItineraryCommandRepository {
 	OptionalLong incrementItineraryVersion(UUID tripId, long baseVersion, Instant updatedAt);
 
 	/**
+	 * 여행방의 현재 itinerary version을 조회한다.
+	 *
+	 * @param tripId 여행방 ID
+	 * @return 여행방이 존재하면 현재 version
+	 */
+	OptionalLong findItineraryVersion(UUID tripId);
+
+	/**
 	 * 일정 day를 저장한다.
 	 *
 	 * @param day 저장할 day
 	 */
 	void insertDay(ItineraryDayCreate day);
+
+	/**
+	 * 여행방의 일차 미정 day를 조회한다.
+	 *
+	 * @param tripId 여행방 ID
+	 * @return 존재하면 일차 미정 day
+	 */
+	Optional<ItineraryDayReadModel> findUnscheduledDay(UUID tripId);
 
 	/**
 	 * 일정 item을 저장한다.

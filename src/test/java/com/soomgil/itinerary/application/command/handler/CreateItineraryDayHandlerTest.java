@@ -8,6 +8,7 @@ import com.soomgil.itinerary.application.command.dto.ItineraryMutationResult;
 import com.soomgil.itinerary.application.port.ItineraryCommandRepository;
 import com.soomgil.itinerary.application.port.ItineraryDayCreate;
 import com.soomgil.itinerary.application.port.ItineraryDayOrderUpdate;
+import com.soomgil.itinerary.application.port.ItineraryDayReadModel;
 import com.soomgil.itinerary.application.port.ItineraryItemCreate;
 import com.soomgil.itinerary.application.port.ItineraryItemOrderUpdate;
 import com.soomgil.itinerary.domain.model.ItineraryDayGroupType;
@@ -37,6 +38,7 @@ class CreateItineraryDayHandlerTest {
 
 	private static final UUID TRIP_ID = UUID.fromString("10000000-0000-0000-0000-000000000001");
 	private static final UUID USER_ID = UUID.fromString("20000000-0000-0000-0000-000000000001");
+	private static final UUID UNSCHEDULED_DAY_ID = UUID.fromString("30000000-0000-0000-0000-000000000099");
 	private static final Instant NOW = Instant.parse("2026-06-17T00:00:00Z");
 
 	private final CapturingItineraryCommandRepository repository = new CapturingItineraryCommandRepository();
@@ -116,10 +118,67 @@ class CreateItineraryDayHandlerTest {
 		);
 	}
 
+	@Test
+	void reusesExistingUnscheduledDayWithoutIncrementingVersion() {
+		repository.currentVersion = 5;
+		repository.unscheduledDay = new ItineraryDayReadModel(
+			UNSCHEDULED_DAY_ID,
+			TRIP_ID,
+			ItineraryDayGroupType.UNSCHEDULED,
+			null,
+			null,
+			"일차 미정",
+			99
+		);
+
+		ItineraryMutationResult result = handler.handle(new CreateItineraryDayCommand(
+			TRIP_ID,
+			USER_ID,
+			5,
+			ItineraryDayGroupType.UNSCHEDULED,
+			null,
+			null,
+			null,
+			null
+		));
+
+		assertThat(result.itineraryVersion()).isEqualTo(5);
+		assertThat(result.day().id()).isEqualTo(UNSCHEDULED_DAY_ID);
+		assertThat(repository.insertedDay).isNull();
+	}
+
+	@Test
+	void rejectsStaleVersionWhenReusingUnscheduledDay() {
+		repository.currentVersion = 5;
+		repository.unscheduledDay = new ItineraryDayReadModel(
+			UNSCHEDULED_DAY_ID,
+			TRIP_ID,
+			ItineraryDayGroupType.UNSCHEDULED,
+			null,
+			null,
+			null,
+			0
+		);
+
+		assertThatThrownBy(() -> handler.handle(new CreateItineraryDayCommand(
+			TRIP_ID,
+			USER_ID,
+			4,
+			ItineraryDayGroupType.UNSCHEDULED,
+			null,
+			null,
+			null,
+			null
+		))).isInstanceOfSatisfying(BusinessException.class, exception ->
+			assertThat(exception.errorCode()).isEqualTo(ErrorCode.CONFLICT)
+		);
+	}
+
 	static class CapturingItineraryCommandRepository implements ItineraryCommandRepository {
 
 		private long currentVersion;
 		private ItineraryDayCreate insertedDay;
+		private ItineraryDayReadModel unscheduledDay;
 
 		@Override
 		public OptionalLong incrementItineraryVersion(UUID tripId, long baseVersion, Instant updatedAt) {
@@ -131,8 +190,18 @@ class CreateItineraryDayHandlerTest {
 		}
 
 		@Override
+		public OptionalLong findItineraryVersion(UUID tripId) {
+			return OptionalLong.of(currentVersion);
+		}
+
+		@Override
 		public void insertDay(ItineraryDayCreate day) {
 			this.insertedDay = day;
+		}
+
+		@Override
+		public Optional<ItineraryDayReadModel> findUnscheduledDay(UUID tripId) {
+			return Optional.ofNullable(unscheduledDay);
 		}
 
 		@Override

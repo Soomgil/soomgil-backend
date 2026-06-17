@@ -10,6 +10,7 @@ import com.soomgil.itinerary.application.command.dto.ItineraryDayView;
 import com.soomgil.itinerary.application.command.dto.ItineraryMutationResult;
 import com.soomgil.itinerary.application.port.ItineraryCommandRepository;
 import com.soomgil.itinerary.application.port.ItineraryDayCreate;
+import com.soomgil.itinerary.application.port.ItineraryDayReadModel;
 import com.soomgil.itinerary.domain.model.ItineraryDayGroupType;
 import com.soomgil.trip.application.query.handler.TripAccessGuard;
 import java.time.Instant;
@@ -47,6 +48,44 @@ public class CreateItineraryDayHandler implements CommandHandler<CreateItinerary
 		tripAccessGuard.requireActiveMember(command.tripId(), command.actorUserId());
 		validate(command);
 
+		if (command.groupType() == ItineraryDayGroupType.UNSCHEDULED) {
+			return reuseUnscheduledDayIfPresent(command);
+		}
+		return createNewDay(command);
+	}
+
+	private void validate(CreateItineraryDayCommand command) {
+		if (command.groupType() == null) {
+			throw new BusinessException(ErrorCode.VALIDATION_FAILED, "Day group type is required.");
+		}
+		if (command.groupType() == ItineraryDayGroupType.DAY && command.dayNumber() == null) {
+			throw new BusinessException(ErrorCode.VALIDATION_FAILED, "Day number is required for DAY group.");
+		}
+		if (command.groupType() == ItineraryDayGroupType.UNSCHEDULED && command.dayNumber() != null) {
+			throw new BusinessException(ErrorCode.VALIDATION_FAILED, "Unscheduled group must not have day number.");
+		}
+		if (command.dayNumber() != null && command.dayNumber() < 1) {
+			throw new BusinessException(ErrorCode.VALIDATION_FAILED, "Day number must be greater than or equal to 1.");
+		}
+		if (command.sortOrder() != null && command.sortOrder() < 0) {
+			throw new BusinessException(ErrorCode.VALIDATION_FAILED, "Sort order must be greater than or equal to 0.");
+		}
+	}
+
+	private ItineraryMutationResult reuseUnscheduledDayIfPresent(CreateItineraryDayCommand command) {
+		return repository.findUnscheduledDay(command.tripId())
+			.map(day -> {
+				long currentVersion = repository.findItineraryVersion(command.tripId())
+					.orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "Trip was not found."));
+				if (currentVersion != command.baseVersion()) {
+					throw new BusinessException(ErrorCode.CONFLICT, "Itinerary version does not match.");
+				}
+				return toResult(command.tripId(), currentVersion, day);
+			})
+			.orElseGet(() -> createNewDay(command));
+	}
+
+	private ItineraryMutationResult createNewDay(CreateItineraryDayCommand command) {
 		Instant now = timeProvider.now();
 		long newVersion = repository.incrementItineraryVersion(command.tripId(), command.baseVersion(), now)
 			.orElseThrow(() -> new BusinessException(ErrorCode.CONFLICT, "Itinerary version does not match."));
@@ -79,22 +118,22 @@ public class CreateItineraryDayHandler implements CommandHandler<CreateItinerary
 		);
 	}
 
-	private void validate(CreateItineraryDayCommand command) {
-		if (command.groupType() == null) {
-			throw new BusinessException(ErrorCode.VALIDATION_FAILED, "Day group type is required.");
-		}
-		if (command.groupType() == ItineraryDayGroupType.DAY && command.dayNumber() == null) {
-			throw new BusinessException(ErrorCode.VALIDATION_FAILED, "Day number is required for DAY group.");
-		}
-		if (command.groupType() == ItineraryDayGroupType.UNSCHEDULED && command.dayNumber() != null) {
-			throw new BusinessException(ErrorCode.VALIDATION_FAILED, "Unscheduled group must not have day number.");
-		}
-		if (command.dayNumber() != null && command.dayNumber() < 1) {
-			throw new BusinessException(ErrorCode.VALIDATION_FAILED, "Day number must be greater than or equal to 1.");
-		}
-		if (command.sortOrder() != null && command.sortOrder() < 0) {
-			throw new BusinessException(ErrorCode.VALIDATION_FAILED, "Sort order must be greater than or equal to 0.");
-		}
+	private ItineraryMutationResult toResult(UUID tripId, long version, ItineraryDayReadModel day) {
+		return new ItineraryMutationResult(
+			tripId,
+			version,
+			new ItineraryDayView(
+				day.id(),
+				day.tripId(),
+				day.groupType(),
+				day.dayNumber(),
+				day.date(),
+				day.title(),
+				day.sortOrder()
+			),
+			null,
+			List.of()
+		);
 	}
 
 	private String normalizeTitle(String value) {

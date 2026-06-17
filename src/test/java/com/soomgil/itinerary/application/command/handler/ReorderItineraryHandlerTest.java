@@ -12,6 +12,7 @@ import com.soomgil.itinerary.application.command.dto.ReorderItineraryCommand;
 import com.soomgil.itinerary.application.port.ItineraryCommandRepository;
 import com.soomgil.itinerary.application.port.ItineraryDayCreate;
 import com.soomgil.itinerary.application.port.ItineraryDayOrderUpdate;
+import com.soomgil.itinerary.application.port.ItineraryDayReadModel;
 import com.soomgil.itinerary.application.port.ItineraryItemCreate;
 import com.soomgil.itinerary.application.port.ItineraryItemOrderUpdate;
 import com.soomgil.trip.application.query.handler.TripAccessGuard;
@@ -152,7 +153,17 @@ class ReorderItineraryHandlerTest {
 		}
 
 		@Override
+		public OptionalLong findItineraryVersion(UUID tripId) {
+			return OptionalLong.of(currentVersion);
+		}
+
+		@Override
 		public void insertDay(ItineraryDayCreate day) {
+		}
+
+		@Override
+		public java.util.Optional<ItineraryDayReadModel> findUnscheduledDay(UUID tripId) {
+			return java.util.Optional.empty();
 		}
 
 		@Override

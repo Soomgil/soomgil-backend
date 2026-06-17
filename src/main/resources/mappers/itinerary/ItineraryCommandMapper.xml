@@ -14,6 +14,13 @@
     RETURNING itinerary_version
   </select>
 
+  <select id="findItineraryVersion" resultType="long">
+    SELECT itinerary_version
+    FROM trip.trips
+    WHERE id = #{tripId}
+      AND status != 'DELETED'
+  </select>
+
   <insert id="insertDay">
     INSERT INTO itinerary.itinerary_days (
       id,
@@ -38,6 +45,21 @@
       #{day.updatedAt}
     )
   </insert>
+
+  <select id="findUnscheduledDay" resultType="com.soomgil.itinerary.application.port.ItineraryDayReadModel">
+    SELECT
+      id,
+      trip_id,
+      group_type,
+      day_number,
+      date,
+      title,
+      sort_order
+    FROM itinerary.itinerary_days
+    WHERE trip_id = #{tripId}
+      AND group_type = 'UNSCHEDULED'
+    LIMIT 1
+  </select>
 
   <insert id="insertItem">
     INSERT INTO itinerary.itinerary_items (
