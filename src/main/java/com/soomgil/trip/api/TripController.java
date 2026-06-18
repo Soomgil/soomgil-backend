@@ -31,7 +31,6 @@ import com.soomgil.trip.application.query.handler.FindTripDetailHandler;
 import com.soomgil.trip.application.query.handler.ListTripInvitesHandler;
 import com.soomgil.trip.application.query.handler.ListMyTripsHandler;
 import com.soomgil.trip.application.query.handler.ListTripMembersHandler;
-import com.soomgil.trip.api.dto.AcceptTripInviteRequest;
 import com.soomgil.trip.api.dto.CreateTripInviteRequest;
 import com.soomgil.trip.api.dto.CreateTripRequest;
 import com.soomgil.trip.api.dto.PagedTripSummary;
@@ -229,11 +228,6 @@ public class TripController extends ApiControllerSupport {
 	public void revokeTripInvite(@PathVariable UUID tripId, @PathVariable UUID inviteId, Principal principal) {
 		UUID currentUserId = currentUserId(principal);
 		revokeTripInviteHandler.handle(new RevokeTripInviteCommand(tripId, inviteId, currentUserId));
-	}
-
-	@PostMapping("/invites/accept")
-	public TripDetail acceptTripInvite(@Valid @RequestBody AcceptTripInviteRequest request) {
-		return notImplemented();
 	}
 
 	private UUID currentUserId(Principal principal) {
