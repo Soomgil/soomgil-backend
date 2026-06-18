@@ -13,9 +13,11 @@ import com.soomgil.record.api.dto.CreateTripRecordRequest;
 import com.soomgil.record.api.dto.PagedTripRecordEntry;
 import com.soomgil.record.api.dto.PagedTripRecordPhoto;
 import com.soomgil.record.api.dto.UpdateTripRecordRequest;
+import com.soomgil.record.application.port.ItineraryReferenceRepository;
 import com.soomgil.record.application.port.TripRecordCommandRepository;
 import com.soomgil.record.application.port.TripRecordEntryCreate;
 import com.soomgil.record.application.port.TripRecordEntryReadModel;
+import com.soomgil.record.application.port.TripRecordEntryUpdate;
 import com.soomgil.record.application.port.TripRecordMediaReadModel;
 import com.soomgil.record.application.port.TripRecordPage;
 import com.soomgil.record.application.port.TripRecordPhotoPage;
@@ -33,6 +35,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 class TripRecordServiceTest {
 
@@ -44,9 +47,11 @@ class TripRecordServiceTest {
 
 	private final TripRecordCommandRepository commandRepository = mock(TripRecordCommandRepository.class);
 	private final TripRecordQueryRepository queryRepository = mock(TripRecordQueryRepository.class);
+	private final ItineraryReferenceRepository itineraryReferenceRepository = mock(ItineraryReferenceRepository.class);
 	private final TripRecordService service = new TripRecordService(
 		commandRepository,
 		queryRepository,
+		itineraryReferenceRepository,
 		new TripAccessGuard(tripRepository()),
 		() -> Instant.parse("2026-06-18T00:00:00Z")
 	);
@@ -113,6 +118,46 @@ class TripRecordServiceTest {
 			null
 		))).isInstanceOfSatisfying(BusinessException.class, exception ->
 			assertThat(exception.errorCode()).isEqualTo(ErrorCode.FORBIDDEN)
+		);
+	}
+
+	@Test
+	void preservesOmittedFieldsAndClearsExplicitNull() {
+		when(queryRepository.findEntry(TRIP_ID, RECORD_ID)).thenReturn(Optional.of(entry(USER_ID)));
+		when(queryRepository.findMedia(RECORD_ID)).thenReturn(List.of());
+		UpdateTripRecordRequest request = new UpdateTripRecordRequest();
+		request.setTitle(" 수정 제목 ");
+		request.setCaption(null);
+
+		service.updateRecord(TRIP_ID, USER_ID, RECORD_ID, request);
+
+		ArgumentCaptor<TripRecordEntryUpdate> captor = ArgumentCaptor.forClass(TripRecordEntryUpdate.class);
+		verify(commandRepository).updateEntry(captor.capture());
+		TripRecordEntryUpdate update = captor.getValue();
+		assertThat(update.title()).isEqualTo("수정 제목");
+		assertThat(update.caption()).isNull();
+		assertThat(update.locationName()).isEqualTo("서울");
+		assertThat(update.lat()).isEqualTo(37.5);
+		assertThat(update.lng()).isEqualTo(127.0);
+		assertThat(update.takenAt()).isEqualTo(OffsetDateTime.parse("2026-06-18T10:00:00Z"));
+	}
+
+	@Test
+	void rejectsItineraryDayFromAnotherTrip() {
+		UUID dayId = UUID.fromString("50000000-0000-0000-0000-000000000001");
+
+		assertThatThrownBy(() -> service.createRecord(TRIP_ID, USER_ID, new CreateTripRecordRequest(
+			dayId,
+			null,
+			"제목",
+			null,
+			null,
+			null,
+			null,
+			null,
+			List.of()
+		))).isInstanceOfSatisfying(BusinessException.class, exception ->
+			assertThat(exception.errorCode()).isEqualTo(ErrorCode.VALIDATION_FAILED)
 		);
 	}
 

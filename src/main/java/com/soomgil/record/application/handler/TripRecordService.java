@@ -13,6 +13,7 @@ import com.soomgil.record.api.dto.RecordVisibility;
 import com.soomgil.record.api.dto.TripRecordEntry;
 import com.soomgil.record.api.dto.TripRecordPhoto;
 import com.soomgil.record.api.dto.UpdateTripRecordRequest;
+import com.soomgil.record.application.port.ItineraryReferenceRepository;
 import com.soomgil.record.application.port.TripRecordCommandRepository;
 import com.soomgil.record.application.port.TripRecordEntryCreate;
 import com.soomgil.record.application.port.TripRecordEntryReadModel;
@@ -44,17 +45,23 @@ public class TripRecordService {
 
 	private final TripRecordCommandRepository commandRepository;
 	private final TripRecordQueryRepository queryRepository;
+	private final ItineraryReferenceRepository itineraryReferenceRepository;
 	private final TripAccessGuard tripAccessGuard;
 	private final TimeProvider timeProvider;
 
 	public TripRecordService(
 		TripRecordCommandRepository commandRepository,
 		TripRecordQueryRepository queryRepository,
+		ItineraryReferenceRepository itineraryReferenceRepository,
 		TripAccessGuard tripAccessGuard,
 		TimeProvider timeProvider
 	) {
 		this.commandRepository = Objects.requireNonNull(commandRepository, "commandRepository must not be null");
 		this.queryRepository = Objects.requireNonNull(queryRepository, "queryRepository must not be null");
+		this.itineraryReferenceRepository = Objects.requireNonNull(
+			itineraryReferenceRepository,
+			"itineraryReferenceRepository must not be null"
+		);
 		this.tripAccessGuard = Objects.requireNonNull(tripAccessGuard, "tripAccessGuard must not be null");
 		this.timeProvider = Objects.requireNonNull(timeProvider, "timeProvider must not be null");
 	}
@@ -75,6 +82,7 @@ public class TripRecordService {
 	public TripRecordEntry createRecord(UUID tripId, UUID userId, CreateTripRecordRequest request) {
 		tripAccessGuard.requireActiveMember(tripId, userId);
 		validate(request.title(), request.lat(), request.lng());
+		validateItineraryReferences(tripId, request.itineraryDayId(), request.itineraryItemId());
 		UUID recordId = Ids.newUuid();
 		OffsetDateTime now = now();
 		commandRepository.insertEntry(new TripRecordEntryCreate(
@@ -107,22 +115,31 @@ public class TripRecordService {
 		tripAccessGuard.requireActiveMember(tripId, userId);
 		TripRecordEntryReadModel current = findEntry(tripId, recordId);
 		requireUploader(current, userId);
-		validate(request.title(), request.lat(), request.lng());
+		UUID itineraryDayId = request.itineraryDayIdProvided() ? request.itineraryDayId() : current.itineraryDayId();
+		UUID itineraryItemId = request.itineraryItemIdProvided() ? request.itineraryItemId() : current.itineraryItemId();
+		String title = request.titleProvided() ? normalizeText(request.title()) : current.title();
+		String caption = request.captionProvided() ? normalizeText(request.caption()) : current.caption();
+		String locationName = request.locationNameProvided() ? normalizeText(request.locationName()) : current.locationName();
+		Double lat = request.latProvided() ? request.lat() : current.lat();
+		Double lng = request.lngProvided() ? request.lng() : current.lng();
+		OffsetDateTime takenAt = request.takenAtProvided() ? request.takenAt() : current.takenAt();
+		validate(title, lat, lng);
+		validateItineraryReferences(tripId, itineraryDayId, itineraryItemId);
 		OffsetDateTime now = now();
 		commandRepository.updateEntry(new TripRecordEntryUpdate(
 			tripId,
 			recordId,
-			request.itineraryDayId(),
-			request.itineraryItemId(),
-			normalizeText(request.title()),
-			normalizeText(request.caption()),
-			normalizeText(request.locationName()),
-			request.lat(),
-			request.lng(),
-			request.takenAt(),
+			itineraryDayId,
+			itineraryItemId,
+			title,
+			caption,
+			locationName,
+			lat,
+			lng,
+			takenAt,
 			now
 		));
-		if (request.mediaFileIds() != null) {
+		if (request.mediaFileIdsProvided()) {
 			replaceMedia(recordId, request.mediaFileIds(), now);
 		}
 		return getRecord(tripId, userId, recordId);
@@ -243,6 +260,23 @@ public class TripRecordService {
 	private void requireUploader(TripRecordEntryReadModel entry, UUID userId) {
 		if (!entry.uploadedByUserId().equals(userId)) {
 			throw new BusinessException(ErrorCode.FORBIDDEN, "Trip record uploader access is required.");
+		}
+	}
+
+	private void validateItineraryReferences(UUID tripId, UUID dayId, UUID itemId) {
+		if (dayId != null && !itineraryReferenceRepository.existsDay(tripId, dayId)) {
+			throw new BusinessException(ErrorCode.VALIDATION_FAILED, "Itinerary day must belong to the trip.");
+		}
+		if (itemId == null) {
+			return;
+		}
+		UUID itemDayId = itineraryReferenceRepository.findItemDayId(tripId, itemId)
+			.orElseThrow(() -> new BusinessException(
+				ErrorCode.VALIDATION_FAILED,
+				"Itinerary item must belong to the trip."
+			));
+		if (dayId != null && !dayId.equals(itemDayId)) {
+			throw new BusinessException(ErrorCode.VALIDATION_FAILED, "Itinerary item must belong to the selected day.");
 		}
 	}
 
