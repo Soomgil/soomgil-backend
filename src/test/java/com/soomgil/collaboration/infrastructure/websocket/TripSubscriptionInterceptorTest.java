@@ -26,8 +26,10 @@ class TripSubscriptionInterceptorTest {
 	private static final UUID USER_ID = UUID.fromString("20000000-0000-0000-0000-000000000001");
 
 	private final TripQueryRepository tripRepository = mock(TripQueryRepository.class);
+	private final CollaborationWebSocketSessionRegistry sessionRegistry = new CollaborationWebSocketSessionRegistry();
 	private final TripSubscriptionInterceptor interceptor = new TripSubscriptionInterceptor(
-		new TripAccessGuard(tripRepository)
+		new TripAccessGuard(tripRepository),
+		sessionRegistry
 	);
 	private final MessageChannel channel = mock(MessageChannel.class);
 
@@ -54,6 +56,18 @@ class TripSubscriptionInterceptorTest {
 	}
 
 	@Test
+	void registersAndRemovesAuthenticatedSession() {
+		Message<?> connect = message(StompCommand.CONNECT, null, true, "session-1");
+		Message<?> disconnect = message(StompCommand.DISCONNECT, null, false, "session-1");
+
+		interceptor.preSend(connect, channel);
+		assertThat(sessionRegistry.isOwnedBy("session-1", USER_ID)).isTrue();
+
+		interceptor.preSend(disconnect, channel);
+		assertThat(sessionRegistry.isOwnedBy("session-1", USER_ID)).isFalse();
+	}
+
+	@Test
 	void rejectsNonMemberTripSubscription() {
 		Message<?> message = message(StompCommand.SUBSCRIBE, "/topic/trips/" + TRIP_ID + "/collaboration", true);
 
@@ -70,8 +84,13 @@ class TripSubscriptionInterceptorTest {
 	}
 
 	private Message<?> message(StompCommand command, String destination, boolean authenticated) {
+		return message(command, destination, authenticated, null);
+	}
+
+	private Message<?> message(StompCommand command, String destination, boolean authenticated, String sessionId) {
 		StompHeaderAccessor accessor = StompHeaderAccessor.create(command);
 		accessor.setDestination(destination);
+		accessor.setSessionId(sessionId);
 		if (authenticated) {
 			accessor.setUser(() -> USER_ID.toString());
 		}

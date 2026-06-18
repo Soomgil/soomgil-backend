@@ -26,19 +26,27 @@ public class TripSubscriptionInterceptor implements ChannelInterceptor {
 	);
 
 	private final TripAccessGuard tripAccessGuard;
+	private final CollaborationWebSocketSessionRegistry sessionRegistry;
 
-	public TripSubscriptionInterceptor(TripAccessGuard tripAccessGuard) {
+	public TripSubscriptionInterceptor(
+		TripAccessGuard tripAccessGuard,
+		CollaborationWebSocketSessionRegistry sessionRegistry
+	) {
 		this.tripAccessGuard = Objects.requireNonNull(tripAccessGuard, "tripAccessGuard must not be null");
+		this.sessionRegistry = Objects.requireNonNull(sessionRegistry, "sessionRegistry must not be null");
 	}
 
 	@Override
 	public Message<?> preSend(Message<?> message, MessageChannel channel) {
 		StompHeaderAccessor accessor = StompHeaderAccessor.wrap(message);
 		if (StompCommand.CONNECT.equals(accessor.getCommand())) {
-			requireUser(accessor.getUser());
+			sessionRegistry.register(accessor.getSessionId(), requireUser(accessor.getUser()));
 		}
 		if (StompCommand.SUBSCRIBE.equals(accessor.getCommand())) {
 			authorizeSubscription(accessor);
+		}
+		if (StompCommand.DISCONNECT.equals(accessor.getCommand())) {
+			sessionRegistry.unregister(accessor.getSessionId());
 		}
 		return message;
 	}

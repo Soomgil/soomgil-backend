@@ -9,6 +9,7 @@ import com.soomgil.collaboration.api.dto.CollaborationActionResponse;
 import com.soomgil.collaboration.api.dto.UndoRedoRequest;
 import com.soomgil.collaboration.application.command.dto.UndoRedoResult;
 import com.soomgil.collaboration.application.command.handler.UndoRedoHandler;
+import com.soomgil.collaboration.infrastructure.web.HttpCollaborationSessionIdProvider;
 import java.security.Principal;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -22,7 +23,7 @@ class CollaborationControllerTest {
 	void returnsUndoResponse() {
 		UndoRedoHandler handler = mock(UndoRedoHandler.class);
 		when(handler.handle(any())).thenReturn(new UndoRedoResult(TRIP_ID, 11L, 2L, false, true));
-		CollaborationController controller = new CollaborationController(handler);
+		CollaborationController controller = new CollaborationController(handler, sessionIdProvider());
 
 		CollaborationActionResponse response = controller.undo(
 			TRIP_ID,
@@ -42,7 +43,7 @@ class CollaborationControllerTest {
 	void returnsRedoResponse() {
 		UndoRedoHandler handler = mock(UndoRedoHandler.class);
 		when(handler.handle(any())).thenReturn(new UndoRedoResult(TRIP_ID, 12L, 4L, true, false));
-		CollaborationController controller = new CollaborationController(handler);
+		CollaborationController controller = new CollaborationController(handler, sessionIdProvider());
 
 		CollaborationActionResponse response = controller.redo(
 			TRIP_ID,
@@ -59,5 +60,11 @@ class CollaborationControllerTest {
 
 	private Principal principal() {
 		return () -> USER_ID.toString();
+	}
+
+	private HttpCollaborationSessionIdProvider sessionIdProvider() {
+		HttpCollaborationSessionIdProvider provider = mock(HttpCollaborationSessionIdProvider.class);
+		when(provider.requireOwnedSession(any(), any())).thenReturn("session-1");
+		return provider;
 	}
 }

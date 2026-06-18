@@ -29,9 +29,14 @@ import org.springframework.web.bind.annotation.RestController;
 public class CollaborationController extends ApiControllerSupport {
 
 	private final UndoRedoHandler undoRedoHandler;
+	private final HttpCollaborationSessionIdProvider sessionIdProvider;
 
-	public CollaborationController(UndoRedoHandler undoRedoHandler) {
+	public CollaborationController(
+		UndoRedoHandler undoRedoHandler,
+		HttpCollaborationSessionIdProvider sessionIdProvider
+	) {
 		this.undoRedoHandler = Objects.requireNonNull(undoRedoHandler, "undoRedoHandler must not be null");
+		this.sessionIdProvider = Objects.requireNonNull(sessionIdProvider, "sessionIdProvider must not be null");
 	}
 
 	@PostMapping("/undo")
@@ -44,7 +49,7 @@ public class CollaborationController extends ApiControllerSupport {
 		return toResponse(undoRedoHandler.handle(new UndoRedoCommand(
 			tripId,
 			currentUserId(principal),
-			normalizeSessionId(websocketSessionId),
+			sessionIdProvider.requireOwnedSession(websocketSessionId, principal),
 			request.baseVersion(),
 			request.commandEventId(),
 			UndoRedoAction.UNDO
@@ -61,7 +66,7 @@ public class CollaborationController extends ApiControllerSupport {
 		return toResponse(undoRedoHandler.handle(new UndoRedoCommand(
 			tripId,
 			currentUserId(principal),
-			normalizeSessionId(websocketSessionId),
+			sessionIdProvider.requireOwnedSession(websocketSessionId, principal),
 			request.baseVersion(),
 			request.commandEventId(),
 			UndoRedoAction.REDO
@@ -90,10 +95,4 @@ public class CollaborationController extends ApiControllerSupport {
 		}
 	}
 
-	private String normalizeSessionId(String value) {
-		if (value == null || value.isBlank()) {
-			return null;
-		}
-		return value.trim();
-	}
 }
