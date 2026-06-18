@@ -56,7 +56,11 @@ class DeleteItineraryItemHandlerTest {
 		assertThat(repository.deletedRouteIds).containsExactly(ROUTE_ID);
 		assertThat(eventRepository.events)
 			.extracting(CollaborationCommandEvent::commandType)
-			.containsExactly("DELETE_ROUTE_SEGMENT", "DELETE_ITINERARY_ITEM");
+			.containsExactly("DELETE_ITINERARY_ITEM");
+		assertThat(eventRepository.events.getFirst().inversePayload())
+			.contains("RESTORE_ITINERARY_ITEM", ROUTE_ID.toString());
+		assertThat(eventRepository.events.getFirst().redoPayload())
+			.contains("DELETE_ITINERARY_ITEM", ROUTE_ID.toString());
 	}
 
 	@Test

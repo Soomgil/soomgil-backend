@@ -17,6 +17,8 @@ import com.soomgil.itinerary.domain.model.ItineraryDayGroupType;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Objects;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
@@ -66,15 +68,13 @@ public class ItineraryCompensationExecutor implements CollaborationCompensationE
 		String action = command.path("action").asText();
 		boolean applied = switch (action) {
 			case "DELETE_ITINERARY_DAY" -> repository.deleteDay(tripId, uuid(command, "dayId"));
-			case "DELETE_ITINERARY_ITEM" -> repository.softDeleteItem(
-				tripId, uuid(command, "itemId"), actorUserId, executedAt);
+			case "DELETE_ITINERARY_ITEM" -> deleteItem(tripId, actorUserId, command, executedAt);
 			case "DELETE_MAP_DRAWING" -> repository.softDeleteMapDrawing(
 				tripId, uuid(command, "drawingId"), actorUserId, executedAt);
 			case "DELETE_ROUTE_SEGMENT" -> repository.softDeleteRouteSegment(
 				tripId, uuid(command, "routeId"), actorUserId, executedAt);
 			case "RESTORE_ITINERARY_DAY" -> restoreDay(tripId, command, executedAt);
-			case "RESTORE_ITINERARY_ITEM" -> repository.restoreItem(
-				tripId, uuid(command, "itemId"), actorUserId, executedAt);
+			case "RESTORE_ITINERARY_ITEM" -> restoreItem(tripId, actorUserId, command, executedAt);
 			case "RESTORE_MAP_DRAWING" -> repository.restoreMapDrawing(
 				tripId, uuid(command, "drawingId"), actorUserId, executedAt);
 			case "RESTORE_ROUTE_SEGMENT" -> repository.restoreRouteSegment(
@@ -88,6 +88,28 @@ public class ItineraryCompensationExecutor implements CollaborationCompensationE
 		if (!applied) {
 			throw new BusinessException(ErrorCode.CONFLICT, "Compensation target has changed or no longer exists.");
 		}
+	}
+
+	private boolean deleteItem(UUID tripId, UUID actorUserId, JsonNode command, Instant executedAt) {
+		if (!repository.softDeleteItem(tripId, uuid(command, "itemId"), actorUserId, executedAt)) {
+			return false;
+		}
+		return routeIds(command).stream()
+			.allMatch(routeId -> repository.softDeleteRouteSegment(tripId, routeId, actorUserId, executedAt));
+	}
+
+	private boolean restoreItem(UUID tripId, UUID actorUserId, JsonNode command, Instant executedAt) {
+		if (!repository.restoreItem(tripId, uuid(command, "itemId"), actorUserId, executedAt)) {
+			return false;
+		}
+		return routeIds(command).stream()
+			.allMatch(routeId -> repository.restoreRouteSegment(tripId, routeId, actorUserId, executedAt));
+	}
+
+	private List<UUID> routeIds(JsonNode command) {
+		List<UUID> routeIds = new ArrayList<>();
+		command.path("routeIds").forEach(node -> routeIds.add(UUID.fromString(node.asText())));
+		return routeIds;
 	}
 
 	private boolean updateMapDrawing(UUID tripId, UUID actorUserId, JsonNode command, Instant executedAt) {

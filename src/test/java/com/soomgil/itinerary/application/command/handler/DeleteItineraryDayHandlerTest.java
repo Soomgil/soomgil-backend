@@ -56,6 +56,8 @@ class DeleteItineraryDayHandlerTest {
 		assertThat(result.day()).isNull();
 		assertThat(repository.deletedDayId).isEqualTo(DAY_ID);
 		assertThat(eventRepository.lastEvent.commandType()).isEqualTo("DELETE_ITINERARY_DAY");
+		assertThat(eventRepository.lastEvent.inversePayload()).contains("RESTORE_ITINERARY_DAY", "첫째 날");
+		assertThat(eventRepository.lastEvent.redoPayload()).contains("DELETE_ITINERARY_DAY");
 	}
 
 	@Test

@@ -50,6 +50,8 @@ class DeleteMapDrawingHandlerTest {
 		assertThat(repository.deletedByUserId).isEqualTo(USER_ID);
 		assertThat(eventRepository.lastEvent.commandType()).isEqualTo("DELETE_MAP_DRAWING");
 		assertThat(eventRepository.lastEvent.aggregateId()).isEqualTo(DRAWING_ID);
+		assertThat(eventRepository.lastEvent.inversePayload()).contains("RESTORE_MAP_DRAWING");
+		assertThat(eventRepository.lastEvent.redoPayload()).contains("DELETE_MAP_DRAWING");
 	}
 
 	@Test

@@ -82,10 +82,10 @@ final class ItineraryCollaborationEvents {
 
 	static CollaborationCommandEvent dayDeleted(
 		UUID tripId,
-		UUID dayId,
 		UUID actorUserId,
 		long versionBefore,
 		long versionAfter,
+		ItineraryDayReadModel day,
 		Instant deletedAt
 	) {
 		return new CollaborationCommandEvent(
@@ -95,12 +95,12 @@ final class ItineraryCollaborationEvents {
 			SOURCE_USER,
 			"DELETE_ITINERARY_DAY",
 			AGGREGATE_DAY,
-			dayId,
+			day.id(),
 			versionBefore,
 			versionAfter,
-			"{\"dayId\":\"" + dayId + "\"}",
-			null,
-			null,
+			"{\"dayId\":\"" + day.id() + "\"}",
+			dayRestorePayload(day),
+			"{\"action\":\"DELETE_ITINERARY_DAY\",\"dayId\":\"" + day.id() + "\"}",
 			deletedAt
 		);
 	}
@@ -148,8 +148,8 @@ final class ItineraryCollaborationEvents {
 			versionBefore,
 			versionAfter,
 			"{\"itemId\":\"" + itemId + "\",\"affectedRouteIds\":" + uuidArrayJson(affectedRouteIds) + "}",
-			null,
-			null,
+			itemDeletePayload("RESTORE_ITINERARY_ITEM", itemId, affectedRouteIds),
+			itemDeletePayload("DELETE_ITINERARY_ITEM", itemId, affectedRouteIds),
 			deletedAt
 		);
 	}
@@ -247,8 +247,8 @@ final class ItineraryCollaborationEvents {
 			versionBefore,
 			versionAfter,
 			"{\"drawingId\":\"" + drawingId + "\"}",
-			null,
-			null,
+			"{\"action\":\"RESTORE_MAP_DRAWING\",\"drawingId\":\"" + drawingId + "\"}",
+			"{\"action\":\"DELETE_MAP_DRAWING\",\"drawingId\":\"" + drawingId + "\"}",
 			deletedAt
 		);
 	}
@@ -323,8 +323,8 @@ final class ItineraryCollaborationEvents {
 			versionBefore,
 			versionAfter,
 			"{\"routeId\":\"" + routeId + "\"}",
-			null,
-			null,
+			"{\"action\":\"RESTORE_ROUTE_SEGMENT\",\"routeId\":\"" + routeId + "\"}",
+			"{\"action\":\"DELETE_ROUTE_SEGMENT\",\"routeId\":\"" + routeId + "\"}",
 			deletedAt
 		);
 	}
@@ -381,6 +381,20 @@ final class ItineraryCollaborationEvents {
 			+ ",\"date\":" + quoted(day.date() == null ? null : day.date().toString())
 			+ ",\"title\":" + quoted(day.title())
 			+ ",\"sortOrder\":" + day.sortOrder() + "}";
+	}
+
+	private static String dayRestorePayload(ItineraryDayReadModel day) {
+		return "{\"action\":\"RESTORE_ITINERARY_DAY\",\"dayId\":\"" + day.id()
+			+ "\",\"groupType\":\"" + day.groupType().name()
+			+ "\",\"dayNumber\":" + nullable(day.dayNumber())
+			+ ",\"date\":" + quoted(day.date() == null ? null : day.date().toString())
+			+ ",\"title\":" + quoted(day.title())
+			+ ",\"sortOrder\":" + day.sortOrder() + "}";
+	}
+
+	private static String itemDeletePayload(String action, UUID itemId, List<UUID> routeIds) {
+		return "{\"action\":\"" + action + "\",\"itemId\":\"" + itemId
+			+ "\",\"routeIds\":" + uuidArrayJson(routeIds) + "}";
 	}
 
 	private static String dayUpdatePayload(ItineraryDayReadModel day) {

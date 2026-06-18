@@ -8,6 +8,7 @@ import com.soomgil.global.error.ErrorCode;
 import com.soomgil.itinerary.application.command.dto.DeleteItineraryDayCommand;
 import com.soomgil.itinerary.application.command.dto.ItineraryMutationResult;
 import com.soomgil.itinerary.application.port.ItineraryCommandRepository;
+import com.soomgil.itinerary.application.port.ItineraryDayReadModel;
 import com.soomgil.trip.application.query.handler.TripAccessGuard;
 import java.time.Instant;
 import java.util.List;
@@ -45,9 +46,8 @@ public class DeleteItineraryDayHandler implements CommandHandler<DeleteItinerary
 		if (command.dayId() == null) {
 			throw new BusinessException(ErrorCode.VALIDATION_FAILED, "Day id is required.");
 		}
-		if (repository.findDay(command.tripId(), command.dayId()).isEmpty()) {
-			throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "Itinerary day was not found.");
-		}
+		ItineraryDayReadModel day = repository.findDay(command.tripId(), command.dayId())
+			.orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "Itinerary day was not found."));
 		if (repository.countActiveItemsByDay(command.tripId(), command.dayId()) > 0) {
 			throw new BusinessException(ErrorCode.BUSINESS_RULE_VIOLATION, "Itinerary day must be empty before deletion.");
 		}
@@ -61,10 +61,10 @@ public class DeleteItineraryDayHandler implements CommandHandler<DeleteItinerary
 		}
 		eventRepository.save(ItineraryCollaborationEvents.dayDeleted(
 			command.tripId(),
-			command.dayId(),
 			command.actorUserId(),
 			command.baseVersion(),
 			newVersion,
+			day,
 			now
 		));
 		return new ItineraryMutationResult(

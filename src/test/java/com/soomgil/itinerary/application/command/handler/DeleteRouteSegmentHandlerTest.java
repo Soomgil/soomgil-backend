@@ -50,6 +50,8 @@ class DeleteRouteSegmentHandlerTest {
 		assertThat(repository.deletedByUserId).isEqualTo(USER_ID);
 		assertThat(eventRepository.lastEvent.commandType()).isEqualTo("DELETE_ROUTE_SEGMENT");
 		assertThat(eventRepository.lastEvent.aggregateId()).isEqualTo(ROUTE_ID);
+		assertThat(eventRepository.lastEvent.inversePayload()).contains("RESTORE_ROUTE_SEGMENT");
+		assertThat(eventRepository.lastEvent.redoPayload()).contains("DELETE_ROUTE_SEGMENT");
 	}
 
 	@Test

@@ -60,14 +60,6 @@ public class DeleteItineraryItemHandler implements CommandHandler<DeleteItinerar
 		}
 		for (UUID routeId : affectedRouteIds) {
 			repository.softDeleteRouteSegment(command.tripId(), routeId, command.actorUserId(), now);
-			eventRepository.save(ItineraryCollaborationEvents.routeSegmentDeleted(
-				command.tripId(),
-				routeId,
-				command.actorUserId(),
-				command.baseVersion(),
-				newVersion,
-				now
-			));
 		}
 		eventRepository.save(ItineraryCollaborationEvents.itemDeleted(
 			command.tripId(),
