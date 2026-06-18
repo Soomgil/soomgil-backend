@@ -44,6 +44,7 @@ springdoc:
 
 mybatis:
   mapper-locations: classpath*:/mappers/**/*.xml
+  type-handlers-package: com.soomgil.global.persistence
   configuration:
     map-underscore-to-camel-case: true
 
