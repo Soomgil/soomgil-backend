@@ -5,7 +5,7 @@
 <mapper namespace="com.soomgil.record.infrastructure.persistence.mapper.RecordMediaAccessMapper">
   <select id="countLinkable" resultType="long">
     SELECT COUNT(*)
-    FROM media.media_files
+    FROM media.media_files media_file
     WHERE owner_user_id = #{userId}
       AND status = 'ACTIVE'
       AND id IN
@@ -15,6 +15,12 @@
       AND (
         (linked_resource_type IS NULL AND linked_resource_id IS NULL)
         OR (linked_resource_type = 'TRIP_RECORD' AND linked_resource_id = #{recordId})
+      )
+      AND NOT EXISTS (
+        SELECT 1
+        FROM record.trip_record_media existing_link
+        WHERE existing_link.media_file_id = media_file.id
+          AND existing_link.record_entry_id != #{recordId}
       )
   </select>
 </mapper>
