@@ -97,6 +97,17 @@
       AND (#{commandEventId,jdbcType=BIGINT} IS NULL OR candidate.id = #{commandEventId})
       AND candidate.source IN ('USER', 'AI_TOOL', 'REDO')
       AND candidate.inverse_payload IS NOT NULL
+      AND candidate.id IN (
+        SELECT recent.id
+        FROM collab.collaboration_command_events recent
+        WHERE recent.trip_id = #{tripId}
+          AND recent.actor_user_id = #{actorUserId}
+          AND recent.websocket_session_id = #{websocketSessionId}
+          AND recent.source IN ('USER', 'AI_TOOL', 'REDO')
+          AND recent.inverse_payload IS NOT NULL
+        ORDER BY recent.created_at DESC, recent.id DESC
+        LIMIT 5
+      )
       AND NOT EXISTS (
         SELECT 1
         FROM collab.collaboration_command_events undo_event
@@ -105,7 +116,10 @@
           AND undo_event.websocket_session_id = #{websocketSessionId}
           AND undo_event.source = 'UNDO'
           AND undo_event.payload ->> 'targetEventId' = candidate.id::text
-          AND undo_event.created_at > candidate.created_at
+          AND (
+            undo_event.created_at > candidate.created_at
+            OR (undo_event.created_at = candidate.created_at AND undo_event.id > candidate.id)
+          )
       )
     ORDER BY candidate.created_at DESC, candidate.id DESC
     LIMIT 1
@@ -121,6 +135,29 @@
       AND (#{commandEventId,jdbcType=BIGINT} IS NULL OR candidate.id = #{commandEventId})
       AND candidate.source = 'UNDO'
       AND candidate.redo_payload IS NOT NULL
+      AND candidate.id IN (
+        SELECT recent.id
+        FROM collab.collaboration_command_events recent
+        WHERE recent.trip_id = #{tripId}
+          AND recent.actor_user_id = #{actorUserId}
+          AND recent.websocket_session_id = #{websocketSessionId}
+          AND recent.source = 'UNDO'
+          AND recent.redo_payload IS NOT NULL
+        ORDER BY recent.created_at DESC, recent.id DESC
+        LIMIT 5
+      )
+      AND NOT EXISTS (
+        SELECT 1
+        FROM collab.collaboration_command_events newer_write
+        WHERE newer_write.trip_id = candidate.trip_id
+          AND newer_write.actor_user_id = candidate.actor_user_id
+          AND newer_write.websocket_session_id = candidate.websocket_session_id
+          AND newer_write.source IN ('USER', 'AI_TOOL')
+          AND (
+            newer_write.created_at > candidate.created_at
+            OR (newer_write.created_at = candidate.created_at AND newer_write.id > candidate.id)
+          )
+      )
       AND NOT EXISTS (
         SELECT 1
         FROM collab.collaboration_command_events redo_event
@@ -129,7 +166,10 @@
           AND redo_event.websocket_session_id = #{websocketSessionId}
           AND redo_event.source = 'REDO'
           AND redo_event.payload ->> 'targetUndoEventId' = candidate.id::text
-          AND redo_event.created_at > candidate.created_at
+          AND (
+            redo_event.created_at > candidate.created_at
+            OR (redo_event.created_at = candidate.created_at AND redo_event.id > candidate.id)
+          )
       )
     ORDER BY candidate.created_at DESC, candidate.id DESC
     LIMIT 1
@@ -144,6 +184,17 @@
         AND candidate.websocket_session_id = #{websocketSessionId}
         AND candidate.source IN ('USER', 'AI_TOOL', 'REDO')
         AND candidate.inverse_payload IS NOT NULL
+        AND candidate.id IN (
+          SELECT recent.id
+          FROM collab.collaboration_command_events recent
+          WHERE recent.trip_id = #{tripId}
+            AND recent.actor_user_id = #{actorUserId}
+            AND recent.websocket_session_id = #{websocketSessionId}
+            AND recent.source IN ('USER', 'AI_TOOL', 'REDO')
+            AND recent.inverse_payload IS NOT NULL
+          ORDER BY recent.created_at DESC, recent.id DESC
+          LIMIT 5
+        )
         AND NOT EXISTS (
           SELECT 1
           FROM collab.collaboration_command_events undo_event
@@ -152,7 +203,10 @@
             AND undo_event.websocket_session_id = #{websocketSessionId}
             AND undo_event.source = 'UNDO'
             AND undo_event.payload ->> 'targetEventId' = candidate.id::text
-            AND undo_event.created_at > candidate.created_at
+            AND (
+              undo_event.created_at > candidate.created_at
+              OR (undo_event.created_at = candidate.created_at AND undo_event.id > candidate.id)
+            )
         )
     )
   </select>
@@ -166,6 +220,29 @@
         AND candidate.websocket_session_id = #{websocketSessionId}
         AND candidate.source = 'UNDO'
         AND candidate.redo_payload IS NOT NULL
+        AND candidate.id IN (
+          SELECT recent.id
+          FROM collab.collaboration_command_events recent
+          WHERE recent.trip_id = #{tripId}
+            AND recent.actor_user_id = #{actorUserId}
+            AND recent.websocket_session_id = #{websocketSessionId}
+            AND recent.source = 'UNDO'
+            AND recent.redo_payload IS NOT NULL
+          ORDER BY recent.created_at DESC, recent.id DESC
+          LIMIT 5
+        )
+        AND NOT EXISTS (
+          SELECT 1
+          FROM collab.collaboration_command_events newer_write
+          WHERE newer_write.trip_id = candidate.trip_id
+            AND newer_write.actor_user_id = candidate.actor_user_id
+            AND newer_write.websocket_session_id = candidate.websocket_session_id
+            AND newer_write.source IN ('USER', 'AI_TOOL')
+            AND (
+              newer_write.created_at > candidate.created_at
+              OR (newer_write.created_at = candidate.created_at AND newer_write.id > candidate.id)
+            )
+        )
         AND NOT EXISTS (
           SELECT 1
           FROM collab.collaboration_command_events redo_event
@@ -174,7 +251,10 @@
             AND redo_event.websocket_session_id = #{websocketSessionId}
             AND redo_event.source = 'REDO'
             AND redo_event.payload ->> 'targetUndoEventId' = candidate.id::text
-            AND redo_event.created_at > candidate.created_at
+            AND (
+              redo_event.created_at > candidate.created_at
+              OR (redo_event.created_at = candidate.created_at AND redo_event.id > candidate.id)
+            )
         )
     )
   </select>
