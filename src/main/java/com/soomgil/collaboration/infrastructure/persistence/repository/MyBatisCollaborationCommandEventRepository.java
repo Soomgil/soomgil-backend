@@ -10,6 +10,8 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
  * MyBatis 기반 협업 command event repository.
@@ -40,8 +42,21 @@ public class MyBatisCollaborationCommandEventRepository implements Collaboration
 	public Long saveReturningId(CollaborationCommandEvent event) {
 		CollaborationCommandEvent persistedEvent = assignCurrentSession(event);
 		Long commandEventId = mapper.insertEventReturningId(persistedEvent);
-		broadcaster.broadcast(commandEventId, persistedEvent);
+		broadcastAfterCommit(commandEventId, persistedEvent);
 		return commandEventId;
+	}
+
+	private void broadcastAfterCommit(Long commandEventId, CollaborationCommandEvent event) {
+		if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+			broadcaster.broadcast(commandEventId, event);
+			return;
+		}
+		TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+			@Override
+			public void afterCommit() {
+				broadcaster.broadcast(commandEventId, event);
+			}
+		});
 	}
 
 	private CollaborationCommandEvent assignCurrentSession(CollaborationCommandEvent event) {
