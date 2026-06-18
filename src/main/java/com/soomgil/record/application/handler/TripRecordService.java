@@ -14,6 +14,7 @@ import com.soomgil.record.api.dto.TripRecordEntry;
 import com.soomgil.record.api.dto.TripRecordPhoto;
 import com.soomgil.record.api.dto.UpdateTripRecordRequest;
 import com.soomgil.record.application.port.ItineraryReferenceRepository;
+import com.soomgil.record.application.port.RecordMediaAccessRepository;
 import com.soomgil.record.application.port.TripRecordCommandRepository;
 import com.soomgil.record.application.port.TripRecordEntryCreate;
 import com.soomgil.record.application.port.TripRecordEntryReadModel;
@@ -46,6 +47,7 @@ public class TripRecordService {
 	private final TripRecordCommandRepository commandRepository;
 	private final TripRecordQueryRepository queryRepository;
 	private final ItineraryReferenceRepository itineraryReferenceRepository;
+	private final RecordMediaAccessRepository mediaAccessRepository;
 	private final TripAccessGuard tripAccessGuard;
 	private final TimeProvider timeProvider;
 
@@ -53,6 +55,7 @@ public class TripRecordService {
 		TripRecordCommandRepository commandRepository,
 		TripRecordQueryRepository queryRepository,
 		ItineraryReferenceRepository itineraryReferenceRepository,
+		RecordMediaAccessRepository mediaAccessRepository,
 		TripAccessGuard tripAccessGuard,
 		TimeProvider timeProvider
 	) {
@@ -62,6 +65,7 @@ public class TripRecordService {
 			itineraryReferenceRepository,
 			"itineraryReferenceRepository must not be null"
 		);
+		this.mediaAccessRepository = Objects.requireNonNull(mediaAccessRepository, "mediaAccessRepository must not be null");
 		this.tripAccessGuard = Objects.requireNonNull(tripAccessGuard, "tripAccessGuard must not be null");
 		this.timeProvider = Objects.requireNonNull(timeProvider, "timeProvider must not be null");
 	}
@@ -100,7 +104,7 @@ public class TripRecordService {
 			now,
 			now
 		));
-		replaceMedia(recordId, request.mediaFileIds(), now);
+		replaceMedia(recordId, userId, request.mediaFileIds(), now);
 		return getRecord(tripId, userId, recordId);
 	}
 
@@ -140,7 +144,7 @@ public class TripRecordService {
 			now
 		));
 		if (request.mediaFileIdsProvided()) {
-			replaceMedia(recordId, request.mediaFileIds(), now);
+			replaceMedia(recordId, userId, request.mediaFileIds(), now);
 		}
 		return getRecord(tripId, userId, recordId);
 	}
@@ -184,12 +188,17 @@ public class TripRecordService {
 			.orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "Trip record was not found."));
 	}
 
-	private void replaceMedia(UUID recordId, List<UUID> mediaFileIds, OffsetDateTime now) {
-		commandRepository.deleteMediaLinks(recordId);
+	private void replaceMedia(UUID recordId, UUID userId, List<UUID> mediaFileIds, OffsetDateTime now) {
 		if (mediaFileIds == null || mediaFileIds.isEmpty()) {
+			commandRepository.deleteMediaLinks(recordId);
 			return;
 		}
-		commandRepository.insertMediaLinks(recordId, mediaFileIds.stream().distinct().toList(), now);
+		List<UUID> distinctIds = mediaFileIds.stream().distinct().toList();
+		if (!mediaAccessRepository.areLinkable(recordId, userId, distinctIds)) {
+			throw new BusinessException(ErrorCode.FORBIDDEN, "Media files must be active and owned by the current user.");
+		}
+		commandRepository.deleteMediaLinks(recordId);
+		commandRepository.insertMediaLinks(recordId, distinctIds, now);
 	}
 
 	private TripRecordEntry toEntry(TripRecordEntryReadModel entry) {

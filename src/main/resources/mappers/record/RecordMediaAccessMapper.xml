@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.soomgil.record.infrastructure.persistence.mapper.RecordMediaAccessMapper">
+  <select id="countLinkable" resultType="long">
+    SELECT COUNT(*)
+    FROM media.media_files
+    WHERE owner_user_id = #{userId}
+      AND status = 'ACTIVE'
+      AND id IN
+      <foreach collection="mediaFileIds" item="mediaFileId" open="(" separator="," close=")">
+        #{mediaFileId}
+      </foreach>
+      AND (
+        (linked_resource_type IS NULL AND linked_resource_id IS NULL)
+        OR (linked_resource_type = 'TRIP_RECORD' AND linked_resource_id = #{recordId})
+      )
+  </select>
+</mapper>

@@ -14,6 +14,7 @@ import com.soomgil.record.api.dto.PagedTripRecordEntry;
 import com.soomgil.record.api.dto.PagedTripRecordPhoto;
 import com.soomgil.record.api.dto.UpdateTripRecordRequest;
 import com.soomgil.record.application.port.ItineraryReferenceRepository;
+import com.soomgil.record.application.port.RecordMediaAccessRepository;
 import com.soomgil.record.application.port.TripRecordCommandRepository;
 import com.soomgil.record.application.port.TripRecordEntryCreate;
 import com.soomgil.record.application.port.TripRecordEntryReadModel;
@@ -48,10 +49,12 @@ class TripRecordServiceTest {
 	private final TripRecordCommandRepository commandRepository = mock(TripRecordCommandRepository.class);
 	private final TripRecordQueryRepository queryRepository = mock(TripRecordQueryRepository.class);
 	private final ItineraryReferenceRepository itineraryReferenceRepository = mock(ItineraryReferenceRepository.class);
+	private final RecordMediaAccessRepository mediaAccessRepository = mock(RecordMediaAccessRepository.class);
 	private final TripRecordService service = new TripRecordService(
 		commandRepository,
 		queryRepository,
 		itineraryReferenceRepository,
+		mediaAccessRepository,
 		new TripAccessGuard(tripRepository()),
 		() -> Instant.parse("2026-06-18T00:00:00Z")
 	);
@@ -60,6 +63,7 @@ class TripRecordServiceTest {
 	void createsRecordAndLinksMedia() {
 		when(queryRepository.findEntry(any(), any())).thenReturn(Optional.of(entry(USER_ID)));
 		when(queryRepository.findMedia(any())).thenReturn(List.of(media()));
+		when(mediaAccessRepository.areLinkable(any(), org.mockito.ArgumentMatchers.eq(USER_ID), any())).thenReturn(true);
 
 		var result = service.createRecord(TRIP_ID, USER_ID, new CreateTripRecordRequest(
 			null,
@@ -77,6 +81,23 @@ class TripRecordServiceTest {
 		assertThat(result.media()).hasSize(1);
 		verify(commandRepository).insertEntry(any(TripRecordEntryCreate.class));
 		verify(commandRepository).insertMediaLinks(any(), org.mockito.ArgumentMatchers.eq(List.of(MEDIA_ID)), any());
+	}
+
+	@Test
+	void rejectsMediaNotOwnedByCurrentUser() {
+		assertThatThrownBy(() -> service.createRecord(TRIP_ID, USER_ID, new CreateTripRecordRequest(
+			null,
+			null,
+			"제목",
+			null,
+			null,
+			null,
+			null,
+			null,
+			List.of(MEDIA_ID)
+		))).isInstanceOfSatisfying(BusinessException.class, exception ->
+			assertThat(exception.errorCode()).isEqualTo(ErrorCode.FORBIDDEN)
+		);
 	}
 
 	@Test
