@@ -2,6 +2,7 @@ package com.soomgil.collaboration.infrastructure.websocket;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.soomgil.collaboration.api.dto.CollaborationCommandEventMessage;
 import com.soomgil.collaboration.application.port.CollaborationCommandEvent;
@@ -10,6 +11,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 class WebSocketCollaborationEventBroadcasterTest {
 
@@ -58,6 +60,26 @@ class WebSocketCollaborationEventBroadcasterTest {
 			org.mockito.ArgumentMatchers.eq("/topic/trips/" + TRIP_ID + "/route-matching"),
 			org.mockito.ArgumentMatchers.any(CollaborationCommandEventMessage.class)
 		);
+	}
+
+	@Test
+	void broadcastsOnlyAfterTransactionCommit() {
+		TransactionSynchronizationManager.initSynchronization();
+		try {
+			broadcaster.broadcast(12L, event("ITINERARY_ITEM"));
+			verifyNoInteractions(messagingTemplate);
+
+			TransactionSynchronizationManager.getSynchronizations().forEach(
+				org.springframework.transaction.support.TransactionSynchronization::afterCommit);
+
+			verify(messagingTemplate).convertAndSend(
+				org.mockito.ArgumentMatchers.eq("/topic/trips/" + TRIP_ID + "/collaboration"),
+				org.mockito.ArgumentMatchers.any(CollaborationCommandEventMessage.class)
+			);
+		}
+		finally {
+			TransactionSynchronizationManager.clearSynchronization();
+		}
 	}
 
 	private CollaborationCommandEvent event(String aggregateType) {

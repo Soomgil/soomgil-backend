@@ -11,7 +11,6 @@ import com.soomgil.collaboration.infrastructure.persistence.mapper.Collaboration
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 class MyBatisCollaborationCommandEventRepositoryTest {
 
@@ -56,25 +55,6 @@ class MyBatisCollaborationCommandEventRepositoryTest {
 		verify(mapper).insertEventReturningId(captor.capture());
 		org.assertj.core.api.Assertions.assertThat(captor.getValue().websocketSessionId()).isEqualTo("session-1");
 		verify(broadcaster).broadcast(17L, captor.getValue());
-	}
-
-	@Test
-	void broadcastsOnlyAfterTransactionCommit() {
-		CollaborationCommandEvent event = event();
-		when(mapper.insertEventReturningId(event)).thenReturn(18L);
-		TransactionSynchronizationManager.initSynchronization();
-		try {
-			repository.save(event);
-			org.mockito.Mockito.verifyNoInteractions(broadcaster);
-
-			TransactionSynchronizationManager.getSynchronizations().forEach(
-				org.springframework.transaction.support.TransactionSynchronization::afterCommit);
-
-			verify(broadcaster).broadcast(18L, event);
-		}
-		finally {
-			TransactionSynchronizationManager.clearSynchronization();
-		}
 	}
 
 	private CollaborationCommandEvent event() {
