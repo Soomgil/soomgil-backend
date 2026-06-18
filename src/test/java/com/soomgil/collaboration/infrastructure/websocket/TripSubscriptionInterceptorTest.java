@@ -19,6 +19,7 @@ import org.springframework.messaging.simp.stomp.StompCommand;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.web.socket.messaging.SessionDisconnectEvent;
 
 class TripSubscriptionInterceptorTest {
 
@@ -64,6 +65,17 @@ class TripSubscriptionInterceptorTest {
 		assertThat(sessionRegistry.isOwnedBy("session-1", USER_ID)).isTrue();
 
 		interceptor.preSend(disconnect, channel);
+		assertThat(sessionRegistry.isOwnedBy("session-1", USER_ID)).isFalse();
+	}
+
+	@Test
+	void removesSessionWhenTransportDisconnectEventArrives() {
+		SessionDisconnectEvent event = mock(SessionDisconnectEvent.class);
+		when(event.getSessionId()).thenReturn("session-1");
+		sessionRegistry.register("session-1", USER_ID);
+
+		sessionRegistry.handleDisconnect(event);
+
 		assertThat(sessionRegistry.isOwnedBy("session-1", USER_ID)).isFalse();
 	}
 
