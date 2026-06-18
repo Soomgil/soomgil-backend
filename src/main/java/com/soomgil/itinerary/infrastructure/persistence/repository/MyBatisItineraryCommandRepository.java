@@ -164,6 +164,21 @@ public class MyBatisItineraryCommandRepository implements ItineraryCommandReposi
 	}
 
 	@Override
+	public boolean restoreItem(UUID tripId, UUID itemId, UUID updatedByUserId, Instant updatedAt) {
+		return mapper.restoreItem(tripId, itemId, updatedByUserId, updatedAt) > 0;
+	}
+
+	@Override
+	public boolean restoreMapDrawing(UUID tripId, UUID drawingId, UUID updatedByUserId, Instant updatedAt) {
+		return mapper.restoreMapDrawing(tripId, drawingId, updatedByUserId, updatedAt) > 0;
+	}
+
+	@Override
+	public boolean restoreRouteSegment(UUID tripId, UUID routeId, UUID updatedByUserId, Instant updatedAt) {
+		return mapper.restoreRouteSegment(tripId, routeId, updatedByUserId, updatedAt) > 0;
+	}
+
+	@Override
 	public long countActiveItems(UUID tripId) {
 		return mapper.countActiveItems(tripId);
 	}

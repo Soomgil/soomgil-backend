@@ -45,7 +45,7 @@ final class ItineraryCollaborationEvents {
 			versionAfter,
 			"{\"dayId\":\"" + day.id() + "\",\"groupType\":\"" + day.groupType().name() + "\",\"sortOrder\":" + day.sortOrder() + "}",
 			"{\"action\":\"DELETE_ITINERARY_DAY\",\"dayId\":\"" + day.id() + "\"}",
-			null,
+			dayRestorePayload(day),
 			createdAt
 		);
 	}
@@ -118,7 +118,7 @@ final class ItineraryCollaborationEvents {
 			versionAfter,
 			"{\"itemId\":\"" + item.id() + "\",\"dayId\":\"" + item.itineraryDayId() + "\",\"sortOrder\":" + item.sortOrder() + "}",
 			"{\"action\":\"DELETE_ITINERARY_ITEM\",\"itemId\":\"" + item.id() + "\"}",
-			null,
+			"{\"action\":\"RESTORE_ITINERARY_ITEM\",\"itemId\":\"" + item.id() + "\"}",
 			createdAt
 		);
 	}
@@ -217,7 +217,7 @@ final class ItineraryCollaborationEvents {
 			versionAfter,
 			"{\"drawingId\":\"" + drawing.id() + "\",\"drawingType\":\"" + drawing.drawingType().name() + "\",\"sortOrder\":" + drawing.sortOrder() + "}",
 			"{\"action\":\"DELETE_MAP_DRAWING\",\"drawingId\":\"" + drawing.id() + "\"}",
-			null,
+			"{\"action\":\"RESTORE_MAP_DRAWING\",\"drawingId\":\"" + drawing.id() + "\"}",
 			createdAt
 		);
 	}
@@ -291,7 +291,7 @@ final class ItineraryCollaborationEvents {
 			"{\"routeId\":\"" + route.id() + "\",\"originItemId\":\"" + route.originItineraryItemId()
 				+ "\",\"destinationItemId\":\"" + route.destinationItineraryItemId() + "\",\"mode\":\"" + route.mode().name() + "\"}",
 			"{\"action\":\"DELETE_ROUTE_SEGMENT\",\"routeId\":\"" + route.id() + "\"}",
-			null,
+			"{\"action\":\"RESTORE_ROUTE_SEGMENT\",\"routeId\":\"" + route.id() + "\"}",
 			createdAt
 		);
 	}
@@ -362,6 +362,26 @@ final class ItineraryCollaborationEvents {
 				.append('}');
 		}
 		return builder.append(']').toString();
+	}
+
+	private static String dayRestorePayload(ItineraryDayCreate day) {
+		return "{\"action\":\"RESTORE_ITINERARY_DAY\",\"dayId\":\"" + day.id()
+			+ "\",\"groupType\":\"" + day.groupType().name()
+			+ "\",\"dayNumber\":" + nullable(day.dayNumber())
+			+ ",\"date\":" + quoted(day.date() == null ? null : day.date().toString())
+			+ ",\"title\":" + quoted(day.title())
+			+ ",\"sortOrder\":" + day.sortOrder() + "}";
+	}
+
+	private static String nullable(Object value) {
+		return value == null ? "null" : value.toString();
+	}
+
+	private static String quoted(String value) {
+		if (value == null) {
+			return "null";
+		}
+		return "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
 	}
 
 	private static String itemsJson(List<ItineraryItemOrderCommand> items) {

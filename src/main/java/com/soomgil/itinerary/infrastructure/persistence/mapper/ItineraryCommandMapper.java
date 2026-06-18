@@ -261,6 +261,27 @@ public interface ItineraryCommandMapper {
 		@Param("deletedAt") Instant deletedAt
 	);
 
+	int restoreItem(
+		@Param("tripId") UUID tripId,
+		@Param("itemId") UUID itemId,
+		@Param("updatedByUserId") UUID updatedByUserId,
+		@Param("updatedAt") Instant updatedAt
+	);
+
+	int restoreMapDrawing(
+		@Param("tripId") UUID tripId,
+		@Param("drawingId") UUID drawingId,
+		@Param("updatedByUserId") UUID updatedByUserId,
+		@Param("updatedAt") Instant updatedAt
+	);
+
+	int restoreRouteSegment(
+		@Param("tripId") UUID tripId,
+		@Param("routeId") UUID routeId,
+		@Param("updatedByUserId") UUID updatedByUserId,
+		@Param("updatedAt") Instant updatedAt
+	);
+
 	/**
 	 * 삭제되지 않은 일정 item 수를 조회한다.
 	 *

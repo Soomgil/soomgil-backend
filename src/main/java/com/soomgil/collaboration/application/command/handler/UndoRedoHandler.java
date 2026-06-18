@@ -134,7 +134,7 @@ public class UndoRedoHandler implements CommandHandler<UndoRedoCommand, UndoRedo
 			command.baseVersion(),
 			newVersion,
 			stackPayload("UNDO", "targetEventId", candidate.id(), candidate.inversePayload()),
-			candidate.payload(),
+			candidate.inversePayload(),
 			candidate.redoPayload() == null ? candidate.payload() : candidate.redoPayload(),
 			now
 		);
@@ -157,7 +157,7 @@ public class UndoRedoHandler implements CommandHandler<UndoRedoCommand, UndoRedo
 			command.baseVersion(),
 			newVersion,
 			stackPayload("REDO", "targetUndoEventId", candidate.id(), candidate.redoPayload()),
-			candidate.payload(),
+			candidate.inversePayload(),
 			candidate.redoPayload(),
 			now
 		);

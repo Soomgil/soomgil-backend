@@ -228,6 +228,18 @@ public interface ItineraryCommandRepository {
 	 */
 	boolean softDeleteItem(UUID tripId, UUID itemId, UUID deletedByUserId, Instant deletedAt);
 
+	default boolean restoreItem(UUID tripId, UUID itemId, UUID updatedByUserId, Instant updatedAt) {
+		return false;
+	}
+
+	default boolean restoreMapDrawing(UUID tripId, UUID drawingId, UUID updatedByUserId, Instant updatedAt) {
+		return false;
+	}
+
+	default boolean restoreRouteSegment(UUID tripId, UUID routeId, UUID updatedByUserId, Instant updatedAt) {
+		return false;
+	}
+
 	/**
 	 * 여행방의 삭제되지 않은 active item 수를 조회한다.
 	 *

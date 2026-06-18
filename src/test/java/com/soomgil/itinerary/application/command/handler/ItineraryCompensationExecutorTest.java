@@ -10,6 +10,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.soomgil.global.error.BusinessException;
 import com.soomgil.global.error.ErrorCode;
 import com.soomgil.itinerary.application.port.ItineraryCommandRepository;
+import com.soomgil.itinerary.application.port.ItineraryDayCreate;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -42,5 +43,32 @@ class ItineraryCompensationExecutorTest {
 		assertThatThrownBy(() -> executor.execute(TRIP_ID, USER_ID, payload, NOW))
 			.isInstanceOfSatisfying(BusinessException.class, exception ->
 				assertThat(exception.errorCode()).isEqualTo(ErrorCode.CONFLICT));
+	}
+
+	@Test
+	void restoresDeletedItemForRedo() {
+		String payload = "{\"action\":\"RESTORE_ITINERARY_ITEM\",\"itemId\":\"" + ITEM_ID + "\"}";
+		when(repository.restoreItem(TRIP_ID, ITEM_ID, USER_ID, NOW)).thenReturn(true);
+
+		assertThat(executor.supports(payload)).isTrue();
+		executor.execute(TRIP_ID, USER_ID, payload, NOW);
+
+		verify(repository).restoreItem(TRIP_ID, ITEM_ID, USER_ID, NOW);
+	}
+
+	@Test
+	void recreatesDeletedDayForRedo() {
+		String payload = "{\"action\":\"RESTORE_ITINERARY_DAY\",\"dayId\":\"" + ITEM_ID
+			+ "\",\"groupType\":\"DAY\",\"dayNumber\":1,\"date\":\"2026-07-01\","
+			+ "\"title\":\"첫째 날\",\"sortOrder\":2}";
+
+		executor.execute(TRIP_ID, USER_ID, payload, NOW);
+
+		org.mockito.ArgumentCaptor<ItineraryDayCreate> captor =
+			org.mockito.ArgumentCaptor.forClass(ItineraryDayCreate.class);
+		verify(repository).insertDay(captor.capture());
+		assertThat(captor.getValue().id()).isEqualTo(ITEM_ID);
+		assertThat(captor.getValue().title()).isEqualTo("첫째 날");
+		assertThat(captor.getValue().sortOrder()).isEqualTo(2);
 	}
 }

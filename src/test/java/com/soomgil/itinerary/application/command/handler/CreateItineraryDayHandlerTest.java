@@ -74,6 +74,11 @@ class CreateItineraryDayHandlerTest {
 		assertThat(result.day().title()).isEqualTo("첫째 날");
 		assertThat(repository.insertedDay.sortOrder()).isEqualTo(3);
 		assertThat(eventRepository.lastEvent.commandType()).isEqualTo("CREATE_ITINERARY_DAY");
+		assertThat(eventRepository.lastEvent.redoPayload()).contains(
+			"RESTORE_ITINERARY_DAY",
+			result.day().id().toString(),
+			"DAY"
+		);
 		assertThat(eventRepository.lastEvent.versionBefore()).isEqualTo(0);
 		assertThat(eventRepository.lastEvent.versionAfter()).isEqualTo(1);
 	}
