@@ -11,6 +11,10 @@ import com.soomgil.global.error.BusinessException;
 import com.soomgil.global.error.ErrorCode;
 import com.soomgil.itinerary.application.port.ItineraryCommandRepository;
 import com.soomgil.itinerary.application.port.ItineraryDayCreate;
+import com.soomgil.itinerary.application.port.MapDrawingSnapshotUpdate;
+import com.soomgil.itinerary.application.port.MapDrawingUpdateResult;
+import com.soomgil.itinerary.domain.model.DrawingType;
+import com.soomgil.itinerary.domain.model.GeometryFormat;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -70,5 +74,23 @@ class ItineraryCompensationExecutorTest {
 		assertThat(captor.getValue().id()).isEqualTo(ITEM_ID);
 		assertThat(captor.getValue().title()).isEqualTo("첫째 날");
 		assertThat(captor.getValue().sortOrder()).isEqualTo(2);
+	}
+
+	@Test
+	void restoresNullableMapDrawingFieldsFromSnapshot() {
+		String payload = "{\"action\":\"UPDATE_MAP_DRAWING\",\"drawingId\":\"" + ITEM_ID
+			+ "\",\"geometry\":{\"type\":\"LineString\"},\"style\":null,\"label\":null,\"sortOrder\":0}";
+		when(repository.applyMapDrawingSnapshot(org.mockito.ArgumentMatchers.any()))
+			.thenReturn(java.util.Optional.of(new MapDrawingUpdateResult(
+				ITEM_ID, null, DrawingType.LINE, GeometryFormat.GEOJSON,
+				"{\"type\":\"LineString\"}", null, null, 0, 2L)));
+
+		executor.execute(TRIP_ID, USER_ID, payload, NOW);
+
+		org.mockito.ArgumentCaptor<MapDrawingSnapshotUpdate> captor =
+			org.mockito.ArgumentCaptor.forClass(MapDrawingSnapshotUpdate.class);
+		verify(repository).applyMapDrawingSnapshot(captor.capture());
+		assertThat(captor.getValue().style()).isNull();
+		assertThat(captor.getValue().label()).isNull();
 	}
 }

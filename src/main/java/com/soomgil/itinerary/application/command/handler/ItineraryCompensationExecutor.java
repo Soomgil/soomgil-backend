@@ -11,7 +11,9 @@ import com.soomgil.itinerary.application.port.ItineraryDayCreate;
 import com.soomgil.itinerary.application.port.ItineraryDayUpdate;
 import com.soomgil.itinerary.application.port.ItineraryItemUpdate;
 import com.soomgil.itinerary.application.port.MapDrawingUpdate;
+import com.soomgil.itinerary.application.port.MapDrawingSnapshotUpdate;
 import com.soomgil.itinerary.application.port.RouteSegmentUpdate;
+import com.soomgil.itinerary.application.port.RouteSegmentSnapshotUpdate;
 import com.soomgil.itinerary.application.port.ItineraryDayOrderUpdate;
 import com.soomgil.itinerary.application.port.ItineraryItemOrderUpdate;
 import com.soomgil.itinerary.domain.model.RouteMode;
@@ -137,21 +139,20 @@ public class ItineraryCompensationExecutor implements CollaborationCompensationE
 	}
 
 	private boolean updateMapDrawing(UUID tripId, UUID actorUserId, JsonNode command, Instant executedAt) {
-		return repository.updateMapDrawing(new MapDrawingUpdate(
+		return repository.applyMapDrawingSnapshot(new MapDrawingSnapshotUpdate(
 			tripId,
 			uuid(command, "drawingId"),
 			command.path("geometry").toString(),
 			command.path("style").isNull() ? null : command.path("style").toString(),
 			nullableText(command, "label"),
 			command.path("sortOrder").asInt(),
-			null,
 			actorUserId,
 			executedAt
 		)).isPresent();
 	}
 
 	private boolean updateRoute(UUID tripId, UUID actorUserId, JsonNode command, Instant executedAt) {
-		return repository.updateRouteSegment(new RouteSegmentUpdate(
+		return repository.applyRouteSegmentSnapshot(new RouteSegmentSnapshotUpdate(
 			tripId,
 			uuid(command, "routeId"),
 			RouteMode.valueOf(command.path("mode").asText()),

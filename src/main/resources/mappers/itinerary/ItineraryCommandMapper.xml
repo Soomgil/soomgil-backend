@@ -328,6 +328,26 @@
       AND deleted_at IS NULL
   </select>
 
+  <select id="applyRouteSegmentSnapshot" resultType="com.soomgil.itinerary.application.port.RouteSegmentUpdateResult">
+    UPDATE itinerary.trip_routes
+    SET
+      mode = #{update.mode},
+      provider_profile = #{update.providerProfile},
+      geometry = #{update.geometry}::jsonb,
+      distance_meters = #{update.distanceMeters,jdbcType=DOUBLE},
+      duration_seconds = #{update.durationSeconds,jdbcType=DOUBLE},
+      confidence = #{update.confidence,jdbcType=DOUBLE},
+      updated_by_user_id = #{update.updatedByUserId},
+      updated_at = #{update.updatedAt}
+    WHERE trip_id = #{update.tripId}
+      AND id = #{update.routeId}
+      AND deleted_at IS NULL
+    RETURNING
+      id, origin_itinerary_item_id, destination_itinerary_item_id, mode, provider,
+      provider_profile, geometry_format, geometry::text AS geometry,
+      distance_meters, duration_seconds, confidence
+  </select>
+
   <select id="insertRouteMatchRequest" resultType="long">
     INSERT INTO itinerary.route_match_requests (
       trip_id,
@@ -578,5 +598,23 @@
     WHERE trip_id = #{tripId}
       AND id = #{drawingId}
       AND deleted_at IS NULL
+  </select>
+
+  <select id="applyMapDrawingSnapshot" resultType="com.soomgil.itinerary.application.port.MapDrawingUpdateResult">
+    UPDATE itinerary.map_drawings
+    SET
+      geometry = #{update.geometry}::jsonb,
+      style = #{update.style,jdbcType=VARCHAR}::jsonb,
+      label = #{update.label,jdbcType=VARCHAR},
+      sort_order = #{update.sortOrder},
+      version = version + 1,
+      updated_by_user_id = #{update.updatedByUserId},
+      updated_at = #{update.updatedAt}
+    WHERE trip_id = #{update.tripId}
+      AND id = #{update.drawingId}
+      AND deleted_at IS NULL
+    RETURNING
+      id, itinerary_day_id, drawing_type, geometry_format, geometry::text AS geometry,
+      style::text AS style, label, sort_order, version
   </select>
 </mapper>

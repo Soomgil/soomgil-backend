@@ -126,6 +126,10 @@ public interface ItineraryCommandRepository {
 	 */
 	Optional<RouteSegmentUpdateResult> updateRouteSegment(RouteSegmentUpdate update);
 
+	default Optional<RouteSegmentUpdateResult> applyRouteSegmentSnapshot(RouteSegmentSnapshotUpdate update) {
+		return Optional.empty();
+	}
+
 	default Optional<RouteSegmentUpdateResult> findRouteSegment(UUID tripId, UUID routeId) {
 		return Optional.empty();
 	}
@@ -185,6 +189,10 @@ public interface ItineraryCommandRepository {
 	 * @return 수정된 drawing, version 조건 불일치 또는 미존재 시 empty
 	 */
 	Optional<MapDrawingUpdateResult> updateMapDrawing(MapDrawingUpdate update);
+
+	default Optional<MapDrawingUpdateResult> applyMapDrawingSnapshot(MapDrawingSnapshotUpdate update) {
+		return Optional.empty();
+	}
 
 	default Optional<MapDrawingUpdateResult> findMapDrawing(UUID tripId, UUID drawingId) {
 		return Optional.empty();

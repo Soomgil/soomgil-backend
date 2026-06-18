@@ -12,10 +12,12 @@ import com.soomgil.itinerary.application.port.ItineraryItemUpdate;
 import com.soomgil.itinerary.application.port.MapDrawingCreate;
 import com.soomgil.itinerary.application.port.MapDrawingUpdate;
 import com.soomgil.itinerary.application.port.MapDrawingUpdateResult;
+import com.soomgil.itinerary.application.port.MapDrawingSnapshotUpdate;
 import com.soomgil.itinerary.application.port.RouteMatchRequestLog;
 import com.soomgil.itinerary.application.port.RouteSegmentCreate;
 import com.soomgil.itinerary.application.port.RouteSegmentUpdate;
 import com.soomgil.itinerary.application.port.RouteSegmentUpdateResult;
+import com.soomgil.itinerary.application.port.RouteSegmentSnapshotUpdate;
 import com.soomgil.itinerary.infrastructure.persistence.mapper.ItineraryCommandMapper;
 import java.time.Instant;
 import java.util.Objects;
@@ -109,6 +111,11 @@ public class MyBatisItineraryCommandRepository implements ItineraryCommandReposi
 	}
 
 	@Override
+	public Optional<RouteSegmentUpdateResult> applyRouteSegmentSnapshot(RouteSegmentSnapshotUpdate update) {
+		return Optional.ofNullable(mapper.applyRouteSegmentSnapshot(update));
+	}
+
+	@Override
 	public Optional<RouteSegmentUpdateResult> findRouteSegment(UUID tripId, UUID routeId) {
 		return Optional.ofNullable(mapper.findRouteSegment(tripId, routeId));
 	}
@@ -141,6 +148,11 @@ public class MyBatisItineraryCommandRepository implements ItineraryCommandReposi
 	@Override
 	public Optional<MapDrawingUpdateResult> updateMapDrawing(MapDrawingUpdate update) {
 		return Optional.ofNullable(mapper.updateMapDrawing(update));
+	}
+
+	@Override
+	public Optional<MapDrawingUpdateResult> applyMapDrawingSnapshot(MapDrawingSnapshotUpdate update) {
+		return Optional.ofNullable(mapper.applyMapDrawingSnapshot(update));
 	}
 
 	@Override
