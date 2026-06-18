@@ -144,6 +144,8 @@ public interface ItineraryCommandMapper {
 	 */
 	RouteSegmentUpdateResult updateRouteSegment(@Param("update") RouteSegmentUpdate update);
 
+	RouteSegmentUpdateResult findRouteSegment(@Param("tripId") UUID tripId, @Param("routeId") UUID routeId);
+
 	/**
 	 * route map matching 요청 이력을 추가한다.
 	 *
@@ -209,6 +211,8 @@ public interface ItineraryCommandMapper {
 	 * @return 수정된 drawing, 조건 불일치 시 null
 	 */
 	MapDrawingUpdateResult updateMapDrawing(@Param("update") MapDrawingUpdate update);
+
+	MapDrawingUpdateResult findMapDrawing(@Param("tripId") UUID tripId, @Param("drawingId") UUID drawingId);
 
 	/**
 	 * 일정 day 존재 여부를 조회한다.

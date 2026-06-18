@@ -56,9 +56,8 @@ public class UpdateMapDrawingHandler implements CommandHandler<UpdateMapDrawingC
 	public ItineraryMutationResult handle(UpdateMapDrawingCommand command) {
 		tripAccessGuard.requireActiveMember(command.tripId(), command.actorUserId());
 		validate(command);
-		if (!repository.existsActiveMapDrawing(command.tripId(), command.drawingId())) {
-			throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "Map drawing was not found.");
-		}
+		MapDrawingUpdateResult current = repository.findMapDrawing(command.tripId(), command.drawingId())
+			.orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "Map drawing was not found."));
 
 		Instant now = timeProvider.now();
 		long newVersion = repository.incrementItineraryVersion(command.tripId(), command.baseVersion(), now)
@@ -80,6 +79,8 @@ public class UpdateMapDrawingHandler implements CommandHandler<UpdateMapDrawingC
 			command.actorUserId(),
 			command.baseVersion(),
 			newVersion,
+			current,
+			drawing,
 			now
 		));
 		return new ItineraryMutationResult(

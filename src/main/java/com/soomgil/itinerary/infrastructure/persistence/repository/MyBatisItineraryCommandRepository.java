@@ -109,6 +109,11 @@ public class MyBatisItineraryCommandRepository implements ItineraryCommandReposi
 	}
 
 	@Override
+	public Optional<RouteSegmentUpdateResult> findRouteSegment(UUID tripId, UUID routeId) {
+		return Optional.ofNullable(mapper.findRouteSegment(tripId, routeId));
+	}
+
+	@Override
 	public Long insertRouteMatchRequest(RouteMatchRequestLog request) {
 		return mapper.insertRouteMatchRequest(request);
 	}
@@ -136,6 +141,11 @@ public class MyBatisItineraryCommandRepository implements ItineraryCommandReposi
 	@Override
 	public Optional<MapDrawingUpdateResult> updateMapDrawing(MapDrawingUpdate update) {
 		return Optional.ofNullable(mapper.updateMapDrawing(update));
+	}
+
+	@Override
+	public Optional<MapDrawingUpdateResult> findMapDrawing(UUID tripId, UUID drawingId) {
+		return Optional.ofNullable(mapper.findMapDrawing(tripId, drawingId));
 	}
 
 	@Override

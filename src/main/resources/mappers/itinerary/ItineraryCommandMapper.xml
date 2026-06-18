@@ -309,6 +309,25 @@
       confidence
   </select>
 
+  <select id="findRouteSegment" resultType="com.soomgil.itinerary.application.port.RouteSegmentUpdateResult">
+    SELECT
+      id,
+      origin_itinerary_item_id,
+      destination_itinerary_item_id,
+      mode,
+      provider,
+      provider_profile,
+      geometry_format,
+      geometry::text AS geometry,
+      distance_meters,
+      duration_seconds,
+      confidence
+    FROM itinerary.trip_routes
+    WHERE trip_id = #{tripId}
+      AND id = #{routeId}
+      AND deleted_at IS NULL
+  </select>
+
   <select id="insertRouteMatchRequest" resultType="long">
     INSERT INTO itinerary.route_match_requests (
       trip_id,
@@ -542,5 +561,22 @@
       label,
       sort_order,
       version
+  </select>
+
+  <select id="findMapDrawing" resultType="com.soomgil.itinerary.application.port.MapDrawingUpdateResult">
+    SELECT
+      id,
+      itinerary_day_id,
+      drawing_type,
+      geometry_format,
+      geometry::text AS geometry,
+      style::text AS style,
+      label,
+      sort_order,
+      version
+    FROM itinerary.map_drawings
+    WHERE trip_id = #{tripId}
+      AND id = #{drawingId}
+      AND deleted_at IS NULL
   </select>
 </mapper>

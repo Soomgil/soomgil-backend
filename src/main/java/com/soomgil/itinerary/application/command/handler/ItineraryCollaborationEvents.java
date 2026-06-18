@@ -8,7 +8,9 @@ import com.soomgil.itinerary.application.port.ItineraryDayReadModel;
 import com.soomgil.itinerary.application.port.ItineraryItemCreate;
 import com.soomgil.itinerary.application.port.ItineraryItemReadModel;
 import com.soomgil.itinerary.application.port.MapDrawingCreate;
+import com.soomgil.itinerary.application.port.MapDrawingUpdateResult;
 import com.soomgil.itinerary.application.port.RouteSegmentCreate;
+import com.soomgil.itinerary.application.port.RouteSegmentUpdateResult;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -257,6 +259,8 @@ final class ItineraryCollaborationEvents {
 		UUID actorUserId,
 		long versionBefore,
 		long versionAfter,
+		MapDrawingUpdateResult before,
+		MapDrawingUpdateResult after,
 		Instant updatedAt
 	) {
 		return new CollaborationCommandEvent(
@@ -269,9 +273,9 @@ final class ItineraryCollaborationEvents {
 			drawingId,
 			versionBefore,
 			versionAfter,
-			"{\"drawingId\":\"" + drawingId + "\"}",
-			null,
-			null,
+			mapDrawingUpdatePayload(after),
+			mapDrawingUpdatePayload(before),
+			mapDrawingUpdatePayload(after),
 			updatedAt
 		);
 	}
@@ -331,6 +335,8 @@ final class ItineraryCollaborationEvents {
 		UUID actorUserId,
 		long versionBefore,
 		long versionAfter,
+		RouteSegmentUpdateResult before,
+		RouteSegmentUpdateResult after,
 		Instant updatedAt
 	) {
 		return new CollaborationCommandEvent(
@@ -343,9 +349,9 @@ final class ItineraryCollaborationEvents {
 			routeId,
 			versionBefore,
 			versionAfter,
-			"{\"routeId\":\"" + routeId + "\"}",
-			null,
-			null,
+			routeUpdatePayload(after),
+			routeUpdatePayload(before),
+			routeUpdatePayload(after),
 			updatedAt
 		);
 	}
@@ -394,6 +400,24 @@ final class ItineraryCollaborationEvents {
 			+ ",\"lat\":" + nullable(item.lat())
 			+ ",\"lng\":" + nullable(item.lng())
 			+ ",\"thumbnailUrl\":" + quoted(item.thumbnailUrl() == null ? null : item.thumbnailUrl().toString()) + "}";
+	}
+
+	private static String mapDrawingUpdatePayload(MapDrawingUpdateResult drawing) {
+		return "{\"action\":\"UPDATE_MAP_DRAWING\",\"drawingId\":\"" + drawing.id()
+			+ "\",\"geometry\":" + drawing.geometry()
+			+ ",\"style\":" + (drawing.style() == null ? "null" : drawing.style())
+			+ ",\"label\":" + quoted(drawing.label())
+			+ ",\"sortOrder\":" + drawing.sortOrder() + "}";
+	}
+
+	private static String routeUpdatePayload(RouteSegmentUpdateResult route) {
+		return "{\"action\":\"UPDATE_ROUTE_SEGMENT\",\"routeId\":\"" + route.id()
+			+ "\",\"mode\":\"" + route.mode().name()
+			+ "\",\"providerProfile\":" + quoted(route.providerProfile())
+			+ ",\"geometry\":" + route.geometry()
+			+ ",\"distanceMeters\":" + nullable(route.distanceMeters())
+			+ ",\"durationSeconds\":" + nullable(route.durationSeconds())
+			+ ",\"confidence\":" + nullable(route.confidence()) + "}";
 	}
 
 	private static String nullable(Object value) {

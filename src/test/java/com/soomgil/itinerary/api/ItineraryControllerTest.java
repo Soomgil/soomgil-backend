@@ -734,6 +734,23 @@ class ItineraryControllerTest {
 		}
 
 		@Override
+		public Optional<RouteSegmentUpdateResult> findRouteSegment(UUID tripId, UUID routeId) {
+			return Optional.of(new RouteSegmentUpdateResult(
+				routeId,
+				UUID.fromString("40000000-0000-0000-0000-000000000001"),
+				UUID.fromString("40000000-0000-0000-0000-000000000002"),
+				com.soomgil.itinerary.domain.model.RouteMode.DRIVING,
+				"MAPBOX",
+				"mapbox/driving",
+				com.soomgil.itinerary.domain.model.GeometryFormat.GEOJSON,
+				"{\"type\":\"LineString\",\"coordinates\":[]}",
+				0.0,
+				0.0,
+				1.0
+			));
+		}
+
+		@Override
 		public Long insertRouteMatchRequest(RouteMatchRequestLog request) {
 			return 10L;
 		}
@@ -772,6 +789,21 @@ class ItineraryControllerTest {
 				update.label(),
 				update.sortOrder(),
 				1L
+			));
+		}
+
+		@Override
+		public Optional<MapDrawingUpdateResult> findMapDrawing(UUID tripId, UUID drawingId) {
+			return Optional.of(new MapDrawingUpdateResult(
+				drawingId,
+				DAY_ID,
+				com.soomgil.itinerary.domain.model.DrawingType.LINE,
+				com.soomgil.itinerary.domain.model.GeometryFormat.GEOJSON,
+				"{\"type\":\"LineString\",\"coordinates\":[]}",
+				"{}",
+				"기존 선",
+				0,
+				0L
 			));
 		}
 

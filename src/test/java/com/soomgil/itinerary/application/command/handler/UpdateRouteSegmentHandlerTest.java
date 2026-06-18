@@ -76,6 +76,8 @@ class UpdateRouteSegmentHandlerTest {
 		assertThat(result.affectedRouteIds()).containsExactly(ROUTE_ID);
 		assertThat(repository.lastUpdate.providerProfile()).isEqualTo("mapbox/walking");
 		assertThat(eventRepository.lastEvent.commandType()).isEqualTo("UPDATE_ROUTE_SEGMENT");
+		assertThat(eventRepository.lastEvent.inversePayload()).contains("UPDATE_ROUTE_SEGMENT", "DRIVING");
+		assertThat(eventRepository.lastEvent.redoPayload()).contains("UPDATE_ROUTE_SEGMENT", "WALKING");
 	}
 
 	@Test
@@ -119,6 +121,14 @@ class UpdateRouteSegmentHandlerTest {
 		private long currentVersion;
 		private boolean existsRoute = true;
 		private RouteSegmentUpdate lastUpdate;
+		private RouteSegmentUpdateResult current = new RouteSegmentUpdateResult(
+			ROUTE_ID, ORIGIN_ITEM_ID, DESTINATION_ITEM_ID, RouteMode.DRIVING, "MAPBOX", "mapbox/driving",
+			GeometryFormat.GEOJSON, "{\"type\":\"LineString\"}", 100.0, 60.0, 0.8);
+
+		@Override
+		public Optional<RouteSegmentUpdateResult> findRouteSegment(UUID tripId, UUID routeId) {
+			return existsRoute ? Optional.of(current) : Optional.empty();
+		}
 
 		@Override
 		public OptionalLong incrementItineraryVersion(UUID tripId, long baseVersion, Instant updatedAt) {
@@ -188,7 +198,7 @@ class UpdateRouteSegmentHandlerTest {
 		@Override
 		public Optional<RouteSegmentUpdateResult> updateRouteSegment(RouteSegmentUpdate update) {
 			this.lastUpdate = update;
-			return Optional.of(new RouteSegmentUpdateResult(
+			current = new RouteSegmentUpdateResult(
 				update.routeId(),
 				ORIGIN_ITEM_ID,
 				DESTINATION_ITEM_ID,
@@ -200,7 +210,8 @@ class UpdateRouteSegmentHandlerTest {
 				update.distanceMeters(),
 				update.durationSeconds(),
 				update.confidence()
-			));
+			);
+			return Optional.of(current);
 		}
 
 		@Override

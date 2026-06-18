@@ -57,9 +57,8 @@ public class UpdateRouteSegmentHandler implements CommandHandler<UpdateRouteSegm
 	public ItineraryMutationResult handle(UpdateRouteSegmentCommand command) {
 		tripAccessGuard.requireActiveMember(command.tripId(), command.actorUserId());
 		validate(command);
-		if (!repository.existsActiveRouteSegment(command.tripId(), command.routeId())) {
-			throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "Route was not found.");
-		}
+		RouteSegmentUpdateResult current = repository.findRouteSegment(command.tripId(), command.routeId())
+			.orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "Route was not found."));
 
 		Instant now = timeProvider.now();
 		long newVersion = repository.incrementItineraryVersion(command.tripId(), command.baseVersion(), now)
@@ -82,6 +81,8 @@ public class UpdateRouteSegmentHandler implements CommandHandler<UpdateRouteSegm
 			command.actorUserId(),
 			command.baseVersion(),
 			newVersion,
+			current,
+			route,
 			now
 		));
 		return new ItineraryMutationResult(

@@ -10,6 +10,9 @@ import com.soomgil.itinerary.application.port.ItineraryCommandRepository;
 import com.soomgil.itinerary.application.port.ItineraryDayCreate;
 import com.soomgil.itinerary.application.port.ItineraryDayUpdate;
 import com.soomgil.itinerary.application.port.ItineraryItemUpdate;
+import com.soomgil.itinerary.application.port.MapDrawingUpdate;
+import com.soomgil.itinerary.application.port.RouteSegmentUpdate;
+import com.soomgil.itinerary.domain.model.RouteMode;
 import com.soomgil.itinerary.domain.model.ItineraryDayGroupType;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -34,7 +37,9 @@ public class ItineraryCompensationExecutor implements CollaborationCompensationE
 		"RESTORE_MAP_DRAWING",
 		"RESTORE_ROUTE_SEGMENT",
 		"UPDATE_ITINERARY_DAY",
-		"UPDATE_ITINERARY_ITEM"
+		"UPDATE_ITINERARY_ITEM",
+		"UPDATE_MAP_DRAWING",
+		"UPDATE_ROUTE_SEGMENT"
 	);
 
 	private final ItineraryCommandRepository repository;
@@ -76,11 +81,42 @@ public class ItineraryCompensationExecutor implements CollaborationCompensationE
 				tripId, uuid(command, "routeId"), actorUserId, executedAt);
 			case "UPDATE_ITINERARY_DAY" -> updateDay(tripId, command, executedAt);
 			case "UPDATE_ITINERARY_ITEM" -> updateItem(tripId, actorUserId, command, executedAt);
+			case "UPDATE_MAP_DRAWING" -> updateMapDrawing(tripId, actorUserId, command, executedAt);
+			case "UPDATE_ROUTE_SEGMENT" -> updateRoute(tripId, actorUserId, command, executedAt);
 			default -> false;
 		};
 		if (!applied) {
 			throw new BusinessException(ErrorCode.CONFLICT, "Compensation target has changed or no longer exists.");
 		}
+	}
+
+	private boolean updateMapDrawing(UUID tripId, UUID actorUserId, JsonNode command, Instant executedAt) {
+		return repository.updateMapDrawing(new MapDrawingUpdate(
+			tripId,
+			uuid(command, "drawingId"),
+			command.path("geometry").toString(),
+			command.path("style").isNull() ? null : command.path("style").toString(),
+			nullableText(command, "label"),
+			command.path("sortOrder").asInt(),
+			null,
+			actorUserId,
+			executedAt
+		)).isPresent();
+	}
+
+	private boolean updateRoute(UUID tripId, UUID actorUserId, JsonNode command, Instant executedAt) {
+		return repository.updateRouteSegment(new RouteSegmentUpdate(
+			tripId,
+			uuid(command, "routeId"),
+			RouteMode.valueOf(command.path("mode").asText()),
+			nullableText(command, "providerProfile"),
+			command.path("geometry").toString(),
+			nullableDouble(command, "distanceMeters"),
+			nullableDouble(command, "durationSeconds"),
+			nullableDouble(command, "confidence"),
+			actorUserId,
+			executedAt
+		)).isPresent();
 	}
 
 	private boolean updateDay(UUID tripId, JsonNode command, Instant executedAt) {
