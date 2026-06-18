@@ -51,6 +51,10 @@ public class AcceptTripInviteHandler implements CommandHandler<AcceptTripInviteC
 		validateInvite(invite, command.actorUserId(), now);
 		validateMembership(invite, command.actorUserId());
 
+		if (!commandRepository.acceptTripInvite(invite.id(), command.actorUserId(), now)) {
+			throw new BusinessException(ErrorCode.CONFLICT, "Trip invite is no longer pending.");
+		}
+
 		TripMember member = TripMember.activeMember(
 			Ids.newUuid(),
 			invite.tripId(),
@@ -58,7 +62,6 @@ public class AcceptTripInviteHandler implements CommandHandler<AcceptTripInviteC
 			now
 		);
 		commandRepository.addTripMember(member);
-		commandRepository.acceptTripInvite(invite.id(), command.actorUserId(), now);
 		return new AcceptTripInviteResult(invite.tripId());
 	}
 

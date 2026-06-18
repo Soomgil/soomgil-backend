@@ -3,6 +3,8 @@ package com.soomgil.trip.application.command.handler;
 import com.soomgil.common.cqrs.CommandHandler;
 import com.soomgil.common.cqrs.NoResult;
 import com.soomgil.common.time.TimeProvider;
+import com.soomgil.global.error.BusinessException;
+import com.soomgil.global.error.ErrorCode;
 import com.soomgil.trip.application.command.dto.RevokeTripInviteCommand;
 import com.soomgil.trip.application.port.TripCommandRepository;
 import com.soomgil.trip.application.port.TripQueryRepository;
@@ -37,7 +39,9 @@ public class RevokeTripInviteHandler implements CommandHandler<RevokeTripInviteC
 	@Transactional
 	public NoResult handle(RevokeTripInviteCommand command) {
 		accessGuard.requireOwner(command.tripId(), command.actorUserId());
-		commandRepository.revokeTripInvite(command.inviteId(), command.actorUserId(), timeProvider.now());
+		if (!commandRepository.revokeTripInvite(command.inviteId(), command.actorUserId(), timeProvider.now())) {
+			throw new BusinessException(ErrorCode.CONFLICT, "Trip invite is no longer pending.");
+		}
 		return NoResult.INSTANCE;
 	}
 }

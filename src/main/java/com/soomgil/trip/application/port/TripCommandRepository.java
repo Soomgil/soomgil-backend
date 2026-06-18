@@ -37,7 +37,7 @@ public interface TripCommandRepository {
 	 * @param revokedByUserId 취소한 사용자 ID
 	 * @param revokedAt 취소 시각
 	 */
-	void revokeTripInvite(UUID inviteId, UUID revokedByUserId, Instant revokedAt);
+	boolean revokeTripInvite(UUID inviteId, UUID revokedByUserId, Instant revokedAt);
 
 	/**
 	 * 여행방 멤버십을 추가한다.
@@ -53,7 +53,7 @@ public interface TripCommandRepository {
 	 * @param acceptedByUserId 수락한 사용자 ID
 	 * @param acceptedAt 수락 시각
 	 */
-	void acceptTripInvite(UUID inviteId, UUID acceptedByUserId, Instant acceptedAt);
+	boolean acceptTripInvite(UUID inviteId, UUID acceptedByUserId, Instant acceptedAt);
 
 	/**
 	 * 여행방 기본 설정을 갱신한다.

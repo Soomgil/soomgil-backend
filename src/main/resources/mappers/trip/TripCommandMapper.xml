@@ -53,6 +53,13 @@
       #{leftAt},
       #{removedByUserId}
     )
+    ON CONFLICT (trip_id, user_id)
+    DO UPDATE SET
+      role = EXCLUDED.role,
+      status = 'ACTIVE',
+      joined_at = EXCLUDED.joined_at,
+      left_at = NULL,
+      removed_by_user_id = NULL
   </insert>
 
   <insert id="insertTripRegion" parameterType="com.soomgil.trip.infrastructure.persistence.row.TripRegionRow">

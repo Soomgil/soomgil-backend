@@ -82,8 +82,8 @@ public class MyBatisTripCommandRepository implements TripCommandRepository {
 	}
 
 	@Override
-	public void revokeTripInvite(UUID inviteId, UUID revokedByUserId, Instant revokedAt) {
-		mapper.revokeTripInvite(inviteId, revokedAt);
+	public boolean revokeTripInvite(UUID inviteId, UUID revokedByUserId, Instant revokedAt) {
+		return mapper.revokeTripInvite(inviteId, revokedAt) > 0;
 	}
 
 	@Override
@@ -101,8 +101,8 @@ public class MyBatisTripCommandRepository implements TripCommandRepository {
 	}
 
 	@Override
-	public void acceptTripInvite(UUID inviteId, UUID acceptedByUserId, Instant acceptedAt) {
-		mapper.acceptTripInvite(inviteId, acceptedByUserId, acceptedAt);
+	public boolean acceptTripInvite(UUID inviteId, UUID acceptedByUserId, Instant acceptedAt) {
+		return mapper.acceptTripInvite(inviteId, acceptedByUserId, acceptedAt) > 0;
 	}
 
 	@Override

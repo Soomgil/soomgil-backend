@@ -85,7 +85,8 @@ class TripInviteControllerTest {
 		}
 
 		@Override
-		public void revokeTripInvite(UUID inviteId, UUID revokedByUserId, Instant revokedAt) {
+		public boolean revokeTripInvite(UUID inviteId, UUID revokedByUserId, Instant revokedAt) {
+			return true;
 		}
 
 		@Override
@@ -94,8 +95,9 @@ class TripInviteControllerTest {
 		}
 
 		@Override
-		public void acceptTripInvite(UUID inviteId, UUID acceptedByUserId, Instant acceptedAt) {
+		public boolean acceptTripInvite(UUID inviteId, UUID acceptedByUserId, Instant acceptedAt) {
 			state.accepted = true;
+			return true;
 		}
 
 		@Override

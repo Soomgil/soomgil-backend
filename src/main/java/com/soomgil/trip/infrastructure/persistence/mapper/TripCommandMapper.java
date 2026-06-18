@@ -52,7 +52,7 @@ public interface TripCommandMapper {
 	 * @param inviteId 초대 ID
 	 * @param revokedAt 취소 시각
 	 */
-	void revokeTripInvite(@Param("inviteId") UUID inviteId, @Param("revokedAt") Instant revokedAt);
+	int revokeTripInvite(@Param("inviteId") UUID inviteId, @Param("revokedAt") Instant revokedAt);
 
 	/**
 	 * 초대를 수락 상태로 전환한다.
@@ -61,7 +61,7 @@ public interface TripCommandMapper {
 	 * @param acceptedByUserId 수락한 사용자 ID
 	 * @param acceptedAt 수락 시각
 	 */
-	void acceptTripInvite(
+	int acceptTripInvite(
 		@Param("inviteId") UUID inviteId,
 		@Param("acceptedByUserId") UUID acceptedByUserId,
 		@Param("acceptedAt") Instant acceptedAt

@@ -69,6 +69,23 @@ class RevokeTripInviteHandlerTest {
 		assertThatThrownBy(() -> handler.handle(new RevokeTripInviteCommand(tripId, inviteId, memberUserId)))
 			.isInstanceOfSatisfying(BusinessException.class, exception ->
 				assertThat(exception.errorCode()).isEqualTo(ErrorCode.FORBIDDEN)
+		);
+	}
+
+	@Test
+	void rejectsInviteAlreadyChangedByConcurrentRequest() {
+		queryRepository.access = Optional.of(new TripAccessSnapshot(
+			tripId,
+			ownerUserId,
+			TripStatus.ACTIVE,
+			TripMemberStatus.ACTIVE,
+			ownerUserId
+		));
+		commandRepository.revokeResult = false;
+
+		assertThatThrownBy(() -> handler.handle(new RevokeTripInviteCommand(tripId, inviteId, ownerUserId)))
+			.isInstanceOfSatisfying(BusinessException.class, exception ->
+				assertThat(exception.errorCode()).isEqualTo(ErrorCode.CONFLICT)
 			);
 	}
 
@@ -81,6 +98,7 @@ class RevokeTripInviteHandlerTest {
 		private UUID revokedInviteId;
 		private UUID revokedByUserId;
 		private Instant revokedAt;
+		private boolean revokeResult = true;
 
 		@Override
 		public void saveCreatedTrip(Trip trip, TripMember initialMember, List<String> legalRegionCodes) {
@@ -91,10 +109,11 @@ class RevokeTripInviteHandlerTest {
 		}
 
 		@Override
-		public void revokeTripInvite(UUID inviteId, UUID revokedByUserId, Instant revokedAt) {
+		public boolean revokeTripInvite(UUID inviteId, UUID revokedByUserId, Instant revokedAt) {
 			this.revokedInviteId = inviteId;
 			this.revokedByUserId = revokedByUserId;
 			this.revokedAt = revokedAt;
+			return revokeResult;
 		}
 
 		@Override
@@ -102,7 +121,8 @@ class RevokeTripInviteHandlerTest {
 		}
 
 		@Override
-		public void acceptTripInvite(UUID inviteId, UUID acceptedByUserId, Instant acceptedAt) {
+		public boolean acceptTripInvite(UUID inviteId, UUID acceptedByUserId, Instant acceptedAt) {
+			return true;
 		}
 
 		@Override

@@ -126,6 +126,25 @@ class AcceptTripInviteHandlerTest {
 		);
 	}
 
+	@Test
+	void rejectsInviteClaimLostToConcurrentRequest() {
+		queryRepository.invite = Optional.of(invite(null, InviteStatus.PENDING, null));
+		queryRepository.access = Optional.of(new TripAccessSnapshot(
+			tripId,
+			actorUserId,
+			TripStatus.ACTIVE,
+			null,
+			ownerUserId
+		));
+		commandRepository.acceptResult = false;
+
+		assertThatThrownBy(() -> handler.handle(new AcceptTripInviteCommand("ABCD1234", actorUserId)))
+			.isInstanceOfSatisfying(BusinessException.class, exception ->
+				assertThat(exception.errorCode()).isEqualTo(ErrorCode.CONFLICT)
+			);
+		assertThat(commandRepository.addedMember).isNull();
+	}
+
 	private TimeProvider fixedTime() {
 		return () -> Instant.parse("2026-06-16T00:00:00Z");
 	}
@@ -135,6 +154,7 @@ class AcceptTripInviteHandlerTest {
 		private TripMember addedMember;
 		private UUID acceptedInviteId;
 		private UUID acceptedByUserId;
+		private boolean acceptResult = true;
 
 		@Override
 		public void saveCreatedTrip(Trip trip, TripMember initialMember, List<String> legalRegionCodes) {
@@ -145,7 +165,8 @@ class AcceptTripInviteHandlerTest {
 		}
 
 		@Override
-		public void revokeTripInvite(UUID inviteId, UUID revokedByUserId, Instant revokedAt) {
+		public boolean revokeTripInvite(UUID inviteId, UUID revokedByUserId, Instant revokedAt) {
+			return true;
 		}
 
 		@Override
@@ -154,9 +175,10 @@ class AcceptTripInviteHandlerTest {
 		}
 
 		@Override
-		public void acceptTripInvite(UUID inviteId, UUID acceptedByUserId, Instant acceptedAt) {
+		public boolean acceptTripInvite(UUID inviteId, UUID acceptedByUserId, Instant acceptedAt) {
 			this.acceptedInviteId = inviteId;
 			this.acceptedByUserId = acceptedByUserId;
+			return acceptResult;
 		}
 
 		@Override
