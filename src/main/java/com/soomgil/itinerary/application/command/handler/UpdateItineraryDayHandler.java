@@ -66,10 +66,11 @@ public class UpdateItineraryDayHandler implements CommandHandler<UpdateItinerary
 		)).orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "Itinerary day was not found."));
 		eventRepository.save(ItineraryCollaborationEvents.dayUpdated(
 			command.tripId(),
-			command.dayId(),
 			command.actorUserId(),
 			command.baseVersion(),
 			newVersion,
+			current,
+			updated,
 			now
 		));
 		return new ItineraryMutationResult(

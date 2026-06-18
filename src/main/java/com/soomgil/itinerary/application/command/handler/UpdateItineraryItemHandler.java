@@ -82,10 +82,11 @@ public class UpdateItineraryItemHandler implements CommandHandler<UpdateItinerar
 		)).orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "Itinerary item was not found."));
 		eventRepository.save(ItineraryCollaborationEvents.itemUpdated(
 			command.tripId(),
-			command.itemId(),
 			command.actorUserId(),
 			command.baseVersion(),
 			newVersion,
+			current,
+			updated,
 			now
 		));
 		return new ItineraryMutationResult(command.tripId(), newVersion, null, toView(updated), null, null, List.of());

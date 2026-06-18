@@ -71,6 +71,8 @@ class UpdateItineraryItemHandlerTest {
 		assertThat(result.item().placeName()).isEqualTo("수정 장소");
 		assertThat(repository.lastUpdate.sortOrder()).isEqualTo(2);
 		assertThat(eventRepository.lastEvent.commandType()).isEqualTo("UPDATE_ITINERARY_ITEM");
+		assertThat(eventRepository.lastEvent.inversePayload()).contains("UPDATE_ITINERARY_ITEM", "성심당");
+		assertThat(eventRepository.lastEvent.redoPayload()).contains("UPDATE_ITINERARY_ITEM", "수정 장소");
 	}
 
 	@Test

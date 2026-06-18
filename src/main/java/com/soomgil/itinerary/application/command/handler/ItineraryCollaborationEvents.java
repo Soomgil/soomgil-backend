@@ -4,7 +4,9 @@ import com.soomgil.collaboration.application.port.CollaborationCommandEvent;
 import com.soomgil.itinerary.application.command.dto.ItineraryDayOrderCommand;
 import com.soomgil.itinerary.application.command.dto.ItineraryItemOrderCommand;
 import com.soomgil.itinerary.application.port.ItineraryDayCreate;
+import com.soomgil.itinerary.application.port.ItineraryDayReadModel;
 import com.soomgil.itinerary.application.port.ItineraryItemCreate;
+import com.soomgil.itinerary.application.port.ItineraryItemReadModel;
 import com.soomgil.itinerary.application.port.MapDrawingCreate;
 import com.soomgil.itinerary.application.port.RouteSegmentCreate;
 import java.time.Instant;
@@ -52,10 +54,11 @@ final class ItineraryCollaborationEvents {
 
 	static CollaborationCommandEvent dayUpdated(
 		UUID tripId,
-		UUID dayId,
 		UUID actorUserId,
 		long versionBefore,
 		long versionAfter,
+		ItineraryDayReadModel before,
+		ItineraryDayReadModel after,
 		Instant updatedAt
 	) {
 		return new CollaborationCommandEvent(
@@ -65,12 +68,12 @@ final class ItineraryCollaborationEvents {
 			SOURCE_USER,
 			"UPDATE_ITINERARY_DAY",
 			AGGREGATE_DAY,
-			dayId,
+			after.id(),
 			versionBefore,
 			versionAfter,
-			"{\"dayId\":\"" + dayId + "\"}",
-			null,
-			null,
+			dayUpdatePayload(after),
+			dayUpdatePayload(before),
+			dayUpdatePayload(after),
 			updatedAt
 		);
 	}
@@ -151,10 +154,11 @@ final class ItineraryCollaborationEvents {
 
 	static CollaborationCommandEvent itemUpdated(
 		UUID tripId,
-		UUID itemId,
 		UUID actorUserId,
 		long versionBefore,
 		long versionAfter,
+		ItineraryItemReadModel before,
+		ItineraryItemReadModel after,
 		Instant updatedAt
 	) {
 		return new CollaborationCommandEvent(
@@ -164,12 +168,12 @@ final class ItineraryCollaborationEvents {
 			SOURCE_USER,
 			"UPDATE_ITINERARY_ITEM",
 			AGGREGATE_ITEM,
-			itemId,
+			after.id(),
 			versionBefore,
 			versionAfter,
-			"{\"itemId\":\"" + itemId + "\"}",
-			null,
-			null,
+			itemUpdatePayload(after),
+			itemUpdatePayload(before),
+			itemUpdatePayload(after),
 			updatedAt
 		);
 	}
@@ -371,6 +375,25 @@ final class ItineraryCollaborationEvents {
 			+ ",\"date\":" + quoted(day.date() == null ? null : day.date().toString())
 			+ ",\"title\":" + quoted(day.title())
 			+ ",\"sortOrder\":" + day.sortOrder() + "}";
+	}
+
+	private static String dayUpdatePayload(ItineraryDayReadModel day) {
+		return "{\"action\":\"UPDATE_ITINERARY_DAY\",\"dayId\":\"" + day.id()
+			+ "\",\"dayNumber\":" + nullable(day.dayNumber())
+			+ ",\"date\":" + quoted(day.date() == null ? null : day.date().toString())
+			+ ",\"title\":" + quoted(day.title())
+			+ ",\"sortOrder\":" + day.sortOrder() + "}";
+	}
+
+	private static String itemUpdatePayload(ItineraryItemReadModel item) {
+		return "{\"action\":\"UPDATE_ITINERARY_ITEM\",\"itemId\":\"" + item.id()
+			+ "\",\"dayId\":\"" + item.itineraryDayId()
+			+ "\",\"sortOrder\":" + item.sortOrder()
+			+ ",\"placeName\":" + quoted(item.placeName())
+			+ ",\"address\":" + quoted(item.address())
+			+ ",\"lat\":" + nullable(item.lat())
+			+ ",\"lng\":" + nullable(item.lng())
+			+ ",\"thumbnailUrl\":" + quoted(item.thumbnailUrl() == null ? null : item.thumbnailUrl().toString()) + "}";
 	}
 
 	private static String nullable(Object value) {

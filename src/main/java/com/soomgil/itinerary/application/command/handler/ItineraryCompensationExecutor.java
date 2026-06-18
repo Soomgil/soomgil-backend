@@ -8,6 +8,8 @@ import com.soomgil.global.error.BusinessException;
 import com.soomgil.global.error.ErrorCode;
 import com.soomgil.itinerary.application.port.ItineraryCommandRepository;
 import com.soomgil.itinerary.application.port.ItineraryDayCreate;
+import com.soomgil.itinerary.application.port.ItineraryDayUpdate;
+import com.soomgil.itinerary.application.port.ItineraryItemUpdate;
 import com.soomgil.itinerary.domain.model.ItineraryDayGroupType;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -30,7 +32,9 @@ public class ItineraryCompensationExecutor implements CollaborationCompensationE
 		"RESTORE_ITINERARY_DAY",
 		"RESTORE_ITINERARY_ITEM",
 		"RESTORE_MAP_DRAWING",
-		"RESTORE_ROUTE_SEGMENT"
+		"RESTORE_ROUTE_SEGMENT",
+		"UPDATE_ITINERARY_DAY",
+		"UPDATE_ITINERARY_ITEM"
 	);
 
 	private final ItineraryCommandRepository repository;
@@ -70,11 +74,41 @@ public class ItineraryCompensationExecutor implements CollaborationCompensationE
 				tripId, uuid(command, "drawingId"), actorUserId, executedAt);
 			case "RESTORE_ROUTE_SEGMENT" -> repository.restoreRouteSegment(
 				tripId, uuid(command, "routeId"), actorUserId, executedAt);
+			case "UPDATE_ITINERARY_DAY" -> updateDay(tripId, command, executedAt);
+			case "UPDATE_ITINERARY_ITEM" -> updateItem(tripId, actorUserId, command, executedAt);
 			default -> false;
 		};
 		if (!applied) {
 			throw new BusinessException(ErrorCode.CONFLICT, "Compensation target has changed or no longer exists.");
 		}
+	}
+
+	private boolean updateDay(UUID tripId, JsonNode command, Instant executedAt) {
+		return repository.updateDay(new ItineraryDayUpdate(
+			tripId,
+			uuid(command, "dayId"),
+			nullableInt(command, "dayNumber"),
+			nullableDate(command, "date"),
+			nullableText(command, "title"),
+			command.path("sortOrder").asInt(),
+			executedAt
+		)).isPresent();
+	}
+
+	private boolean updateItem(UUID tripId, UUID actorUserId, JsonNode command, Instant executedAt) {
+		return repository.updateItem(new ItineraryItemUpdate(
+			tripId,
+			uuid(command, "itemId"),
+			uuid(command, "dayId"),
+			command.path("sortOrder").asInt(),
+			command.path("placeName").asText(),
+			nullableText(command, "address"),
+			nullableDouble(command, "lat"),
+			nullableDouble(command, "lng"),
+			nullableText(command, "thumbnailUrl"),
+			actorUserId,
+			executedAt
+		)).isPresent();
 	}
 
 	private boolean restoreDay(UUID tripId, JsonNode command, Instant executedAt) {
@@ -112,5 +146,21 @@ public class ItineraryCompensationExecutor implements CollaborationCompensationE
 		catch (IllegalArgumentException exception) {
 			throw new BusinessException(ErrorCode.VALIDATION_FAILED, "Compensation target ID is invalid.");
 		}
+	}
+
+	private String nullableText(JsonNode command, String field) {
+		return command.path(field).isNull() ? null : command.path(field).asText();
+	}
+
+	private Integer nullableInt(JsonNode command, String field) {
+		return command.path(field).isNull() ? null : command.path(field).asInt();
+	}
+
+	private Double nullableDouble(JsonNode command, String field) {
+		return command.path(field).isNull() ? null : command.path(field).asDouble();
+	}
+
+	private LocalDate nullableDate(JsonNode command, String field) {
+		return command.path(field).isNull() ? null : LocalDate.parse(command.path(field).asText());
 	}
 }

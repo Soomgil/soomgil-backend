@@ -64,6 +64,8 @@ class UpdateItineraryDayHandlerTest {
 		assertThat(result.day().title()).isEqualTo("둘째 날");
 		assertThat(repository.lastUpdate.sortOrder()).isEqualTo(5);
 		assertThat(eventRepository.lastEvent.commandType()).isEqualTo("UPDATE_ITINERARY_DAY");
+		assertThat(eventRepository.lastEvent.inversePayload()).contains("UPDATE_ITINERARY_DAY", "첫째 날");
+		assertThat(eventRepository.lastEvent.redoPayload()).contains("UPDATE_ITINERARY_DAY", "둘째 날");
 	}
 
 	@Test
