@@ -185,6 +185,7 @@ final class ItineraryCollaborationEvents {
 		UUID actorUserId,
 		long versionBefore,
 		long versionAfter,
+		List<ItineraryDayOrderCommand> before,
 		List<ItineraryDayOrderCommand> days,
 		Instant createdAt
 	) {
@@ -198,9 +199,9 @@ final class ItineraryCollaborationEvents {
 			tripId,
 			versionBefore,
 			versionAfter,
-			"{\"days\":" + daysJson(days) + "}",
-			null,
-			null,
+			reorderPayload(days),
+			reorderPayload(before),
+			reorderPayload(days),
 			createdAt
 		);
 	}
@@ -372,6 +373,10 @@ final class ItineraryCollaborationEvents {
 				.append('}');
 		}
 		return builder.append(']').toString();
+	}
+
+	private static String reorderPayload(List<ItineraryDayOrderCommand> days) {
+		return "{\"action\":\"REORDER_ITINERARY\",\"days\":" + daysJson(days) + "}";
 	}
 
 	private static String dayRestorePayload(ItineraryDayCreate day) {

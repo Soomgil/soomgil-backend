@@ -12,6 +12,8 @@ import com.soomgil.itinerary.application.port.ItineraryDayUpdate;
 import com.soomgil.itinerary.application.port.ItineraryItemUpdate;
 import com.soomgil.itinerary.application.port.MapDrawingUpdate;
 import com.soomgil.itinerary.application.port.RouteSegmentUpdate;
+import com.soomgil.itinerary.application.port.ItineraryDayOrderUpdate;
+import com.soomgil.itinerary.application.port.ItineraryItemOrderUpdate;
 import com.soomgil.itinerary.domain.model.RouteMode;
 import com.soomgil.itinerary.domain.model.ItineraryDayGroupType;
 import java.time.Instant;
@@ -41,7 +43,8 @@ public class ItineraryCompensationExecutor implements CollaborationCompensationE
 		"UPDATE_ITINERARY_DAY",
 		"UPDATE_ITINERARY_ITEM",
 		"UPDATE_MAP_DRAWING",
-		"UPDATE_ROUTE_SEGMENT"
+		"UPDATE_ROUTE_SEGMENT",
+		"REORDER_ITINERARY"
 	);
 
 	private final ItineraryCommandRepository repository;
@@ -83,11 +86,32 @@ public class ItineraryCompensationExecutor implements CollaborationCompensationE
 			case "UPDATE_ITINERARY_ITEM" -> updateItem(tripId, actorUserId, command, executedAt);
 			case "UPDATE_MAP_DRAWING" -> updateMapDrawing(tripId, actorUserId, command, executedAt);
 			case "UPDATE_ROUTE_SEGMENT" -> updateRoute(tripId, actorUserId, command, executedAt);
+			case "REORDER_ITINERARY" -> reorder(tripId, actorUserId, command, executedAt);
 			default -> false;
 		};
 		if (!applied) {
 			throw new BusinessException(ErrorCode.CONFLICT, "Compensation target has changed or no longer exists.");
 		}
+	}
+
+	private boolean reorder(UUID tripId, UUID actorUserId, JsonNode command, Instant executedAt) {
+		for (JsonNode day : command.path("days")) {
+			UUID dayId = uuid(day, "dayId");
+			if (!repository.existsDay(tripId, dayId)) {
+				return false;
+			}
+			repository.updateDayOrder(new ItineraryDayOrderUpdate(
+				tripId, dayId, day.path("sortOrder").asInt(), executedAt));
+			for (JsonNode item : day.path("items")) {
+				UUID itemId = uuid(item, "itemId");
+				if (!repository.existsItem(tripId, itemId)) {
+					return false;
+				}
+				repository.updateItemOrder(new ItineraryItemOrderUpdate(
+					tripId, dayId, itemId, item.path("sortOrder").asInt(), actorUserId, executedAt));
+			}
+		}
+		return true;
 	}
 
 	private boolean deleteItem(UUID tripId, UUID actorUserId, JsonNode command, Instant executedAt) {

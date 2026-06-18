@@ -67,6 +67,8 @@ class ReorderItineraryHandlerTest {
 		assertThat(repository.itemUpdates.get(0).updatedByUserId()).isEqualTo(USER_ID);
 		assertThat(eventRepository.lastEvent.commandType()).isEqualTo("REORDER_ITINERARY");
 		assertThat(eventRepository.lastEvent.payload()).contains(ITEM_ID.toString());
+		assertThat(eventRepository.lastEvent.inversePayload()).contains("REORDER_ITINERARY", ITEM_ID.toString());
+		assertThat(eventRepository.lastEvent.redoPayload()).contains("REORDER_ITINERARY", ITEM_ID.toString());
 	}
 
 	@Test
@@ -182,7 +184,12 @@ class ReorderItineraryHandlerTest {
 
 		@Override
 		public java.util.Optional<ItineraryDayReadModel> findDay(UUID tripId, UUID dayId) {
-			return java.util.Optional.empty();
+			if (!dayIds.contains(dayId)) {
+				return java.util.Optional.empty();
+			}
+			return java.util.Optional.of(new ItineraryDayReadModel(
+				dayId, tripId, com.soomgil.itinerary.domain.model.ItineraryDayGroupType.DAY,
+				dayId.equals(DAY_ID) ? 1 : 2, null, null, dayId.equals(DAY_ID) ? 0 : 1));
 		}
 
 		@Override
@@ -212,7 +219,12 @@ class ReorderItineraryHandlerTest {
 
 		@Override
 		public java.util.Optional<com.soomgil.itinerary.application.port.ItineraryItemReadModel> findItem(UUID tripId, UUID itemId) {
-			return java.util.Optional.empty();
+			if (!itemIds.contains(itemId)) {
+				return java.util.Optional.empty();
+			}
+			return java.util.Optional.of(new com.soomgil.itinerary.application.port.ItineraryItemReadModel(
+				itemId, DAY_ID, 0, com.soomgil.itinerary.domain.model.ItineraryItemType.PLACE,
+				"KTO", "place", "장소", null, null, null, null, "AVAILABLE"));
 		}
 
 		@Override

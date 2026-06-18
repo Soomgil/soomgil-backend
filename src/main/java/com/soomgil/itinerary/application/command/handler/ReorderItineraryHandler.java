@@ -12,9 +12,14 @@ import com.soomgil.itinerary.application.command.dto.ReorderItineraryCommand;
 import com.soomgil.itinerary.application.port.ItineraryCommandRepository;
 import com.soomgil.itinerary.application.port.ItineraryDayOrderUpdate;
 import com.soomgil.itinerary.application.port.ItineraryItemOrderUpdate;
+import com.soomgil.itinerary.application.port.ItineraryDayReadModel;
+import com.soomgil.itinerary.application.port.ItineraryItemReadModel;
 import com.soomgil.trip.application.query.handler.TripAccessGuard;
 import java.time.Instant;
 import java.util.HashSet;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -53,6 +58,7 @@ public class ReorderItineraryHandler implements CommandHandler<ReorderItineraryC
 		tripAccessGuard.requireActiveMember(command.tripId(), command.actorUserId());
 		validateSnapshot(command);
 		ensureSnapshotExists(command);
+		List<ItineraryDayOrderCommand> previousOrder = currentOrder(command);
 
 		Instant now = timeProvider.now();
 		long newVersion = repository.incrementItineraryVersion(command.tripId(), command.baseVersion(), now)
@@ -75,10 +81,37 @@ public class ReorderItineraryHandler implements CommandHandler<ReorderItineraryC
 			command.actorUserId(),
 			command.baseVersion(),
 			newVersion,
+			previousOrder,
 			command.days(),
 			now
 		));
 		return new ItineraryMutationResult(command.tripId(), newVersion, null, null, null, null, List.of());
+	}
+
+	private List<ItineraryDayOrderCommand> currentOrder(ReorderItineraryCommand command) {
+		Map<UUID, CurrentDayOrder> days = new LinkedHashMap<>();
+		for (ItineraryDayOrderCommand requestedDay : command.days()) {
+			ItineraryDayReadModel day = repository.findDay(command.tripId(), requestedDay.dayId())
+				.orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "Itinerary day was not found."));
+			days.put(day.id(), new CurrentDayOrder(day.id(), day.sortOrder(), new ArrayList<>()));
+		}
+		for (ItineraryDayOrderCommand requestedDay : command.days()) {
+			for (ItineraryItemOrderCommand requestedItem : requestedDay.itemOrders()) {
+				ItineraryItemReadModel item = repository.findItem(command.tripId(), requestedItem.itemId())
+					.orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "Itinerary item was not found."));
+				CurrentDayOrder currentDay = days.get(item.itineraryDayId());
+				if (currentDay == null) {
+					throw new BusinessException(ErrorCode.CONFLICT, "Itinerary item day does not match the snapshot.");
+				}
+				currentDay.items().add(new ItineraryItemOrderCommand(item.id(), item.sortOrder()));
+			}
+		}
+		return days.values().stream()
+			.map(day -> new ItineraryDayOrderCommand(day.dayId(), day.sortOrder(), List.copyOf(day.items())))
+			.toList();
+	}
+
+	private record CurrentDayOrder(UUID dayId, int sortOrder, List<ItineraryItemOrderCommand> items) {
 	}
 
 	private void validateSnapshot(ReorderItineraryCommand command) {
