@@ -14,6 +14,7 @@ import com.soomgil.collaboration.application.command.dto.UndoRedoResult;
 import com.soomgil.collaboration.application.port.CollaborationCommandEvent;
 import com.soomgil.collaboration.application.port.CollaborationCommandEventReadModel;
 import com.soomgil.collaboration.application.port.CollaborationCommandEventRepository;
+import com.soomgil.collaboration.application.port.CollaborationCompensationExecutor;
 import com.soomgil.global.error.BusinessException;
 import com.soomgil.global.error.ErrorCode;
 import com.soomgil.itinerary.application.port.ItineraryCommandRepository;
@@ -37,12 +38,14 @@ class UndoRedoHandlerTest {
 
 	private final CollaborationCommandEventRepository eventRepository = mock(CollaborationCommandEventRepository.class);
 	private final ItineraryCommandRepository itineraryRepository = mock(ItineraryCommandRepository.class);
+	private final CollaborationCompensationExecutor compensationExecutor = mock(CollaborationCompensationExecutor.class);
 	private final UndoRedoHandler handler = new UndoRedoHandler(
 		eventRepository,
 		itineraryRepository,
 		new TripAccessGuard(tripRepository()),
 		() -> Instant.parse("2026-06-18T00:00:00Z"),
-		new ObjectMapper()
+		new ObjectMapper(),
+		java.util.List.of(compensationExecutor)
 	);
 
 	@Test
@@ -60,6 +63,7 @@ class UndoRedoHandlerTest {
 		when(eventRepository.saveReturningId(any())).thenReturn(2L);
 		when(eventRepository.hasUndoCandidate(TRIP_ID, USER_ID, SESSION_ID)).thenReturn(false);
 		when(eventRepository.hasRedoCandidate(TRIP_ID, USER_ID, SESSION_ID)).thenReturn(true);
+		when(compensationExecutor.supports(any())).thenReturn(true);
 
 		UndoRedoResult result = handler.handle(new UndoRedoCommand(TRIP_ID, USER_ID, SESSION_ID, 10L, null, UndoRedoAction.UNDO));
 
@@ -67,6 +71,12 @@ class UndoRedoHandlerTest {
 		assertThat(result.commandEventId()).isEqualTo(2L);
 		assertThat(result.undoAvailable()).isFalse();
 		assertThat(result.redoAvailable()).isTrue();
+		verify(compensationExecutor).execute(
+			org.mockito.ArgumentMatchers.eq(TRIP_ID),
+			org.mockito.ArgumentMatchers.eq(USER_ID),
+			org.mockito.ArgumentMatchers.contains("DELETE_ITINERARY_DAY"),
+			org.mockito.ArgumentMatchers.eq(Instant.parse("2026-06-18T00:00:00Z"))
+		);
 		verify(eventRepository).saveReturningId(org.mockito.ArgumentMatchers.argThat(event ->
 			event.source().equals("UNDO")
 				&& event.commandType().equals("UNDO_CREATE_ITINERARY_DAY")
@@ -87,6 +97,7 @@ class UndoRedoHandlerTest {
 		when(itineraryRepository.incrementItineraryVersion(TRIP_ID, 11L, Instant.parse("2026-06-18T00:00:00Z")))
 			.thenReturn(OptionalLong.of(12L));
 		when(eventRepository.saveReturningId(any())).thenReturn(4L);
+		when(compensationExecutor.supports(any())).thenReturn(true);
 
 		UndoRedoResult result = handler.handle(new UndoRedoCommand(TRIP_ID, USER_ID, SESSION_ID, 11L, 3L, UndoRedoAction.REDO));
 

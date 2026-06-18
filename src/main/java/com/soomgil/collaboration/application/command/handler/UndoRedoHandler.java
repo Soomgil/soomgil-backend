@@ -9,6 +9,7 @@ import com.soomgil.collaboration.application.command.dto.UndoRedoResult;
 import com.soomgil.collaboration.application.port.CollaborationCommandEvent;
 import com.soomgil.collaboration.application.port.CollaborationCommandEventReadModel;
 import com.soomgil.collaboration.application.port.CollaborationCommandEventRepository;
+import com.soomgil.collaboration.application.port.CollaborationCompensationExecutor;
 import com.soomgil.common.cqrs.CommandHandler;
 import com.soomgil.common.time.TimeProvider;
 import com.soomgil.global.error.BusinessException;
@@ -17,6 +18,7 @@ import com.soomgil.itinerary.application.port.ItineraryCommandRepository;
 import com.soomgil.trip.application.query.handler.TripAccessGuard;
 import java.time.Instant;
 import java.util.Map;
+import java.util.List;
 import java.util.Objects;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,19 +34,22 @@ public class UndoRedoHandler implements CommandHandler<UndoRedoCommand, UndoRedo
 	private final TripAccessGuard tripAccessGuard;
 	private final TimeProvider timeProvider;
 	private final ObjectMapper objectMapper;
+	private final List<CollaborationCompensationExecutor> compensationExecutors;
 
 	public UndoRedoHandler(
 		CollaborationCommandEventRepository eventRepository,
 		ItineraryCommandRepository itineraryRepository,
 		TripAccessGuard tripAccessGuard,
 		TimeProvider timeProvider,
-		ObjectMapper objectMapper
+		ObjectMapper objectMapper,
+		List<CollaborationCompensationExecutor> compensationExecutors
 	) {
 		this.eventRepository = Objects.requireNonNull(eventRepository, "eventRepository must not be null");
 		this.itineraryRepository = Objects.requireNonNull(itineraryRepository, "itineraryRepository must not be null");
 		this.tripAccessGuard = Objects.requireNonNull(tripAccessGuard, "tripAccessGuard must not be null");
 		this.timeProvider = Objects.requireNonNull(timeProvider, "timeProvider must not be null");
 		this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper must not be null");
+		this.compensationExecutors = List.copyOf(compensationExecutors);
 	}
 
 	@Override
@@ -57,6 +62,7 @@ public class UndoRedoHandler implements CommandHandler<UndoRedoCommand, UndoRedo
 		Instant now = timeProvider.now();
 		long newVersion = itineraryRepository.incrementItineraryVersion(command.tripId(), command.baseVersion(), now)
 			.orElseThrow(() -> new BusinessException(ErrorCode.CONFLICT, "Itinerary version does not match."));
+		executeCompensation(command, candidate, now);
 		CollaborationCommandEvent event = command.action() == UndoRedoAction.UNDO
 			? undoEvent(command, candidate, newVersion, now)
 			: redoEvent(command, candidate, newVersion, now);
@@ -68,6 +74,21 @@ public class UndoRedoHandler implements CommandHandler<UndoRedoCommand, UndoRedo
 			eventRepository.hasUndoCandidate(command.tripId(), command.actorUserId(), command.websocketSessionId()),
 			eventRepository.hasRedoCandidate(command.tripId(), command.actorUserId(), command.websocketSessionId())
 		);
+	}
+
+	private void executeCompensation(
+		UndoRedoCommand command,
+		CollaborationCommandEventReadModel candidate,
+		Instant now
+	) {
+		String payload = command.action() == UndoRedoAction.UNDO
+			? candidate.inversePayload()
+			: candidate.redoPayload();
+		CollaborationCompensationExecutor executor = compensationExecutors.stream()
+			.filter(candidateExecutor -> candidateExecutor.supports(payload))
+			.findFirst()
+			.orElseThrow(() -> new BusinessException(ErrorCode.CONFLICT, "Collaboration command cannot be compensated."));
+		executor.execute(command.tripId(), command.actorUserId(), payload, now);
 	}
 
 	private void validate(UndoRedoCommand command) {
