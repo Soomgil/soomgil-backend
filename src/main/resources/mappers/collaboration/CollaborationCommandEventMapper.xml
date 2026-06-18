@@ -36,7 +36,7 @@
     )
   </insert>
 
-  <select id="insertEventReturningId" resultType="long">
+  <select id="insertEventReturningId" resultType="long" flushCache="true" useCache="false">
     INSERT INTO collab.collaboration_command_events (
       trip_id,
       actor_user_id,
