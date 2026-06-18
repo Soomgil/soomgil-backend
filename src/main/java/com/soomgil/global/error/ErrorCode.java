@@ -17,7 +17,26 @@ public enum ErrorCode {
 	CONFLICT(HttpStatus.CONFLICT, "CONFLICT", "Request conflicts with current state."),
 	BUSINESS_RULE_VIOLATION(HttpStatus.UNPROCESSABLE_ENTITY, "BUSINESS_RULE_VIOLATION", "Business rule violation."),
 	NOT_IMPLEMENTED(HttpStatus.NOT_IMPLEMENTED, "NOT_IMPLEMENTED", "Endpoint is not implemented yet."),
-	INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR", "Unexpected server error.");
+	INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR", "Unexpected server error."),
+	INVALID_CREDENTIALS(HttpStatus.UNAUTHORIZED, "INVALID_CREDENTIALS", "Email or password is incorrect."),
+	EMAIL_ALREADY_USED(HttpStatus.CONFLICT, "EMAIL_ALREADY_USED", "Email is already registered."),
+	USER_NOT_FOUND(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", "User was not found."),
+	USER_INACTIVE(HttpStatus.FORBIDDEN, "USER_INACTIVE", "User account is not active."),
+	REFRESH_TOKEN_INVALID(HttpStatus.UNAUTHORIZED, "REFRESH_TOKEN_INVALID", "Refresh token is invalid."),
+	REFRESH_TOKEN_REUSE_DETECTED(HttpStatus.UNAUTHORIZED, "REFRESH_TOKEN_REUSE_DETECTED", "Refresh token reuse detected."),
+	EMAIL_NOT_VERIFIED(HttpStatus.FORBIDDEN, "EMAIL_NOT_VERIFIED", "Email address is not verified."),
+	INVALID_TOKEN(HttpStatus.UNAUTHORIZED, "INVALID_TOKEN", "Token is invalid."),
+	TOKEN_EXPIRED(HttpStatus.UNAUTHORIZED, "TOKEN_EXPIRED", "Token has expired."),
+	OAUTH_PROVIDER_ERROR(HttpStatus.BAD_GATEWAY, "OAUTH_PROVIDER_ERROR", "OAuth provider returned an error."),
+	OAUTH_EMAIL_CONFLICT(HttpStatus.CONFLICT, "OAUTH_EMAIL_CONFLICT", "Email is already used by another account."),
+	OAUTH_NOT_CONFIGURED(HttpStatus.SERVICE_UNAVAILABLE, "OAUTH_NOT_CONFIGURED", "OAuth provider is not configured."),
+	POLICY_NOT_ACCEPTED(HttpStatus.FORBIDDEN, "POLICY_NOT_ACCEPTED", "Required policy must be accepted."),
+	SESSION_NOT_FOUND(HttpStatus.NOT_FOUND, "SESSION_NOT_FOUND", "Session was not found."),
+	INVALID_PROFILE_IMAGE(HttpStatus.UNPROCESSABLE_ENTITY, "INVALID_PROFILE_IMAGE", "Profile image reference is invalid."),
+	INVALID_TIMEZONE(HttpStatus.UNPROCESSABLE_ENTITY, "INVALID_TIMEZONE", "Timezone is not supported."),
+	INVALID_DISPLAY_LANGUAGE(HttpStatus.UNPROCESSABLE_ENTITY, "INVALID_DISPLAY_LANGUAGE", "Display language is not supported."),
+	ACCOUNT_DELETION_BLOCKED_BY_ACTIVE_OWNER_TRIP(HttpStatus.CONFLICT, "ACCOUNT_DELETION_BLOCKED_BY_ACTIVE_OWNER_TRIP", "Active trip ownership blocks account deletion."),
+	PROFILE_NOT_FOUND(HttpStatus.NOT_FOUND, "PROFILE_NOT_FOUND", "User profile was not found.");
 
 	private final HttpStatus status;
 	private final String code;

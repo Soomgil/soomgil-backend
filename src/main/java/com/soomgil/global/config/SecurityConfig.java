@@ -1,5 +1,7 @@
 package com.soomgil.global.config;
 
+import com.soomgil.auth.application.service.OAuthProperties;
+import com.soomgil.global.security.JwtToCurrentUserAuthenticationConverter;
 import com.soomgil.global.security.ProblemDetailsAuthenticationEntryPoint;
 import com.soomgil.global.security.ProblemDetailsAccessDeniedHandler;
 import java.util.List;
@@ -23,7 +25,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
  * 인증 실패와 권한 실패는 각각 ProblemDetails 401/403 응답으로 변환한다.
  */
 @Configuration
-@EnableConfigurationProperties(CorsProperties.class)
+@EnableConfigurationProperties({CorsProperties.class, OAuthProperties.class})
 public class SecurityConfig {
 
 	@Bean
@@ -31,7 +33,8 @@ public class SecurityConfig {
 		HttpSecurity http,
 		CorsConfigurationSource corsConfigurationSource,
 		ProblemDetailsAuthenticationEntryPoint authenticationEntryPoint,
-		ProblemDetailsAccessDeniedHandler accessDeniedHandler
+		ProblemDetailsAccessDeniedHandler accessDeniedHandler,
+		JwtToCurrentUserAuthenticationConverter jwtAuthenticationConverter
 	) throws Exception {
 		return http
 			.csrf(AbstractHttpConfigurer::disable)
@@ -45,10 +48,23 @@ public class SecurityConfig {
 			)
 			.authorizeHttpRequests(auth -> auth
 				.requestMatchers(HttpMethod.GET, "/api/v1/health").permitAll()
+				.requestMatchers(HttpMethod.POST, "/api/v1/auth/register").permitAll()
+				.requestMatchers(HttpMethod.POST, "/api/v1/auth/login").permitAll()
+				.requestMatchers(HttpMethod.POST, "/api/v1/auth/token/refresh").permitAll()
+				.requestMatchers(HttpMethod.POST, "/api/v1/auth/email-verifications").permitAll()
+				.requestMatchers(HttpMethod.POST, "/api/v1/auth/email-verifications/verify").permitAll()
+				.requestMatchers(HttpMethod.POST, "/api/v1/auth/password-resets").permitAll()
+				.requestMatchers(HttpMethod.POST, "/api/v1/auth/password-resets/confirm").permitAll()
+				.requestMatchers(HttpMethod.GET, "/api/v1/auth/oauth/*/authorization-url").permitAll()
+				.requestMatchers(HttpMethod.POST, "/api/v1/auth/oauth/*/callback").permitAll()
+				.requestMatchers(HttpMethod.GET, "/api/v1/auth/policies").permitAll()
 				.requestMatchers("/actuator/health/**", "/actuator/info").permitAll()
 				.requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
 				.anyRequest().authenticated()
 			)
+			.oauth2ResourceServer(oauth -> oauth.jwt(jwt -> jwt
+				.jwtAuthenticationConverter(jwtAuthenticationConverter)
+			))
 			.build();
 	}
 
