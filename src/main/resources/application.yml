@@ -57,7 +57,3 @@ soomgil:
       bucket: ${S3_BUCKET:soomgil-local}
       access-key: ${S3_ACCESS_KEY:soomgil}
       secret-key: ${S3_SECRET_KEY:change-me-change-me}
-  tourism-source:
-    award-photo-matching:
-      enabled: ${TOURISM_SOURCE_AWARD_PHOTO_MATCHING_ENABLED:false}
-      limit: ${TOURISM_SOURCE_AWARD_PHOTO_MATCHING_LIMIT:100}
