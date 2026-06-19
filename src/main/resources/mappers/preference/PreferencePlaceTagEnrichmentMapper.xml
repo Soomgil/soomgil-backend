@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+	PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+	"https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.soomgil.preference.infrastructure.persistence.mapper.PreferencePlaceTagEnrichmentMapper">
+
+	<resultMap id="PreferenceTagLookupRowMap" type="com.soomgil.preference.infrastructure.persistence.row.PreferenceTagLookupRow">
+		<constructor>
+			<arg column="id" javaType="java.lang.String"/>
+			<arg column="code" javaType="java.lang.String"/>
+		</constructor>
+	</resultMap>
+
+	<select id="findActiveSelectableTags" resultMap="PreferenceTagLookupRowMap">
+		SELECT
+			CAST(id AS text) AS id,
+			code
+		FROM preference.preference_tags
+		WHERE is_active = true
+			AND is_selectable = true
+			AND tag_type = 'TAG'
+			AND code IN
+			<foreach collection="codes" item="code" open="(" separator="," close=")">
+				#{code}
+			</foreach>
+	</select>
+
+	<insert id="insertEnrichment" parameterType="com.soomgil.preference.infrastructure.persistence.row.PlaceTagEnrichmentInsertRow">
+		INSERT INTO preference.place_tag_enrichments (
+			id,
+			provider,
+			external_place_id,
+			source_modified_at,
+			source_hash,
+			status,
+			model_provider,
+			model_name,
+			prompt_version,
+			tag_dictionary_version,
+			selection_policy_version,
+			candidate_count,
+			selected_count,
+			enriched_at
+		)
+		VALUES (
+			CAST(#{id} AS uuid),
+			#{provider},
+			#{externalPlaceId},
+			#{sourceModifiedAt},
+			#{sourceHash},
+			#{status},
+			#{modelProvider},
+			#{modelName},
+			#{promptVersion},
+			#{tagDictionaryVersion},
+			#{selectionPolicyVersion},
+			#{candidateCount},
+			#{selectedCount},
+			now()
+		)
+	</insert>
+
+	<insert id="insertCandidate" parameterType="com.soomgil.preference.infrastructure.persistence.row.PlaceTagEnrichmentCandidateInsertRow">
+		INSERT INTO preference.place_tag_enrichment_candidates (
+			id,
+			enrichment_id,
+			candidate_code,
+			matched_tag_id,
+			confidence,
+			weight,
+			selection_score,
+			status,
+			rationale
+		)
+		VALUES (
+			CAST(#{id} AS uuid),
+			CAST(#{enrichmentId} AS uuid),
+			#{candidateCode},
+			CAST(#{matchedTagId} AS uuid),
+			#{confidence},
+			#{weight},
+			#{selectionScore},
+			#{status},
+			#{rationale}
+		)
+	</insert>
+
+	<insert id="insertSelectedTag" parameterType="com.soomgil.preference.infrastructure.persistence.row.PlaceTagEnrichmentTagInsertRow">
+		INSERT INTO preference.place_tag_enrichment_tags (
+			enrichment_id,
+			tag_id,
+			confidence,
+			weight,
+			preference_discrimination_snapshot,
+			selection_score,
+			rank_order,
+			tag_statistic_run_id,
+			rationale
+		)
+		VALUES (
+			CAST(#{enrichmentId} AS uuid),
+			CAST(#{tagId} AS uuid),
+			#{confidence},
+			#{weight},
+			#{preferenceDiscriminationSnapshot},
+			#{selectionScore},
+			#{rankOrder},
+			CAST(#{tagStatisticRunId} AS uuid),
+			#{rationale}
+		)
+	</insert>
+</mapper>
