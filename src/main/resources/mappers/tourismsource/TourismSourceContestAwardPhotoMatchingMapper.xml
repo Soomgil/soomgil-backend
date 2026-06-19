@@ -27,6 +27,18 @@
 		</constructor>
 	</resultMap>
 
+	<select id="findPendingPhotoIds" resultType="string">
+		SELECT CAST(p.id AS text)
+		FROM tourism_source.contest_award_photos p
+		WHERE NOT EXISTS (
+			SELECT 1
+			FROM tourism_source.contest_award_photo_matches m
+			WHERE m.photo_id = p.id
+		)
+		ORDER BY p.created_at ASC, p.id ASC
+		LIMIT #{limit}
+	</select>
+
 	<select id="findPhoto" resultMap="PhotoRowMap">
 		SELECT
 			title,
