@@ -11,6 +11,7 @@ import com.soomgil.place.application.query.dto.PlaceSearchCriteria;
 import com.soomgil.place.application.query.dto.PlaceSearchItem;
 import com.soomgil.place.application.query.dto.PlaceSearchQuery;
 import com.soomgil.place.application.query.dto.PlaceSearchResult;
+import com.soomgil.place.application.query.dto.PlaceViewportCandidateCriteria;
 import com.soomgil.place.infrastructure.persistence.mapper.TourismSourcePlaceSearchMapper;
 import com.soomgil.place.infrastructure.persistence.repository.TourismSourcePlaceSearchRepository;
 import com.soomgil.place.infrastructure.persistence.row.TourismSourcePlaceSearchRow;
@@ -112,6 +113,11 @@ class TourismSourcePlaceSearchQueryHandlerTest {
 
 		@Override
 		public List<TourismSourcePlaceSearchRow> search(PlaceSearchCriteria criteria) {
+			return List.of();
+		}
+
+		@Override
+		public List<TourismSourcePlaceSearchRow> findViewportCandidates(PlaceViewportCandidateCriteria criteria) {
 			return List.of();
 		}
 	}

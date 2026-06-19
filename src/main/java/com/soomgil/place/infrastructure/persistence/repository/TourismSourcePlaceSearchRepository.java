@@ -1,10 +1,13 @@
 package com.soomgil.place.infrastructure.persistence.repository;
 
 import com.soomgil.common.api.dto.PageMeta;
+import com.soomgil.place.api.dto.PlaceProvider;
 import com.soomgil.place.api.dto.PlaceSourceStatus;
 import com.soomgil.place.application.query.dto.PlaceSearchCriteria;
 import com.soomgil.place.application.query.dto.PlaceSearchItem;
 import com.soomgil.place.application.query.dto.PlaceSearchResult;
+import com.soomgil.place.application.query.dto.PlaceViewportCandidate;
+import com.soomgil.place.application.query.dto.PlaceViewportCandidateCriteria;
 import com.soomgil.place.infrastructure.persistence.mapper.TourismSourcePlaceSearchMapper;
 import com.soomgil.place.infrastructure.persistence.row.TourismSourcePlaceSearchRow;
 import java.net.URI;
@@ -42,20 +45,51 @@ public class TourismSourcePlaceSearchRepository {
 			totalElements,
 			totalPages(totalElements, criteria.size()),
 			List.of()
-		));
+			));
+	}
+
+	/**
+	 * 지도 viewport 안의 관광 원천 장소 후보를 조회한다.
+	 *
+	 * @param criteria viewport 후보 조회 조건
+	 * @return 후보 목록
+	 */
+	public List<PlaceViewportCandidate> findViewportCandidates(PlaceViewportCandidateCriteria criteria) {
+		if (!criteria.hasValidBounds()) {
+			return List.of();
+		}
+
+		return mapper.findViewportCandidates(criteria)
+			.stream()
+			.map(this::toViewportCandidate)
+			.toList();
 	}
 
 	private PlaceSearchItem toItem(TourismSourcePlaceSearchRow row) {
 		return new PlaceSearchItem(
 			String.valueOf(row.contentId()),
 			row.title(),
-				row.address(),
-				row.latitude(),
-				row.longitude(),
-				toUri(row.thumbnailUrl()),
-				row.category(),
-				PlaceSourceStatus.AVAILABLE
-			);
+			row.address(),
+			row.latitude(),
+			row.longitude(),
+			toUri(row.thumbnailUrl()),
+			row.category(),
+			PlaceSourceStatus.AVAILABLE
+		);
+	}
+
+	private PlaceViewportCandidate toViewportCandidate(TourismSourcePlaceSearchRow row) {
+		return new PlaceViewportCandidate(
+			PlaceProvider.KTO,
+			String.valueOf(row.contentId()),
+			row.title(),
+			row.address(),
+			row.latitude(),
+			row.longitude(),
+			toUri(row.thumbnailUrl()),
+			row.category(),
+			PlaceSourceStatus.AVAILABLE
+		);
 	}
 
 	private URI toUri(String value) {
