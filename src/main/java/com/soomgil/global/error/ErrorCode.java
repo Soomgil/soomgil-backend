@@ -36,7 +36,23 @@ public enum ErrorCode {
 	INVALID_TIMEZONE(HttpStatus.UNPROCESSABLE_ENTITY, "INVALID_TIMEZONE", "Timezone is not supported."),
 	INVALID_DISPLAY_LANGUAGE(HttpStatus.UNPROCESSABLE_ENTITY, "INVALID_DISPLAY_LANGUAGE", "Display language is not supported."),
 	ACCOUNT_DELETION_BLOCKED_BY_ACTIVE_OWNER_TRIP(HttpStatus.CONFLICT, "ACCOUNT_DELETION_BLOCKED_BY_ACTIVE_OWNER_TRIP", "Active trip ownership blocks account deletion."),
-	PROFILE_NOT_FOUND(HttpStatus.NOT_FOUND, "PROFILE_NOT_FOUND", "User profile was not found.");
+	PROFILE_NOT_FOUND(HttpStatus.NOT_FOUND, "PROFILE_NOT_FOUND", "User profile was not found."),
+	POST_NOT_FOUND(HttpStatus.NOT_FOUND, "POST_NOT_FOUND", "Community post was not found."),
+	POST_AUTHOR_REQUIRED(HttpStatus.FORBIDDEN, "POST_AUTHOR_REQUIRED", "Only the post author can perform this action."),
+	INVALID_SHARE_TOKEN(HttpStatus.FORBIDDEN, "INVALID_SHARE_TOKEN", "Share token is invalid or missing."),
+	TRIP_MEMBER_REQUIRED(HttpStatus.FORBIDDEN, "TRIP_MEMBER_REQUIRED", "Only active trip members can publish."),
+	SOURCE_TRIP_VERSION_CONFLICT(HttpStatus.CONFLICT, "SOURCE_TRIP_VERSION_CONFLICT", "Trip version has changed since last read."),
+	REPORT_TARGET_NOT_FOUND(HttpStatus.NOT_FOUND, "REPORT_TARGET_NOT_FOUND", "Reported content was not found."),
+	DUPLICATE_REPORT(HttpStatus.CONFLICT, "DUPLICATE_REPORT", "Already reported this content."),
+	CANNOT_REPORT_OWN_CONTENT(HttpStatus.UNPROCESSABLE_ENTITY, "CANNOT_REPORT_OWN_CONTENT", "Cannot report your own content."),
+	REPORT_NOT_FOUND(HttpStatus.NOT_FOUND, "REPORT_NOT_FOUND", "Report was not found."),
+	INVALID_REPORT_TRANSITION(HttpStatus.CONFLICT, "INVALID_REPORT_TRANSITION", "Report cannot transition from its current status."),
+	MODERATION_ACCESS_DENIED(HttpStatus.FORBIDDEN, "MODERATION_ACCESS_DENIED", "Moderator role is required."),
+	PLANNING_NOTE_NOT_FOUND(HttpStatus.NOT_FOUND, "PLANNING_NOTE_NOT_FOUND", "Planning note was not found."),
+	PLANNING_CHECKLIST_NOT_FOUND(HttpStatus.NOT_FOUND, "PLANNING_CHECKLIST_NOT_FOUND", "Planning checklist was not found."),
+	PLANNING_ITEM_NOT_FOUND(HttpStatus.NOT_FOUND, "PLANNING_ITEM_NOT_FOUND", "Planning checklist item was not found."),
+	PLANNING_VERSION_CONFLICT(HttpStatus.CONFLICT, "PLANNING_VERSION_CONFLICT", "Planning resource version has changed since last read."),
+	PLANNING_SCOPE_DAY_MISMATCH(HttpStatus.UNPROCESSABLE_ENTITY, "PLANNING_SCOPE_DAY_MISMATCH", "Scope type and itinerary day id are inconsistent.");
 
 	private final HttpStatus status;
 	private final String code;
