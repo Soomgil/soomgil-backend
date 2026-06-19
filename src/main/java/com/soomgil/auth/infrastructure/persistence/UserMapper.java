@@ -2,6 +2,7 @@ package com.soomgil.auth.infrastructure.persistence;
 
 import com.soomgil.auth.domain.model.AuthUser;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.apache.ibatis.annotations.Insert;
@@ -30,4 +31,13 @@ public interface UserMapper {
 
 	@Update("UPDATE auth.users SET status = #{status}, status_changed_at = now(), updated_at = now() WHERE id = #{id}")
 	void updateStatus(@Param("id") UUID id, @Param("status") String status);
+
+	/**
+	 * 사용자에게 부여된 역할 목록을 조회한다({@code auth.user_roles}).
+	 *
+	 * @param id 사용자 식별자
+	 * @return 역할 문자열 목록 (예: {@code MODERATOR}, {@code ADMIN})
+	 */
+	@Select("SELECT role FROM auth.user_roles WHERE user_id = #{id}")
+	List<String> findRolesByUserId(@Param("id") UUID id);
 }
