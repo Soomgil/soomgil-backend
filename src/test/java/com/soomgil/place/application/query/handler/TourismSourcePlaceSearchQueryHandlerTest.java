@@ -11,7 +11,9 @@ import com.soomgil.place.application.query.dto.PlaceSearchCriteria;
 import com.soomgil.place.application.query.dto.PlaceSearchItem;
 import com.soomgil.place.application.query.dto.PlaceSearchQuery;
 import com.soomgil.place.application.query.dto.PlaceSearchResult;
+import com.soomgil.place.infrastructure.persistence.mapper.TourismSourcePlaceSearchMapper;
 import com.soomgil.place.infrastructure.persistence.repository.TourismSourcePlaceSearchRepository;
+import com.soomgil.place.infrastructure.persistence.row.TourismSourcePlaceSearchRow;
 import java.net.URI;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -90,10 +92,27 @@ class TourismSourcePlaceSearchQueryHandlerTest {
 		private PlaceSearchCriteria lastCriteria;
 		private PlaceSearchResult result;
 
+		private RecordingTourismSourcePlaceSearchRepository() {
+			super(new NoopTourismSourcePlaceSearchMapper());
+		}
+
 		@Override
 		public PlaceSearchResult search(PlaceSearchCriteria criteria) {
 			lastCriteria = criteria;
 			return result;
+		}
+	}
+
+	private static final class NoopTourismSourcePlaceSearchMapper implements TourismSourcePlaceSearchMapper {
+
+		@Override
+		public long count(PlaceSearchCriteria criteria) {
+			return 0;
+		}
+
+		@Override
+		public List<TourismSourcePlaceSearchRow> search(PlaceSearchCriteria criteria) {
+			return List.of();
 		}
 	}
 }
