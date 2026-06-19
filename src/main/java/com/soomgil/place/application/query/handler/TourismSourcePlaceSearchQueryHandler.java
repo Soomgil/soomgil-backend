@@ -8,10 +8,12 @@ import com.soomgil.place.application.query.dto.PlaceSearchItem;
 import com.soomgil.place.application.query.dto.PlaceSearchQuery;
 import com.soomgil.place.application.query.dto.PlaceSearchResult;
 import com.soomgil.place.infrastructure.persistence.repository.TourismSourcePlaceSearchRepository;
+import org.springframework.stereotype.Service;
 
 /**
  * 관광 원천 데이터를 사용해 장소 검색 query를 처리하는 handler.
  */
+@Service
 public class TourismSourcePlaceSearchQueryHandler implements PlaceSearchQueryHandler {
 
 	private final TourismSourcePlaceSearchRepository repository;

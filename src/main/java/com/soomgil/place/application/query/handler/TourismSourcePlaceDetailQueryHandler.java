@@ -5,10 +5,12 @@ import com.soomgil.place.api.dto.PlaceProvider;
 import com.soomgil.place.application.query.dto.PlaceDetailItem;
 import com.soomgil.place.application.query.dto.PlaceDetailQuery;
 import com.soomgil.place.infrastructure.persistence.repository.TourismSourcePlaceDetailRepository;
+import org.springframework.stereotype.Service;
 
 /**
  * 관광 원천 데이터를 사용해 장소 상세 query를 처리하는 handler.
  */
+@Service
 public class TourismSourcePlaceDetailQueryHandler implements PlaceDetailQueryHandler {
 
 	private final TourismSourcePlaceDetailRepository repository;
