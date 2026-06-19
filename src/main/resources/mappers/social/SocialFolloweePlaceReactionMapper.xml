@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+	PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+	"https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.soomgil.social.infrastructure.persistence.mapper.SocialFolloweePlaceReactionMapper">
+
+	<resultMap id="FolloweePlaceReactionRowMap"
+		type="com.soomgil.social.infrastructure.persistence.row.FolloweePlaceReactionRow">
+		<constructor>
+			<arg column="provider" javaType="java.lang.String"/>
+			<arg column="external_place_id" javaType="java.lang.String"/>
+			<arg column="user_id" javaType="java.lang.String"/>
+			<arg column="display_name" javaType="java.lang.String"/>
+			<arg column="profile_image_url" javaType="java.lang.String"/>
+		</constructor>
+	</resultMap>
+
+	<select id="findPositiveReactions" resultMap="FolloweePlaceReactionRowMap">
+		SELECT
+			upr.provider,
+			upr.external_place_id,
+			CAST(profile.user_id AS text) AS user_id,
+			profile.display_name,
+			profile.profile_image_url
+		FROM social.user_follows follow
+		JOIN preference.user_place_reactions upr
+			ON upr.user_id = follow.following_user_id
+		JOIN auth.user_profiles profile
+			ON profile.user_id = follow.following_user_id
+		WHERE follow.follower_user_id = CAST(#{currentUserId} AS uuid)
+			AND follow.status = 'ACTIVE'
+			AND follow.deleted_at IS NULL
+			AND upr.reaction IN ('LIKE', 'SUPER_LIKE')
+			AND (
+			<foreach collection="places" item="place" separator=" OR ">
+				(upr.provider = #{place.provider}::text
+					AND upr.external_place_id = #{place.externalPlaceId})
+			</foreach>
+			)
+		ORDER BY
+			upr.provider,
+			upr.external_place_id,
+			CASE upr.reaction WHEN 'SUPER_LIKE' THEN 0 ELSE 1 END,
+			upr.last_reacted_at DESC,
+			profile.user_id
+	</select>
+</mapper>

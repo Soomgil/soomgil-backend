@@ -35,9 +35,12 @@ class SwipeFeedQueryHandlerIntegrationTest {
 
 	@BeforeEach
 	void setUp() {
+		createExternalContractFixtures();
 		jdbcTemplate.update("DELETE FROM preference.user_saved_places");
 		jdbcTemplate.update("DELETE FROM preference.user_swipe_events");
 		jdbcTemplate.update("DELETE FROM preference.user_place_reactions");
+		jdbcTemplate.update("DELETE FROM social.user_follows");
+		jdbcTemplate.update("DELETE FROM auth.user_profiles");
 		jdbcTemplate.update("DELETE FROM tourism_source.attraction_images");
 		jdbcTemplate.update("DELETE FROM tourism_source.attractions");
 		jdbcTemplate.update("DELETE FROM tourism_source.contenttypes");
@@ -87,6 +90,27 @@ class SwipeFeedQueryHandlerIntegrationTest {
 			""",
 			USER_ID
 		);
+	}
+
+	private void createExternalContractFixtures() {
+		jdbcTemplate.execute("CREATE SCHEMA IF NOT EXISTS auth");
+		jdbcTemplate.execute("CREATE SCHEMA IF NOT EXISTS social");
+		jdbcTemplate.execute("""
+			CREATE TABLE IF NOT EXISTS auth.user_profiles (
+				user_id uuid PRIMARY KEY,
+				display_name varchar(80) NOT NULL,
+				profile_image_url text
+			)
+			""");
+		jdbcTemplate.execute("""
+			CREATE TABLE IF NOT EXISTS social.user_follows (
+				follower_user_id uuid NOT NULL,
+				following_user_id uuid NOT NULL,
+				status varchar(20) NOT NULL,
+				deleted_at timestamp with time zone,
+				PRIMARY KEY (follower_user_id, following_user_id)
+			)
+			""");
 	}
 
 	@Test
