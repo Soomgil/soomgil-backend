@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+	PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+	"https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.soomgil.preference.infrastructure.persistence.mapper.PreferenceSwipeReactionMapper">
+
+	<resultMap id="UserPlaceReactionRowMap" type="com.soomgil.preference.infrastructure.persistence.row.UserPlaceReactionRow">
+		<constructor>
+			<arg column="id" javaType="java.lang.String"/>
+			<arg column="reaction" javaType="java.lang.String"/>
+		</constructor>
+	</resultMap>
+
+	<select id="findReaction" resultMap="UserPlaceReactionRowMap">
+		SELECT
+			CAST(id AS text) AS id,
+			reaction
+		FROM preference.user_place_reactions
+		WHERE user_id = CAST(#{userId} AS uuid)
+			AND provider = #{provider}
+			AND external_place_id = #{externalPlaceId}
+	</select>
+
+	<insert id="insertReaction" parameterType="com.soomgil.preference.infrastructure.persistence.row.UserPlaceReactionInsertRow">
+		INSERT INTO preference.user_place_reactions (
+			id,
+			user_id,
+			provider,
+			external_place_id,
+			reaction,
+			reaction_count,
+			source_modified_at
+		)
+		VALUES (
+			CAST(#{id} AS uuid),
+			CAST(#{userId} AS uuid),
+			#{provider},
+			#{externalPlaceId},
+			#{reaction},
+			1,
+			#{sourceModifiedAt}
+		)
+	</insert>
+
+	<update id="updateReaction" parameterType="com.soomgil.preference.infrastructure.persistence.row.UserPlaceReactionUpdateRow">
+		UPDATE preference.user_place_reactions
+		SET reaction = #{reaction},
+			reaction_count = reaction_count + 1,
+			last_reacted_at = now(),
+			source_modified_at = #{sourceModifiedAt}
+		WHERE id = CAST(#{id} AS uuid)
+	</update>
+
+	<insert id="insertEvent" parameterType="com.soomgil.preference.infrastructure.persistence.row.UserSwipeEventInsertRow">
+		INSERT INTO preference.user_swipe_events (
+			user_id,
+			provider,
+			external_place_id,
+			reaction,
+			previous_reaction,
+			source_modified_at
+		)
+		VALUES (
+			CAST(#{userId} AS uuid),
+			#{provider},
+			#{externalPlaceId},
+			#{reaction},
+			#{previousReaction},
+			#{sourceModifiedAt}
+		)
+	</insert>
+</mapper>
