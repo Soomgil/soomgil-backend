@@ -7,7 +7,9 @@ import com.soomgil.place.api.dto.PlaceProvider;
 import com.soomgil.place.api.dto.PlaceSourceStatus;
 import com.soomgil.place.application.query.dto.PlaceDetailItem;
 import com.soomgil.place.application.query.dto.PlaceDetailQuery;
+import com.soomgil.place.infrastructure.persistence.mapper.TourismSourcePlaceDetailMapper;
 import com.soomgil.place.infrastructure.persistence.repository.TourismSourcePlaceDetailRepository;
+import com.soomgil.place.infrastructure.persistence.row.TourismSourcePlaceDetailRow;
 import java.net.URI;
 import java.time.OffsetDateTime;
 import org.junit.jupiter.api.BeforeEach;
@@ -66,10 +68,22 @@ class TourismSourcePlaceDetailQueryHandlerTest {
 		private PlaceDetailQuery lastQuery;
 		private PlaceDetailItem item;
 
+		private RecordingTourismSourcePlaceDetailRepository() {
+			super(new NoopTourismSourcePlaceDetailMapper());
+		}
+
 		@Override
 		public PlaceDetailItem find(PlaceDetailQuery query) {
 			lastQuery = query;
 			return item;
+		}
+	}
+
+	private static final class NoopTourismSourcePlaceDetailMapper implements TourismSourcePlaceDetailMapper {
+
+		@Override
+		public TourismSourcePlaceDetailRow findByContentId(String contentId) {
+			return null;
 		}
 	}
 }

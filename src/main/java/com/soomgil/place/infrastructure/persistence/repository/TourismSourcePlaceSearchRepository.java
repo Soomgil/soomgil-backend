@@ -7,11 +7,14 @@ import com.soomgil.place.application.query.dto.PlaceSearchItem;
 import com.soomgil.place.application.query.dto.PlaceSearchResult;
 import com.soomgil.place.infrastructure.persistence.mapper.TourismSourcePlaceSearchMapper;
 import com.soomgil.place.infrastructure.persistence.row.TourismSourcePlaceSearchRow;
+import java.net.URI;
 import java.util.List;
+import org.springframework.stereotype.Repository;
 
 /**
  * 관광 원천 저장소에서 장소 검색 결과를 조회하는 repository.
  */
+@Repository
 public class TourismSourcePlaceSearchRepository {
 
 	private final TourismSourcePlaceSearchMapper mapper;
@@ -46,13 +49,20 @@ public class TourismSourcePlaceSearchRepository {
 		return new PlaceSearchItem(
 			String.valueOf(row.contentId()),
 			row.title(),
-			row.address(),
-			row.latitude(),
-			row.longitude(),
-			row.thumbnailUrl(),
-			row.category(),
-			PlaceSourceStatus.AVAILABLE
-		);
+				row.address(),
+				row.latitude(),
+				row.longitude(),
+				toUri(row.thumbnailUrl()),
+				row.category(),
+				PlaceSourceStatus.AVAILABLE
+			);
+	}
+
+	private URI toUri(String value) {
+		if (value == null || value.isBlank()) {
+			return null;
+		}
+		return URI.create(value);
 	}
 
 	private int totalPages(long totalElements, int size) {

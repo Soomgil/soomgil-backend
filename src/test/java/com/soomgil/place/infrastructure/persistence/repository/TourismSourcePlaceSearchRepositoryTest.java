@@ -7,7 +7,6 @@ import com.soomgil.place.application.query.dto.PlaceSearchCriteria;
 import com.soomgil.place.application.query.dto.PlaceSearchResult;
 import com.soomgil.place.infrastructure.persistence.mapper.TourismSourcePlaceSearchMapper;
 import com.soomgil.place.infrastructure.persistence.row.TourismSourcePlaceSearchRow;
-import java.net.URI;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -29,12 +28,12 @@ class TourismSourcePlaceSearchRepositoryTest {
 		mapper.rows = List.of(new TourismSourcePlaceSearchRow(
 			126508,
 			"Haeundae Beach",
-			"Busan Haeundae-gu",
-			35.1587,
-			129.1604,
-			URI.create("https://cdn.soomgil.example.com/places/126508.jpg"),
-			"ATTRACTION"
-		));
+				"Busan Haeundae-gu",
+				35.1587,
+				129.1604,
+				"https://cdn.soomgil.example.com/places/126508.jpg",
+				"ATTRACTION"
+			));
 
 		PlaceSearchResult result = repository.search(new PlaceSearchCriteria(
 			"Busan beach",

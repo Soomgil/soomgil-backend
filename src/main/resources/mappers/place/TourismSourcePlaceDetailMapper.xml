@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+	PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+	"https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.soomgil.place.infrastructure.persistence.mapper.TourismSourcePlaceDetailMapper">
+
+	<resultMap id="PlaceDetailRowMap" type="com.soomgil.place.infrastructure.persistence.row.TourismSourcePlaceDetailRow">
+		<constructor>
+			<arg column="content_id" javaType="java.lang.Integer"/>
+			<arg column="title" javaType="java.lang.String"/>
+			<arg column="address" javaType="java.lang.String"/>
+			<arg column="latitude" javaType="java.lang.Double"/>
+			<arg column="longitude" javaType="java.lang.Double"/>
+			<arg column="thumbnail_url" javaType="java.lang.String"/>
+			<arg column="category" javaType="java.lang.String"/>
+			<arg column="overview" javaType="java.lang.String"/>
+			<arg column="tel" javaType="java.lang.String"/>
+			<arg column="source_modified_at" javaType="java.time.OffsetDateTime"/>
+		</constructor>
+	</resultMap>
+
+	<select id="findByContentId" parameterType="string" resultMap="PlaceDetailRowMap">
+		SELECT
+			a.content_id,
+			a.title,
+			NULLIF(concat_ws(' ', a.addr1, a.addr2), '') AS address,
+			a.latitude,
+			a.longitude,
+			coalesce(image.public_url, a.first_image1, a.first_image2) AS thumbnail_url,
+			coalesce(ct.content_type_name, 'UNKNOWN') AS category,
+			a.overview,
+			a.tel,
+			a.source_modified_at
+		FROM tourism_source.attractions a
+		LEFT JOIN tourism_source.contenttypes ct ON ct.content_type_id = a.content_type_id
+		LEFT JOIN LATERAL (
+			SELECT ai.public_url
+			FROM tourism_source.attraction_images ai
+			WHERE ai.attraction_no = a.no
+				AND ai.is_active = true
+			ORDER BY ai.display_order ASC, ai.created_at ASC
+			LIMIT 1
+		) image ON true
+		WHERE CAST(a.content_id AS text) = #{contentId}
+		LIMIT 1
+	</select>
+</mapper>
