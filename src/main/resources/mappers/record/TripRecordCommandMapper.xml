@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.soomgil.record.infrastructure.persistence.mapper.TripRecordCommandMapper">
+  <insert id="insertEntry">
+    INSERT INTO record.trip_record_entries (
+      id,
+      trip_id,
+      itinerary_day_id,
+      itinerary_item_id,
+      uploaded_by_user_id,
+      title,
+      caption,
+      location_name,
+      lat,
+      lng,
+      taken_at,
+      visibility,
+      status,
+      created_at,
+      updated_at
+    )
+    VALUES (
+      #{entry.id},
+      #{entry.tripId},
+      #{entry.itineraryDayId},
+      #{entry.itineraryItemId},
+      #{entry.uploadedByUserId},
+      #{entry.title},
+      #{entry.caption},
+      #{entry.locationName},
+      #{entry.lat},
+      #{entry.lng},
+      #{entry.takenAt},
+      'TRIP_MEMBERS',
+      'ACTIVE',
+      #{entry.createdAt},
+      #{entry.updatedAt}
+    )
+  </insert>
+
+  <update id="updateEntry">
+    UPDATE record.trip_record_entries
+    SET
+      itinerary_day_id = #{entry.itineraryDayId},
+      itinerary_item_id = #{entry.itineraryItemId},
+      title = #{entry.title},
+      caption = #{entry.caption},
+      location_name = #{entry.locationName},
+      lat = #{entry.lat},
+      lng = #{entry.lng},
+      taken_at = #{entry.takenAt},
+      updated_at = #{entry.updatedAt}
+    WHERE trip_id = #{entry.tripId}
+      AND id = #{entry.recordId}
+      AND status = 'ACTIVE'
+  </update>
+
+  <update id="softDeleteEntry">
+    UPDATE record.trip_record_entries
+    SET
+      status = 'DELETED',
+      deleted_at = #{deletedAt},
+      updated_at = #{deletedAt}
+    WHERE trip_id = #{tripId}
+      AND id = #{recordId}
+      AND status = 'ACTIVE'
+  </update>
+
+  <delete id="deleteMediaLinks">
+    DELETE FROM record.trip_record_media
+    WHERE record_entry_id = #{recordId}
+  </delete>
+
+  <insert id="insertMediaLink">
+    INSERT INTO record.trip_record_media (
+      record_entry_id,
+      media_file_id,
+      sort_order,
+      created_at
+    )
+    VALUES (
+      #{recordId},
+      #{mediaFileId},
+      #{sortOrder},
+      #{createdAt}
+    )
+  </insert>
+</mapper>

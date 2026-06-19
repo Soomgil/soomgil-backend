@@ -1,0 +1,173 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.soomgil.trip.infrastructure.persistence.mapper.TripCommandMapper">
+  <insert id="insertTrip" parameterType="com.soomgil.trip.infrastructure.persistence.row.TripRow">
+    INSERT INTO trip.trips (
+      id,
+      owner_user_id,
+      title,
+      display_destination,
+      status,
+      itinerary_version,
+      retripped_from_post_id,
+      retripped_from_snapshot_version,
+      created_at,
+      updated_at,
+      deleted_at
+    )
+    VALUES (
+      #{id},
+      #{ownerUserId},
+      #{title},
+      #{displayDestination},
+      #{status},
+      #{itineraryVersion},
+      #{retrippedFromPostId},
+      #{retrippedFromSnapshotVersion},
+      #{createdAt},
+      #{updatedAt},
+      #{deletedAt}
+    )
+  </insert>
+
+  <insert id="insertTripMember" parameterType="com.soomgil.trip.infrastructure.persistence.row.TripMemberRow">
+    INSERT INTO trip.trip_members (
+      id,
+      trip_id,
+      user_id,
+      role,
+      status,
+      joined_at,
+      left_at,
+      removed_by_user_id
+    )
+    VALUES (
+      #{id},
+      #{tripId},
+      #{userId},
+      #{role},
+      #{status},
+      #{joinedAt},
+      #{leftAt},
+      #{removedByUserId}
+    )
+    ON CONFLICT (trip_id, user_id)
+    DO UPDATE SET
+      role = EXCLUDED.role,
+      status = 'ACTIVE',
+      joined_at = EXCLUDED.joined_at,
+      left_at = NULL,
+      removed_by_user_id = NULL
+  </insert>
+
+  <insert id="insertTripRegion" parameterType="com.soomgil.trip.infrastructure.persistence.row.TripRegionRow">
+    INSERT INTO trip.trip_regions (
+      trip_id,
+      legal_region_code,
+      sort_order,
+      created_at
+    )
+    VALUES (
+      #{tripId},
+      #{legalRegionCode},
+      #{sortOrder},
+      #{createdAt}
+    )
+  </insert>
+
+  <insert id="insertTripInvite" parameterType="com.soomgil.trip.infrastructure.persistence.row.TripInviteRow">
+    INSERT INTO trip.trip_invites (
+      id,
+      trip_id,
+      created_by_user_id,
+      invitee_user_id,
+      invite_code,
+      invite_token_hash,
+      status,
+      expires_at,
+      accepted_by_user_id,
+      accepted_at,
+      revoked_at,
+      created_at
+    )
+    VALUES (
+      #{id},
+      #{tripId},
+      #{createdByUserId},
+      #{inviteeUserId},
+      #{inviteCode},
+      #{inviteTokenHash},
+      #{status},
+      #{expiresAt},
+      #{acceptedByUserId},
+      #{acceptedAt},
+      #{revokedAt},
+      #{createdAt}
+    )
+  </insert>
+
+  <update id="revokeTripInvite">
+    UPDATE trip.trip_invites
+    SET
+      status = 'REVOKED',
+      revoked_at = #{revokedAt}
+    WHERE id = #{inviteId}
+      AND status = 'PENDING'
+  </update>
+
+  <update id="acceptTripInvite">
+    UPDATE trip.trip_invites
+    SET
+      status = 'ACCEPTED',
+      accepted_by_user_id = #{acceptedByUserId},
+      accepted_at = #{acceptedAt}
+    WHERE id = #{inviteId}
+      AND status = 'PENDING'
+  </update>
+
+  <update id="updateTrip" parameterType="com.soomgil.trip.application.port.TripSettingsUpdate">
+    UPDATE trip.trips
+    <set>
+      <if test="title != null">
+        title = #{title},
+      </if>
+      <if test="displayDestinationProvided">
+        display_destination = #{displayDestination},
+      </if>
+      <if test="status != null">
+        status = #{status},
+      </if>
+      updated_at = #{updatedAt}
+    </set>
+    WHERE id = #{tripId}
+      AND status != 'DELETED'
+  </update>
+
+  <delete id="deleteTripRegions">
+    DELETE FROM trip.trip_regions
+    WHERE trip_id = #{tripId}
+  </delete>
+
+  <update id="softDeleteTrip">
+    UPDATE trip.trips
+    SET
+      status = 'DELETED',
+      updated_at = #{deletedAt},
+      deleted_at = #{deletedAt}
+    WHERE id = #{tripId}
+      AND status != 'DELETED'
+  </update>
+
+  <update id="removeTripMember">
+    UPDATE trip.trip_members
+    SET
+      status = 'REMOVED',
+      left_at = #{removedAt},
+      removed_by_user_id = #{removedByUserId}
+    WHERE trip_id = #{tripId}
+      AND user_id = #{userId}
+      AND status = 'ACTIVE'
+  </update>
+</mapper>

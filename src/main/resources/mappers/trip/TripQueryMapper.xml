@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.soomgil.trip.infrastructure.persistence.mapper.TripQueryMapper">
+  <select id="findTripAccess" resultType="com.soomgil.trip.infrastructure.persistence.row.TripAccessRow">
+    SELECT
+      t.id AS trip_id,
+      #{userId} AS user_id,
+      t.status AS trip_status,
+      m.status AS member_status,
+      t.owner_user_id AS owner_user_id
+    FROM trip.trips t
+    LEFT JOIN trip.trip_members m
+      ON m.trip_id = t.id
+      AND m.user_id = #{userId}
+    WHERE t.id = #{tripId}
+  </select>
+
+  <select id="findTrip" resultType="com.soomgil.trip.infrastructure.persistence.row.TripRow">
+    SELECT
+      id,
+      owner_user_id,
+      title,
+      display_destination,
+      status,
+      itinerary_version,
+      retripped_from_post_id,
+      retripped_from_snapshot_version,
+      created_at,
+      updated_at,
+      deleted_at
+    FROM trip.trips
+    WHERE id = #{tripId}
+  </select>
+
+  <select id="findTripMembers" resultType="com.soomgil.trip.infrastructure.persistence.row.TripMemberReadRow">
+    SELECT
+      m.id AS id,
+      m.trip_id AS trip_id,
+      m.user_id AS user_id,
+      m.role AS role,
+      m.status AS status,
+      m.joined_at AS joined_at,
+      t.owner_user_id AS owner_user_id
+    FROM trip.trip_members m
+    JOIN trip.trips t
+      ON t.id = m.trip_id
+    WHERE m.trip_id = #{tripId}
+    <if test="status != null">
+      AND m.status = #{status}
+    </if>
+    ORDER BY
+      CASE WHEN m.user_id = t.owner_user_id THEN 0 ELSE 1 END,
+      m.joined_at ASC,
+      m.id ASC
+  </select>
+
+  <sql id="myTripsFilter">
+    FROM trip.trips t
+    JOIN trip.trip_members m
+      ON m.trip_id = t.id
+      AND m.user_id = #{userId}
+      AND m.status = 'ACTIVE'
+    WHERE t.status != 'DELETED'
+    <if test="status != null">
+      AND t.status = #{status}
+    </if>
+    <if test="role != null and role == 'OWNER'">
+      AND t.owner_user_id = #{userId}
+    </if>
+    <if test="role != null and role == 'MEMBER'">
+      AND t.owner_user_id != #{userId}
+    </if>
+  </sql>
+
+  <select id="findMyTrips" resultType="com.soomgil.trip.infrastructure.persistence.row.TripRow">
+    SELECT
+      t.id,
+      t.owner_user_id,
+      t.title,
+      t.display_destination,
+      t.status,
+      t.itinerary_version,
+      t.retripped_from_post_id,
+      t.retripped_from_snapshot_version,
+      t.created_at,
+      t.updated_at,
+      t.deleted_at
+    <include refid="myTripsFilter" />
+    ORDER BY t.created_at DESC, t.id DESC
+    LIMIT #{size}
+    OFFSET #{offset}
+  </select>
+
+  <select id="countMyTrips" resultType="long">
+    SELECT count(*)
+    <include refid="myTripsFilter" />
+  </select>
+
+  <select id="findTripInvites" resultType="com.soomgil.trip.infrastructure.persistence.row.TripInviteRow">
+    SELECT
+      id,
+      trip_id,
+      created_by_user_id,
+      invitee_user_id,
+      invite_code,
+      invite_token_hash,
+      status,
+      expires_at,
+      accepted_by_user_id,
+      accepted_at,
+      revoked_at,
+      created_at
+    FROM trip.trip_invites
+    WHERE trip_id = #{tripId}
+    <if test="status != null">
+      AND status = #{status}
+    </if>
+    ORDER BY created_at DESC, id DESC
+  </select>
+
+  <select id="findTripInviteForAccept" resultType="com.soomgil.trip.infrastructure.persistence.row.TripInviteAcceptRow">
+    SELECT
+      i.id,
+      i.trip_id,
+      i.invite_code,
+      i.invitee_user_id,
+      i.status,
+      i.expires_at,
+      t.owner_user_id,
+      t.status AS trip_status
+    FROM trip.trip_invites i
+    JOIN trip.trips t
+      ON t.id = i.trip_id
+    WHERE i.invite_code = #{inviteCode}
+    ORDER BY i.created_at DESC, i.id DESC
+    LIMIT 1
+  </select>
+</mapper>

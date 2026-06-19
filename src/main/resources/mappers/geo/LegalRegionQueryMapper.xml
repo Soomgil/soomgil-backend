@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.soomgil.geo.infrastructure.persistence.mapper.LegalRegionQueryMapper">
+  <sql id="legalRegionFilter">
+    FROM geo.legal_regions
+    WHERE 1 = 1
+    <if test="query != null">
+      AND (name ILIKE concat('%', #{query}, '%') OR full_name ILIKE concat('%', #{query}, '%'))
+    </if>
+    <if test="level != null">
+      AND level = #{level}
+    </if>
+    <if test="parentCode != null">
+      AND parent_code = #{parentCode}
+    </if>
+    <if test="isActive != null">
+      AND is_active = #{isActive}
+    </if>
+  </sql>
+
+  <select id="findLegalRegions" resultType="com.soomgil.geo.infrastructure.persistence.row.LegalRegionRow">
+    SELECT
+      code,
+      name,
+      full_name,
+      level,
+      parent_code,
+      is_active
+    <include refid="legalRegionFilter" />
+    ORDER BY
+      CASE level
+        WHEN 'SIDO' THEN 0
+        WHEN 'SIGUNGU' THEN 1
+        ELSE 2
+      END,
+      full_name ASC,
+      code ASC
+    LIMIT #{size}
+    OFFSET #{offset}
+  </select>
+
+  <select id="countLegalRegions" resultType="long">
+    SELECT count(*)
+    <include refid="legalRegionFilter" />
+  </select>
+</mapper>

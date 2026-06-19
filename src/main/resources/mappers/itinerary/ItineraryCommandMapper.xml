@@ -1,0 +1,620 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.soomgil.itinerary.infrastructure.persistence.mapper.ItineraryCommandMapper">
+  <select id="incrementItineraryVersion" resultType="long" flushCache="true" useCache="false">
+    UPDATE trip.trips
+    SET
+      itinerary_version = itinerary_version + 1,
+      updated_at = #{updatedAt}
+    WHERE id = #{tripId}
+      AND status != 'DELETED'
+      AND itinerary_version = #{baseVersion}
+    RETURNING itinerary_version
+  </select>
+
+  <select id="findItineraryVersion" resultType="long">
+    SELECT itinerary_version
+    FROM trip.trips
+    WHERE id = #{tripId}
+      AND status != 'DELETED'
+  </select>
+
+  <insert id="insertDay">
+    INSERT INTO itinerary.itinerary_days (
+      id,
+      trip_id,
+      group_type,
+      day_number,
+      date,
+      title,
+      sort_order,
+      created_at,
+      updated_at
+    )
+    VALUES (
+      #{day.id},
+      #{day.tripId},
+      #{day.groupType},
+      #{day.dayNumber},
+      #{day.date},
+      #{day.title},
+      #{day.sortOrder},
+      #{day.createdAt},
+      #{day.updatedAt}
+    )
+  </insert>
+
+  <select id="findDay" resultType="com.soomgil.itinerary.application.port.ItineraryDayReadModel">
+    SELECT
+      id,
+      trip_id,
+      group_type,
+      day_number,
+      date,
+      title,
+      sort_order
+    FROM itinerary.itinerary_days
+    WHERE trip_id = #{tripId}
+      AND id = #{dayId}
+  </select>
+
+  <select id="findUnscheduledDay" resultType="com.soomgil.itinerary.application.port.ItineraryDayReadModel">
+    SELECT
+      id,
+      trip_id,
+      group_type,
+      day_number,
+      date,
+      title,
+      sort_order
+    FROM itinerary.itinerary_days
+    WHERE trip_id = #{tripId}
+      AND group_type = 'UNSCHEDULED'
+    LIMIT 1
+  </select>
+
+  <select id="updateDay" resultType="com.soomgil.itinerary.application.port.ItineraryDayReadModel" flushCache="true" useCache="false">
+    UPDATE itinerary.itinerary_days
+    SET
+      day_number = #{update.dayNumber,jdbcType=INTEGER},
+      date = #{update.date,jdbcType=DATE},
+      title = #{update.title,jdbcType=VARCHAR},
+      sort_order = #{update.sortOrder},
+      updated_at = #{update.updatedAt}
+    WHERE trip_id = #{update.tripId}
+      AND id = #{update.dayId}
+    RETURNING
+      id,
+      trip_id,
+      group_type,
+      day_number,
+      date,
+      title,
+      sort_order
+  </select>
+
+  <select id="countActiveItemsByDay" resultType="long">
+    SELECT count(*)
+    FROM itinerary.itinerary_items
+    WHERE trip_id = #{tripId}
+      AND itinerary_day_id = #{dayId}
+      AND deleted_at IS NULL
+  </select>
+
+  <delete id="deleteDay">
+    DELETE FROM itinerary.itinerary_days
+    WHERE trip_id = #{tripId}
+      AND id = #{dayId}
+      AND NOT EXISTS (
+        SELECT 1
+        FROM itinerary.itinerary_items
+        WHERE trip_id = #{tripId}
+          AND itinerary_day_id = #{dayId}
+          AND deleted_at IS NULL
+      )
+  </delete>
+
+  <insert id="insertItem">
+    INSERT INTO itinerary.itinerary_items (
+      id,
+      trip_id,
+      itinerary_day_id,
+      sort_order,
+      item_type,
+      place_provider,
+      external_place_id,
+      place_name,
+      address,
+      lat,
+      lng,
+      thumbnail_url,
+      source_status,
+      created_by_user_id,
+      updated_by_user_id,
+      created_at,
+      updated_at
+    )
+    VALUES (
+      #{item.id},
+      #{item.tripId},
+      #{item.itineraryDayId},
+      #{item.sortOrder},
+      #{item.itemType},
+      #{item.placeProvider},
+      #{item.externalPlaceId},
+      #{item.placeName},
+      #{item.address},
+      #{item.lat},
+      #{item.lng},
+      #{item.thumbnailUrl},
+      #{item.sourceStatus},
+      #{item.createdByUserId},
+      #{item.updatedByUserId},
+      #{item.createdAt},
+      #{item.updatedAt}
+    )
+  </insert>
+
+  <select id="findItem" resultType="com.soomgil.itinerary.application.port.ItineraryItemReadModel">
+    SELECT
+      id,
+      itinerary_day_id,
+      sort_order,
+      item_type,
+      place_provider,
+      external_place_id,
+      place_name,
+      address,
+      lat,
+      lng,
+      thumbnail_url,
+      source_status
+    FROM itinerary.itinerary_items
+    WHERE trip_id = #{tripId}
+      AND id = #{itemId}
+      AND deleted_at IS NULL
+  </select>
+
+  <select id="updateItem" resultType="com.soomgil.itinerary.application.port.ItineraryItemReadModel" flushCache="true" useCache="false">
+    UPDATE itinerary.itinerary_items
+    SET
+      itinerary_day_id = #{update.itineraryDayId},
+      sort_order = #{update.sortOrder},
+      place_name = #{update.placeName},
+      address = #{update.address,jdbcType=VARCHAR},
+      lat = #{update.lat,jdbcType=DOUBLE},
+      lng = #{update.lng,jdbcType=DOUBLE},
+      thumbnail_url = #{update.thumbnailUrl,jdbcType=VARCHAR},
+      updated_by_user_id = #{update.updatedByUserId},
+      updated_at = #{update.updatedAt}
+    WHERE trip_id = #{update.tripId}
+      AND id = #{update.itemId}
+      AND deleted_at IS NULL
+    RETURNING
+      id,
+      itinerary_day_id,
+      sort_order,
+      item_type,
+      place_provider,
+      external_place_id,
+      place_name,
+      address,
+      lat,
+      lng,
+      thumbnail_url,
+      source_status
+  </select>
+
+  <insert id="insertMapDrawing">
+    INSERT INTO itinerary.map_drawings (
+      id,
+      trip_id,
+      itinerary_day_id,
+      drawing_type,
+      geometry_format,
+      geometry,
+      style,
+      label,
+      sort_order,
+      version,
+      created_by_user_id,
+      updated_by_user_id,
+      created_at,
+      updated_at
+    )
+    VALUES (
+      #{drawing.id},
+      #{drawing.tripId},
+      #{drawing.itineraryDayId},
+      #{drawing.drawingType},
+      #{drawing.geometryFormat},
+      #{drawing.geometry}::jsonb,
+      #{drawing.style}::jsonb,
+      #{drawing.label},
+      #{drawing.sortOrder},
+      #{drawing.version},
+      #{drawing.createdByUserId},
+      #{drawing.updatedByUserId},
+      #{drawing.createdAt},
+      #{drawing.updatedAt}
+    )
+  </insert>
+
+  <insert id="insertRouteSegment">
+    INSERT INTO itinerary.trip_routes (
+      id,
+      trip_id,
+      origin_itinerary_item_id,
+      destination_itinerary_item_id,
+      mode,
+      provider,
+      provider_profile,
+      geometry_format,
+      geometry,
+      distance_meters,
+      duration_seconds,
+      confidence,
+      created_by_user_id,
+      updated_by_user_id,
+      created_at,
+      updated_at
+    )
+    VALUES (
+      #{route.id},
+      #{route.tripId},
+      #{route.originItineraryItemId},
+      #{route.destinationItineraryItemId},
+      #{route.mode},
+      #{route.provider},
+      #{route.providerProfile},
+      #{route.geometryFormat},
+      #{route.geometry}::jsonb,
+      #{route.distanceMeters},
+      #{route.durationSeconds},
+      #{route.confidence},
+      #{route.createdByUserId},
+      #{route.updatedByUserId},
+      #{route.createdAt},
+      #{route.updatedAt}
+    )
+  </insert>
+
+  <select id="updateRouteSegment" resultType="com.soomgil.itinerary.application.port.RouteSegmentUpdateResult" flushCache="true" useCache="false">
+    UPDATE itinerary.trip_routes
+    SET
+      mode = COALESCE(#{update.mode,jdbcType=VARCHAR}, mode),
+      provider_profile = COALESCE(#{update.providerProfile,jdbcType=VARCHAR}, provider_profile),
+      geometry = COALESCE(#{update.geometry,jdbcType=VARCHAR}::jsonb, geometry),
+      distance_meters = COALESCE(#{update.distanceMeters,jdbcType=DOUBLE}, distance_meters),
+      duration_seconds = COALESCE(#{update.durationSeconds,jdbcType=DOUBLE}, duration_seconds),
+      confidence = COALESCE(#{update.confidence,jdbcType=DOUBLE}, confidence),
+      updated_by_user_id = #{update.updatedByUserId},
+      updated_at = #{update.updatedAt}
+    WHERE trip_id = #{update.tripId}
+      AND id = #{update.routeId}
+      AND deleted_at IS NULL
+    RETURNING
+      id,
+      origin_itinerary_item_id,
+      destination_itinerary_item_id,
+      mode,
+      provider,
+      provider_profile,
+      geometry_format,
+      geometry::text AS geometry,
+      distance_meters,
+      duration_seconds,
+      confidence
+  </select>
+
+  <select id="findRouteSegment" resultType="com.soomgil.itinerary.application.port.RouteSegmentUpdateResult">
+    SELECT
+      id,
+      origin_itinerary_item_id,
+      destination_itinerary_item_id,
+      mode,
+      provider,
+      provider_profile,
+      geometry_format,
+      geometry::text AS geometry,
+      distance_meters,
+      duration_seconds,
+      confidence
+    FROM itinerary.trip_routes
+    WHERE trip_id = #{tripId}
+      AND id = #{routeId}
+      AND deleted_at IS NULL
+  </select>
+
+  <select id="applyRouteSegmentSnapshot" resultType="com.soomgil.itinerary.application.port.RouteSegmentUpdateResult" flushCache="true" useCache="false">
+    UPDATE itinerary.trip_routes
+    SET
+      mode = #{update.mode},
+      provider_profile = #{update.providerProfile},
+      geometry = #{update.geometry}::jsonb,
+      distance_meters = #{update.distanceMeters,jdbcType=DOUBLE},
+      duration_seconds = #{update.durationSeconds,jdbcType=DOUBLE},
+      confidence = #{update.confidence,jdbcType=DOUBLE},
+      updated_by_user_id = #{update.updatedByUserId},
+      updated_at = #{update.updatedAt}
+    WHERE trip_id = #{update.tripId}
+      AND id = #{update.routeId}
+      AND deleted_at IS NULL
+    RETURNING
+      id, origin_itinerary_item_id, destination_itinerary_item_id, mode, provider,
+      provider_profile, geometry_format, geometry::text AS geometry,
+      distance_meters, duration_seconds, confidence
+  </select>
+
+  <select id="insertRouteMatchRequest" resultType="long" flushCache="true" useCache="false">
+    INSERT INTO itinerary.route_match_requests (
+      trip_id,
+      trip_route_id,
+      origin_itinerary_item_id,
+      destination_itinerary_item_id,
+      requested_by_user_id,
+      provider,
+      provider_profile,
+      input_coordinates,
+      radiuses,
+      tidy,
+      request_hash,
+      status,
+      confidence,
+      distance_meters,
+      duration_seconds,
+      tracepoints,
+      matchings_metadata,
+      error_code,
+      error_message,
+      created_at,
+      completed_at
+    )
+    VALUES (
+      #{request.tripId},
+      #{request.tripRouteId,jdbcType=OTHER},
+      #{request.originItineraryItemId},
+      #{request.destinationItineraryItemId},
+      #{request.requestedByUserId},
+      #{request.provider},
+      #{request.providerProfile},
+      #{request.inputCoordinates}::jsonb,
+      #{request.radiuses,jdbcType=VARCHAR}::jsonb,
+      #{request.tidy},
+      #{request.requestHash},
+      #{request.status},
+      #{request.confidence,jdbcType=DOUBLE},
+      #{request.distanceMeters,jdbcType=DOUBLE},
+      #{request.durationSeconds,jdbcType=DOUBLE},
+      #{request.tracepoints,jdbcType=VARCHAR}::jsonb,
+      #{request.matchingsMetadata,jdbcType=VARCHAR}::jsonb,
+      #{request.errorCode,jdbcType=VARCHAR},
+      #{request.errorMessage,jdbcType=VARCHAR},
+      #{request.createdAt},
+      #{request.completedAt}
+    )
+    RETURNING id
+  </select>
+
+  <select id="existsDay" resultType="boolean">
+    SELECT EXISTS (
+      SELECT 1
+      FROM itinerary.itinerary_days
+      WHERE trip_id = #{tripId}
+        AND id = #{dayId}
+    )
+  </select>
+
+  <select id="countDays" resultType="long">
+    SELECT count(*)
+    FROM itinerary.itinerary_days
+    WHERE trip_id = #{tripId}
+  </select>
+
+  <select id="existsItem" resultType="boolean">
+    SELECT EXISTS (
+      SELECT 1
+      FROM itinerary.itinerary_items
+      WHERE trip_id = #{tripId}
+        AND id = #{itemId}
+        AND deleted_at IS NULL
+    )
+  </select>
+
+  <select id="findActiveRouteIdsByItem" resultType="java.util.UUID">
+    SELECT id
+    FROM itinerary.trip_routes
+    WHERE trip_id = #{tripId}
+      AND deleted_at IS NULL
+      AND (
+        origin_itinerary_item_id = #{itemId}
+        OR destination_itinerary_item_id = #{itemId}
+      )
+    ORDER BY created_at ASC, id ASC
+  </select>
+
+  <select id="existsActiveRouteSegment" resultType="boolean">
+    SELECT EXISTS (
+      SELECT 1
+      FROM itinerary.trip_routes
+      WHERE trip_id = #{tripId}
+        AND id = #{routeId}
+        AND deleted_at IS NULL
+    )
+  </select>
+
+  <select id="existsActiveMapDrawing" resultType="boolean">
+    SELECT EXISTS (
+      SELECT 1
+      FROM itinerary.map_drawings
+      WHERE trip_id = #{tripId}
+        AND id = #{drawingId}
+        AND deleted_at IS NULL
+    )
+  </select>
+
+  <select id="countActiveItems" resultType="long">
+    SELECT count(*)
+    FROM itinerary.itinerary_items
+    WHERE trip_id = #{tripId}
+      AND deleted_at IS NULL
+  </select>
+
+  <update id="updateDayOrder">
+    UPDATE itinerary.itinerary_days
+    SET
+      sort_order = #{update.sortOrder},
+      updated_at = #{update.updatedAt}
+    WHERE trip_id = #{update.tripId}
+      AND id = #{update.dayId}
+  </update>
+
+  <update id="updateItemOrder">
+    UPDATE itinerary.itinerary_items
+    SET
+      itinerary_day_id = #{update.dayId},
+      sort_order = #{update.sortOrder},
+      updated_by_user_id = #{update.updatedByUserId},
+      updated_at = #{update.updatedAt}
+    WHERE trip_id = #{update.tripId}
+      AND id = #{update.itemId}
+      AND deleted_at IS NULL
+  </update>
+
+  <update id="softDeleteItem">
+    UPDATE itinerary.itinerary_items
+    SET
+      deleted_by_user_id = #{deletedByUserId},
+      deleted_at = #{deletedAt},
+      updated_by_user_id = #{deletedByUserId},
+      updated_at = #{deletedAt}
+    WHERE trip_id = #{tripId}
+      AND id = #{itemId}
+      AND deleted_at IS NULL
+  </update>
+
+  <update id="softDeleteRouteSegment">
+    UPDATE itinerary.trip_routes
+    SET
+      deleted_by_user_id = #{deletedByUserId},
+      deleted_at = #{deletedAt},
+      updated_by_user_id = #{deletedByUserId},
+      updated_at = #{deletedAt}
+    WHERE trip_id = #{tripId}
+      AND id = #{routeId}
+      AND deleted_at IS NULL
+  </update>
+
+  <update id="softDeleteMapDrawing">
+    UPDATE itinerary.map_drawings
+    SET
+      deleted_by_user_id = #{deletedByUserId},
+      deleted_at = #{deletedAt},
+      updated_by_user_id = #{deletedByUserId},
+      updated_at = #{deletedAt}
+    WHERE trip_id = #{tripId}
+      AND id = #{drawingId}
+      AND deleted_at IS NULL
+  </update>
+
+  <update id="restoreItem">
+    UPDATE itinerary.itinerary_items
+    SET
+      deleted_by_user_id = NULL,
+      deleted_at = NULL,
+      updated_by_user_id = #{updatedByUserId},
+      updated_at = #{updatedAt}
+    WHERE trip_id = #{tripId}
+      AND id = #{itemId}
+      AND deleted_at IS NOT NULL
+  </update>
+
+  <update id="restoreMapDrawing">
+    UPDATE itinerary.map_drawings
+    SET
+      deleted_by_user_id = NULL,
+      deleted_at = NULL,
+      updated_by_user_id = #{updatedByUserId},
+      updated_at = #{updatedAt}
+    WHERE trip_id = #{tripId}
+      AND id = #{drawingId}
+      AND deleted_at IS NOT NULL
+  </update>
+
+  <update id="restoreRouteSegment">
+    UPDATE itinerary.trip_routes
+    SET
+      deleted_by_user_id = NULL,
+      deleted_at = NULL,
+      updated_by_user_id = #{updatedByUserId},
+      updated_at = #{updatedAt}
+    WHERE trip_id = #{tripId}
+      AND id = #{routeId}
+      AND deleted_at IS NOT NULL
+  </update>
+
+  <select id="updateMapDrawing" resultType="com.soomgil.itinerary.application.port.MapDrawingUpdateResult" flushCache="true" useCache="false">
+    UPDATE itinerary.map_drawings
+    SET
+      geometry = COALESCE(#{update.geometry,jdbcType=VARCHAR}::jsonb, geometry),
+      style = COALESCE(#{update.style,jdbcType=VARCHAR}::jsonb, style),
+      label = COALESCE(#{update.label,jdbcType=VARCHAR}, label),
+      sort_order = COALESCE(#{update.sortOrder,jdbcType=INTEGER}, sort_order),
+      version = version + 1,
+      updated_by_user_id = #{update.updatedByUserId},
+      updated_at = #{update.updatedAt}
+    WHERE trip_id = #{update.tripId}
+      AND id = #{update.drawingId}
+      AND deleted_at IS NULL
+      <if test="update.expectedVersion != null">
+        AND version = #{update.expectedVersion}
+      </if>
+    RETURNING
+      id,
+      itinerary_day_id,
+      drawing_type,
+      geometry_format,
+      geometry::text AS geometry,
+      style::text AS style,
+      label,
+      sort_order,
+      version
+  </select>
+
+  <select id="findMapDrawing" resultType="com.soomgil.itinerary.application.port.MapDrawingUpdateResult">
+    SELECT
+      id,
+      itinerary_day_id,
+      drawing_type,
+      geometry_format,
+      geometry::text AS geometry,
+      style::text AS style,
+      label,
+      sort_order,
+      version
+    FROM itinerary.map_drawings
+    WHERE trip_id = #{tripId}
+      AND id = #{drawingId}
+      AND deleted_at IS NULL
+  </select>
+
+  <select id="applyMapDrawingSnapshot" resultType="com.soomgil.itinerary.application.port.MapDrawingUpdateResult" flushCache="true" useCache="false">
+    UPDATE itinerary.map_drawings
+    SET
+      geometry = #{update.geometry}::jsonb,
+      style = #{update.style,jdbcType=VARCHAR}::jsonb,
+      label = #{update.label,jdbcType=VARCHAR},
+      sort_order = #{update.sortOrder},
+      version = version + 1,
+      updated_by_user_id = #{update.updatedByUserId},
+      updated_at = #{update.updatedAt}
+    WHERE trip_id = #{update.tripId}
+      AND id = #{update.drawingId}
+      AND deleted_at IS NULL
+    RETURNING
+      id, itinerary_day_id, drawing_type, geometry_format, geometry::text AS geometry,
+      style::text AS style, label, sort_order, version
+  </select>
+</mapper>
