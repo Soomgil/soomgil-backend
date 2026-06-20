@@ -19,6 +19,18 @@ public interface PreferenceTagStatisticsMapper {
 
 	List<TagReactionAggregateRow> aggregateFinalReactionsByTag();
 
+	long countSyntheticReactions(@Param("generatorVersion") String generatorVersion);
+
+	long countPositiveSyntheticReactions(@Param("generatorVersion") String generatorVersion);
+
+	List<TagReactionAggregateRow> aggregateSyntheticReactionsByTag(
+		@Param("generatorVersion") String generatorVersion
+	);
+
+	long countActiveSyntheticPersonas(@Param("generatorVersion") String generatorVersion);
+
+	long countActiveSyntheticPersonasWithoutEvents(@Param("generatorVersion") String generatorVersion);
+
 	void insertRun(TagStatisticRunInsertRow row);
 
 	void insertStatistic(TagStatisticInsertRow row);

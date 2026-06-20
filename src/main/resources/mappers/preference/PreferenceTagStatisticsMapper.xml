@@ -54,6 +54,52 @@
 		ORDER BY tag.tag_id
 	</select>
 
+	<select id="countSyntheticReactions" resultType="long">
+		SELECT count(*)
+		FROM preference.synthetic_swipe_events
+		WHERE generator_version = #{generatorVersion}
+	</select>
+
+	<select id="countPositiveSyntheticReactions" resultType="long">
+		SELECT count(*)
+		FROM preference.synthetic_swipe_events
+		WHERE generator_version = #{generatorVersion}
+			AND reaction IN ('LIKE', 'SUPER_LIKE')
+	</select>
+
+	<select id="aggregateSyntheticReactionsByTag" resultMap="TagReactionAggregateRowMap">
+		SELECT
+			CAST(tag.tag_id AS text) AS tag_id,
+			count(*) FILTER (WHERE reaction.reaction IN ('LIKE', 'SUPER_LIKE')) AS positive_count,
+			count(*) AS reaction_count
+		FROM preference.synthetic_swipe_events reaction
+		JOIN preference.place_tag_enrichment_tags tag
+			ON tag.enrichment_id = reaction.place_tag_enrichment_id
+		WHERE reaction.generator_version = #{generatorVersion}
+		GROUP BY tag.tag_id
+		ORDER BY tag.tag_id
+	</select>
+
+	<select id="countActiveSyntheticPersonas" resultType="long">
+		SELECT count(*)
+		FROM preference.synthetic_personas
+		WHERE generator_version = #{generatorVersion}
+			AND is_active = true
+	</select>
+
+	<select id="countActiveSyntheticPersonasWithoutEvents" resultType="long">
+		SELECT count(*)
+		FROM preference.synthetic_personas persona
+		WHERE persona.generator_version = #{generatorVersion}
+			AND persona.is_active = true
+			AND NOT EXISTS (
+				SELECT 1
+				FROM preference.synthetic_swipe_events event
+				WHERE event.persona_id = persona.id
+					AND event.generator_version = persona.generator_version
+			)
+	</select>
+
 	<insert id="insertRun" parameterType="com.soomgil.preference.infrastructure.persistence.row.TagStatisticRunInsertRow">
 		INSERT INTO preference.tag_statistic_runs (
 			id,
@@ -68,7 +114,7 @@
 		)
 		VALUES (
 			CAST(#{id} AS uuid),
-			'REAL_USER',
+			#{source},
 			'RUNNING',
 			#{alpha},
 			#{globalPositiveRate},
