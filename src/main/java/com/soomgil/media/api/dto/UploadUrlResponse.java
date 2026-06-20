@@ -6,6 +6,7 @@ import java.net.URI;
 import java.time.OffsetDateTime;
 import java.util.Map;
 
+/** object storage에 직접 PUT할 URL과 필수 header 응답. */
 public record UploadUrlResponse(
 	@NotNull
 	URI uploadUrl,

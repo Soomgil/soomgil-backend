@@ -5,12 +5,14 @@ import com.soomgil.global.error.ErrorCode;
 import com.soomgil.global.storage.StorageObjectKey;
 import com.soomgil.media.domain.model.MediaPurpose;
 import java.util.UUID;
+import org.springframework.stereotype.Component;
 
 /**
  * 사용자 소유 media object key를 생성하고 소유권을 검증한다.
  *
  * <p>사용자 입력 파일명은 key에 넣지 않아 path traversal과 제어 문자 문제를 차단한다.
  */
+@Component
 public final class MediaObjectKeyPolicy {
 
 	public StorageObjectKey create(UUID userId, MediaPurpose purpose, UUID objectId, String mimeType) {

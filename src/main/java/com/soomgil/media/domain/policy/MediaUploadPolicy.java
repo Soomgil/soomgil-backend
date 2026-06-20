@@ -5,12 +5,14 @@ import com.soomgil.global.error.ErrorCode;
 import com.soomgil.media.domain.model.MediaPurpose;
 import java.util.Map;
 import java.util.Set;
+import org.springframework.stereotype.Component;
 
 /**
  * 업로드 목적별 MIME allowlist와 최대 byte 크기를 검증한다.
  *
  * <p>값은 업로드 URL 발급과 업로드 완료 검증에서 동일하게 적용해야 한다.
  */
+@Component
 public final class MediaUploadPolicy {
 
 	private static final long MIB = 1024L * 1024L;
@@ -25,9 +27,16 @@ public final class MediaUploadPolicy {
 		if (!allowedMimeTypes(purpose).contains(mimeType)) {
 			throw new BusinessException(ErrorCode.UNSUPPORTED_MEDIA_TYPE);
 		}
-		if (byteSize <= 0 || byteSize > SIZE_LIMITS.get(purpose)) {
+		if (byteSize <= 0 || byteSize > sizeLimit(purpose, mimeType)) {
 			throw new BusinessException(ErrorCode.MEDIA_SIZE_LIMIT_EXCEEDED);
 		}
+	}
+
+	private long sizeLimit(MediaPurpose purpose, String mimeType) {
+		if (purpose == MediaPurpose.TRIP_RECORD && !"video/mp4".equals(mimeType)) {
+			return 20 * MIB;
+		}
+		return SIZE_LIMITS.get(purpose);
 	}
 
 	private Set<String> allowedMimeTypes(MediaPurpose purpose) {
