@@ -12,7 +12,6 @@ import com.soomgil.planning.api.dto.UpdateChecklistItemRequest;
 import com.soomgil.planning.api.dto.UpdateChecklistMemberStatusRequest;
 import com.soomgil.planning.api.dto.UpsertChecklistRequest;
 import com.soomgil.planning.api.dto.UpsertNoteRequest;
-import com.soomgil.planning.api.dto.VersionedCommandRequest;
 import com.soomgil.planning.application.command.CreateChecklistItemCommand;
 import com.soomgil.planning.application.command.DeleteChecklistCommand;
 import com.soomgil.planning.application.command.DeleteChecklistItemCommand;
@@ -58,7 +57,7 @@ import org.springframework.web.bind.annotation.RestController;
  * 여행방 planning REST 엔드포인트.
  *
  * <p>note / checklist / checklist item / member status에 대한 CRUD를 노출한다.
- * 모든 mutation은 {@code baseVersion} 낙관적 동시성 제어를 따른다.
+ * DBML에 version 컬럼이 없으므로 resource 단위 optimistic lock은 수행하지 않는다.
  * 권한은 handler 단에서 {@code TripMemberAccessChecker}로 검증한다.
  */
 @Validated
@@ -126,7 +125,6 @@ public class PlanningController extends ApiControllerSupport {
 		return upsertNoteCommandHandler.handle(new UpsertNoteCommand(
 			tripId,
 			currentUser.userId(),
-			request.baseVersion(),
 			request.scopeType(),
 			request.itineraryDayId(),
 			request.content()
@@ -138,11 +136,10 @@ public class PlanningController extends ApiControllerSupport {
 	public void deleteNote(
 		@PathVariable UUID tripId,
 		@PathVariable UUID noteId,
-		@AuthenticationPrincipal CurrentUser currentUser,
-		@Valid @RequestBody VersionedCommandRequest request
+		@AuthenticationPrincipal CurrentUser currentUser
 	) {
 		deleteNoteCommandHandler.handle(new DeleteNoteCommand(
-			tripId, noteId, currentUser.userId(), request.baseVersion()
+			tripId, noteId, currentUser.userId()
 		));
 	}
 
@@ -167,7 +164,6 @@ public class PlanningController extends ApiControllerSupport {
 		return upsertChecklistCommandHandler.handle(new UpsertChecklistCommand(
 			tripId,
 			currentUser.userId(),
-			request.baseVersion(),
 			request.scopeType(),
 			request.itineraryDayId(),
 			request.title()
@@ -178,11 +174,10 @@ public class PlanningController extends ApiControllerSupport {
 	public PlanningMutationResponse deleteChecklist(
 		@PathVariable UUID tripId,
 		@PathVariable UUID checklistId,
-		@AuthenticationPrincipal CurrentUser currentUser,
-		@Valid @RequestBody VersionedCommandRequest request
+		@AuthenticationPrincipal CurrentUser currentUser
 	) {
 		return deleteChecklistCommandHandler.handle(new DeleteChecklistCommand(
-			tripId, checklistId, currentUser.userId(), request.baseVersion()
+			tripId, checklistId, currentUser.userId()
 		));
 	}
 
@@ -196,7 +191,7 @@ public class PlanningController extends ApiControllerSupport {
 	) {
 		return createChecklistItemCommandHandler.handle(new CreateChecklistItemCommand(
 			tripId, checklistId, currentUser.userId(),
-			request.baseVersion(), request.content(), request.sortOrder()
+			request.content(), request.sortOrder()
 		));
 	}
 
@@ -210,7 +205,7 @@ public class PlanningController extends ApiControllerSupport {
 	) {
 		return updateChecklistItemCommandHandler.handle(new UpdateChecklistItemCommand(
 			tripId, checklistId, itemId, currentUser.userId(),
-			request.baseVersion(), request.content(), request.sortOrder()
+			request.content(), request.sortOrder()
 		));
 	}
 
@@ -220,11 +215,10 @@ public class PlanningController extends ApiControllerSupport {
 		@PathVariable UUID tripId,
 		@PathVariable UUID checklistId,
 		@PathVariable UUID itemId,
-		@AuthenticationPrincipal CurrentUser currentUser,
-		@Valid @RequestBody VersionedCommandRequest request
+		@AuthenticationPrincipal CurrentUser currentUser
 	) {
 		deleteChecklistItemCommandHandler.handle(new DeleteChecklistItemCommand(
-			tripId, checklistId, itemId, currentUser.userId(), request.baseVersion()
+			tripId, checklistId, itemId, currentUser.userId()
 		));
 	}
 
@@ -237,7 +231,7 @@ public class PlanningController extends ApiControllerSupport {
 	) {
 		return reorderChecklistItemsCommandHandler.handle(new ReorderChecklistItemsCommand(
 			tripId, checklistId, currentUser.userId(),
-			request.baseVersion(), request.itemOrders()
+			request.itemOrders()
 		));
 	}
 
@@ -251,7 +245,7 @@ public class PlanningController extends ApiControllerSupport {
 	) {
 		return updateChecklistMemberStatusCommandHandler.handle(new UpdateChecklistMemberStatusCommand(
 			tripId, checklistId, itemId, currentUser.userId(),
-			request.baseVersion(), request.isCompleted()
+			request.isCompleted()
 		));
 	}
 }

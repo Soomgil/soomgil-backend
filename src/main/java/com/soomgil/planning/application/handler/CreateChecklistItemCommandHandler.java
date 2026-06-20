@@ -64,12 +64,14 @@ public class CreateChecklistItemCommandHandler implements CommandHandler<CreateC
 
 		Instant now = Instant.now();
 		UUID itemId = UUID.randomUUID();
-		itemMapper.insert(itemId, command.checklistId(), sortOrder, command.content(), now);
+		itemMapper.insert(itemId, command.checklistId(), sortOrder, command.content(),
+			command.actorUserId(), now);
 
 		ChecklistItemRecord created = new ChecklistItemRecord(itemId, command.checklistId(),
-			sortOrder, command.content(), 1L, null, now, now);
+			sortOrder, command.content(), command.actorUserId(), command.actorUserId(),
+			null, null, now, now);
 		ChecklistItem dto = assembler.toItemDto(created, List.of());
-		PlanningMutationResponse response = assembler.toMutationResponse(command.tripId(), 1L, dto);
+		PlanningMutationResponse response = assembler.toMutationResponse(command.tripId(), dto);
 		broadcaster.broadcast(new ChecklistItemCreatedEvent(command.tripId(),
 			command.actorUserId(), command.checklistId(), dto));
 		return response;

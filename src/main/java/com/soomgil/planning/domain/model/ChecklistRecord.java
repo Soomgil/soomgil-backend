@@ -16,8 +16,10 @@ import java.util.UUID;
  * @param tripId 여행방 식별자
  * @param scopeType 범위 (TRIP 또는 DAY)
  * @param itineraryDayId DAY scope인 경우 일차 식별자. TRIP scope이면 null
- * @param title 표시용 제목 (nullable)
- * @param version 낙관적 잠금 버전
+ * @param title 표현용 제목 (nullable)
+ * @param createdByUserId 최초 작성자
+ * @param updatedByUserId 마지막 수정자
+ * @param deletedByUserId 삭제자
  * @param deletedAt soft delete 시각. null이면 활성
  * @param createdAt 생성 시각
  * @param updatedAt 마지막 수정 시각
@@ -28,7 +30,9 @@ public record ChecklistRecord(
 	PlanningScopeType scopeType,
 	UUID itineraryDayId,
 	String title,
-	long version,
+	UUID createdByUserId,
+	UUID updatedByUserId,
+	UUID deletedByUserId,
 	Instant deletedAt,
 	Instant createdAt,
 	Instant updatedAt

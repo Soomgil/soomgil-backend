@@ -47,8 +47,9 @@ class CreateChecklistItemCommandHandlerTest {
 	void autoSortOrderWhenNull() {
 		UUID tripId = UUID.randomUUID();
 		UUID checklistId = UUID.randomUUID();
+		UUID actorId = UUID.randomUUID();
 		ChecklistRecord checklist = new ChecklistRecord(checklistId, tripId, PlanningScopeType.TRIP,
-			null, "제목", 1L, null, Instant.now(), Instant.now());
+			null, "제목", actorId, actorId, null, null, Instant.now(), Instant.now());
 
 		when(checklistMapper.findById(checklistId)).thenReturn(Optional.of(checklist));
 		when(itemMapper.findMaxSortOrder(checklistId)).thenReturn(5);
@@ -56,16 +57,17 @@ class CreateChecklistItemCommandHandlerTest {
 			6, "새 항목", List.of(), null);
 		when(assembler.toItemDto(any(), any())).thenReturn(stubItem);
 		PlanningMutationResponse stubResponse = new PlanningMutationResponse(
-			tripId, 1L, null, false, false, null, null, stubItem, null);
-		when(assembler.toMutationResponse(eq(tripId), eq(1L), any(ChecklistItem.class)))
+			tripId, null, null, false, false, null, null, stubItem, null);
+		when(assembler.toMutationResponse(eq(tripId), any(ChecklistItem.class)))
 			.thenReturn(stubResponse);
 
 		PlanningMutationResponse result = handler.handle(new CreateChecklistItemCommand(
-			tripId, checklistId, UUID.randomUUID(), 1L, "새 항목", null
+			tripId, checklistId, actorId, "새 항목", null
 		));
 
 		assertThat(result).isSameAs(stubResponse);
-		verify(itemMapper).insert(any(UUID.class), eq(checklistId), eq(6), eq("새 항목"), any());
+		verify(itemMapper).insert(any(UUID.class), eq(checklistId), eq(6), eq("새 항목"),
+			eq(actorId), any());
 		verify(broadcaster).broadcast(any(PlanningRealtimeEvent.class));
 	}
 
@@ -74,24 +76,26 @@ class CreateChecklistItemCommandHandlerTest {
 	void usesExplicitSortOrder() {
 		UUID tripId = UUID.randomUUID();
 		UUID checklistId = UUID.randomUUID();
+		UUID actorId = UUID.randomUUID();
 		ChecklistRecord checklist = new ChecklistRecord(checklistId, tripId, PlanningScopeType.TRIP,
-			null, "제목", 1L, null, Instant.now(), Instant.now());
+			null, "제목", actorId, actorId, null, null, Instant.now(), Instant.now());
 
 		when(checklistMapper.findById(checklistId)).thenReturn(Optional.of(checklist));
 		ChecklistItem stubItem = new ChecklistItem(UUID.randomUUID(), checklistId,
 			10, "새 항목", List.of(), null);
 		when(assembler.toItemDto(any(), any())).thenReturn(stubItem);
 		PlanningMutationResponse stubResponse = new PlanningMutationResponse(
-			tripId, 1L, null, false, false, null, null, stubItem, null);
-		when(assembler.toMutationResponse(eq(tripId), eq(1L), any(ChecklistItem.class)))
+			tripId, null, null, false, false, null, null, stubItem, null);
+		when(assembler.toMutationResponse(eq(tripId), any(ChecklistItem.class)))
 			.thenReturn(stubResponse);
 
 		PlanningMutationResponse result = handler.handle(new CreateChecklistItemCommand(
-			tripId, checklistId, UUID.randomUUID(), 1L, "새 항목", 10
+			tripId, checklistId, actorId, "새 항목", 10
 		));
 
 		assertThat(result).isSameAs(stubResponse);
-		verify(itemMapper).insert(any(UUID.class), eq(checklistId), eq(10), eq("새 항목"), any());
+		verify(itemMapper).insert(any(UUID.class), eq(checklistId), eq(10), eq("새 항목"),
+			eq(actorId), any());
 		verify(itemMapper, never()).findMaxSortOrder(any());
 	}
 
@@ -103,12 +107,12 @@ class CreateChecklistItemCommandHandlerTest {
 		when(checklistMapper.findById(checklistId)).thenReturn(Optional.empty());
 
 		assertThatThrownBy(() -> handler.handle(new CreateChecklistItemCommand(
-			UUID.randomUUID(), checklistId, UUID.randomUUID(), 1L, "본문", null
+			UUID.randomUUID(), checklistId, UUID.randomUUID(), "본문", null
 		)))
 			.isInstanceOf(PlanningException.class)
 			.satisfies(ex -> assertThat(((PlanningException) ex).errorCode())
 				.isEqualTo(ErrorCode.PLANNING_CHECKLIST_NOT_FOUND));
 
-		verify(itemMapper, never()).insert(any(), any(), anyInt(), any(), any());
+		verify(itemMapper, never()).insert(any(), any(), anyInt(), any(), any(), any());
 	}
 }

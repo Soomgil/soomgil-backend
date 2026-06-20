@@ -14,7 +14,6 @@ import java.util.UUID;
  * @param checklistId 소속 checklist
  * @param itemId item 식별자
  * @param actorUserId 요청자
- * @param baseVersion item의 version
  * @param content 새 본문 (null이면 유지)
  * @param sortOrder 새 정렬 순서 (null이면 유지)
  */
@@ -23,7 +22,6 @@ public record UpdateChecklistItemCommand(
 	UUID checklistId,
 	UUID itemId,
 	UUID actorUserId,
-	long baseVersion,
 	String content,
 	Integer sortOrder
 ) implements Command<PlanningMutationResponse> {

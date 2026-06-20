@@ -3,7 +3,6 @@ package com.soomgil.planning.application.handler;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -40,28 +39,27 @@ class DeleteNoteCommandHandlerTest {
 	);
 
 	@Test
-	@DisplayName("활성 note를 baseVersion 일치로 soft delete한다")
+	@DisplayName("활성 note를 soft delete한다")
 	void deletesActiveNote() {
 		UUID tripId = UUID.randomUUID();
 		UUID actorId = UUID.randomUUID();
 		UUID noteId = UUID.randomUUID();
 		NoteRecord existing = new NoteRecord(noteId, tripId, PlanningScopeType.TRIP, null,
-			"본문", 2L, null, Instant.now(), Instant.now());
+			"본문", actorId, actorId, null, null, Instant.now(), Instant.now());
 
 		when(noteMapper.findById(noteId)).thenReturn(Optional.of(existing));
-		when(noteMapper.softDelete(eq(noteId), eq(2L), any())).thenReturn(1);
-		Note stubNote = new Note(noteId, tripId, PlanningScopeType.TRIP, null, "본문", 3L, null);
+		Note stubNote = new Note(noteId, tripId, PlanningScopeType.TRIP, null, "본문", null);
 		when(assembler.toNoteDto(any(NoteRecord.class))).thenReturn(stubNote);
 		PlanningMutationResponse stubResponse = new PlanningMutationResponse(
-			tripId, 3L, null, false, false, stubNote, null, null, null);
-		when(assembler.toMutationResponse(eq(tripId), eq(3L), any(Note.class))).thenReturn(stubResponse);
+			tripId, null, null, false, false, stubNote, null, null, null);
+		when(assembler.toMutationResponse(eq(tripId), any(Note.class))).thenReturn(stubResponse);
 
 		PlanningMutationResponse result = handler.handle(new DeleteNoteCommand(
-			tripId, noteId, actorId, 2L
+			tripId, noteId, actorId
 		));
 
 		assertThat(result).isSameAs(stubResponse);
-		verify(noteMapper).softDelete(eq(noteId), eq(2L), any());
+		verify(noteMapper).softDelete(eq(noteId), eq(actorId), any());
 		verify(broadcaster).broadcast(any(PlanningRealtimeEvent.class));
 	}
 
@@ -74,31 +72,12 @@ class DeleteNoteCommandHandlerTest {
 		when(noteMapper.findById(noteId)).thenReturn(Optional.empty());
 
 		assertThatThrownBy(() -> handler.handle(new DeleteNoteCommand(
-			tripId, noteId, UUID.randomUUID(), 1L
+			tripId, noteId, UUID.randomUUID()
 		)))
 			.isInstanceOf(PlanningException.class)
 			.satisfies(ex -> assertThat(((PlanningException) ex).errorCode())
 				.isEqualTo(ErrorCode.PLANNING_NOTE_NOT_FOUND));
 
-		verify(noteMapper, never()).softDelete(any(), anyLong(), any());
-	}
-
-	@Test
-	@DisplayName("soft delete 시 affectedRows가 0이면 PLANNING_VERSION_CONFLICT")
-	void versionConflictThrows() {
-		UUID tripId = UUID.randomUUID();
-		UUID noteId = UUID.randomUUID();
-		NoteRecord existing = new NoteRecord(noteId, tripId, PlanningScopeType.TRIP, null,
-			"본문", 2L, null, Instant.now(), Instant.now());
-
-		when(noteMapper.findById(noteId)).thenReturn(Optional.of(existing));
-		when(noteMapper.softDelete(eq(noteId), eq(1L), any())).thenReturn(0);
-
-		assertThatThrownBy(() -> handler.handle(new DeleteNoteCommand(
-			tripId, noteId, UUID.randomUUID(), 1L
-		)))
-			.isInstanceOf(PlanningException.class)
-			.satisfies(ex -> assertThat(((PlanningException) ex).errorCode())
-				.isEqualTo(ErrorCode.PLANNING_VERSION_CONFLICT));
+		verify(noteMapper, never()).softDelete(any(), any(), any());
 	}
 }

@@ -15,8 +15,7 @@ import org.apache.ibatis.annotations.Update;
 /**
  * planning.checklists 테이블 접근 mapper.
  *
- * <p>모든 UPDATE/DELETE는 {@code WHERE id = ? AND version = ? AND deleted_at IS NULL} 조건으로
- * 낙관적 잠금을 검증한다.
+ * <p>DBML에 version 컬럼이 없으므로 UPDATE/DELETE는 식별자 기반으로 처리한다.
  */
 @Mapper
 public interface ChecklistMapper {
@@ -29,13 +28,16 @@ public interface ChecklistMapper {
 	 * @param scopeType scope
 	 * @param itineraryDayId 일차 식별자 (TRIP scope이면 null)
 	 * @param title 표시용 제목 (nullable)
+	 * @param actorUserId 작성자
 	 * @param now 생성 시각
 	 */
 	@Insert("""
 		INSERT INTO planning.checklists (
-		    id, trip_id, scope_type, itinerary_day_id, title, version, created_at, updated_at
+		    id, trip_id, scope_type, itinerary_day_id, title,
+		    created_by_user_id, updated_by_user_id, created_at, updated_at
 		) VALUES (
-		    #{id}, #{tripId}, #{scopeType}, #{itineraryDayId}, #{title}, 1, #{now}, #{now}
+		    #{id}, #{tripId}, #{scopeType}, #{itineraryDayId}, #{title},
+		    #{actorUserId}, #{actorUserId}, #{now}, #{now}
 		)
 		""")
 	void insert(
@@ -44,6 +46,7 @@ public interface ChecklistMapper {
 		@Param("scopeType") PlanningScopeType scopeType,
 		@Param("itineraryDayId") UUID itineraryDayId,
 		@Param("title") String title,
+		@Param("actorUserId") UUID actorUserId,
 		@Param("now") Instant now
 	);
 
@@ -56,7 +59,8 @@ public interface ChecklistMapper {
 	 * @return checklist. 없으면 empty
 	 */
 	@Select("""
-		SELECT id, trip_id, scope_type, itinerary_day_id, title, version,
+		SELECT id, trip_id, scope_type, itinerary_day_id, title,
+		       created_by_user_id, updated_by_user_id, deleted_by_user_id,
 		       deleted_at, created_at, updated_at
 		FROM planning.checklists
 		WHERE trip_id = #{tripId}
@@ -77,11 +81,12 @@ public interface ChecklistMapper {
 	 * @param tripId 여행방 식별자
 	 * @param scopeType scope (null이면 전체)
 	 * @param itineraryDayId 일차 식별자 (null이면 전체)
-	 * @return 활성 checklist 목록 (sort_order는 별도로 item에서)
+	 * @return 활성 checklist 목록
 	 */
 	@Select("""
 		<script>
-		SELECT id, trip_id, scope_type, itinerary_day_id, title, version,
+		SELECT id, trip_id, scope_type, itinerary_day_id, title,
+		       created_by_user_id, updated_by_user_id, deleted_by_user_id,
 		       deleted_at, created_at, updated_at
 		FROM planning.checklists
 		WHERE trip_id = #{tripId}
@@ -104,7 +109,8 @@ public interface ChecklistMapper {
 	 * @return checklist. 없으면 empty
 	 */
 	@Select("""
-		SELECT id, trip_id, scope_type, itinerary_day_id, title, version,
+		SELECT id, trip_id, scope_type, itinerary_day_id, title,
+		       created_by_user_id, updated_by_user_id, deleted_by_user_id,
 		       deleted_at, created_at, updated_at
 		FROM planning.checklists
 		WHERE id = #{id}
@@ -112,23 +118,25 @@ public interface ChecklistMapper {
 	Optional<ChecklistRecord> findById(@Param("id") UUID id);
 
 	/**
-	 * checklist title을 갱신하고 version을 1 증가시킨다.
+	 * checklist title을 갱신한다.
 	 *
 	 * @param id checklist 식별자
 	 * @param title 새 title (nullable)
-	 * @param baseVersion 호출자가 읽은 version
+	 * @param actorUserId 수정자
 	 * @param now 수정 시각
-	 * @return 영향받은 row 수. 0이면 버전 충돌
+	 * @return 영향받은 row 수. 0이면 대상이 없거나 이미 삭제됨
 	 */
 	@Update("""
 		UPDATE planning.checklists
-		SET title = #{title}, version = version + 1, updated_at = #{now}
-		WHERE id = #{id} AND version = #{baseVersion} AND deleted_at IS NULL
+		SET title = #{title},
+		    updated_by_user_id = #{actorUserId},
+		    updated_at = #{now}
+		WHERE id = #{id} AND deleted_at IS NULL
 		""")
 	int updateTitle(
 		@Param("id") UUID id,
 		@Param("title") String title,
-		@Param("baseVersion") long baseVersion,
+		@Param("actorUserId") UUID actorUserId,
 		@Param("now") Instant now
 	);
 
@@ -136,18 +144,21 @@ public interface ChecklistMapper {
 	 * checklist를 soft delete한다.
 	 *
 	 * @param id checklist 식별자
-	 * @param baseVersion 호출자가 읽은 version
+	 * @param actorUserId 삭제자
 	 * @param now 삭제 시각
-	 * @return 영향받은 row 수. 0이면 버전 충돌
+	 * @return 영향받은 row 수. 0이면 대상이 없거나 이미 삭제됨
 	 */
 	@Update("""
 		UPDATE planning.checklists
-		SET deleted_at = #{now}, version = version + 1, updated_at = #{now}
-		WHERE id = #{id} AND version = #{baseVersion} AND deleted_at IS NULL
+		SET deleted_at = #{now},
+		    deleted_by_user_id = #{actorUserId},
+		    updated_by_user_id = #{actorUserId},
+		    updated_at = #{now}
+		WHERE id = #{id} AND deleted_at IS NULL
 		""")
 	int softDelete(
 		@Param("id") UUID id,
-		@Param("baseVersion") long baseVersion,
+		@Param("actorUserId") UUID actorUserId,
 		@Param("now") Instant now
 	);
 }

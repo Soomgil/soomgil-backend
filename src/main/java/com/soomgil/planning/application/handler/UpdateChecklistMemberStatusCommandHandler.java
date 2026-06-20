@@ -23,8 +23,8 @@ import org.springframework.transaction.annotation.Transactional;
  * {@link UpdateChecklistMemberStatusCommand}를 처리한다.
  *
  * <p>현재 사용자의 checklist item 완료 상태를 토글한다.
- * 기존 member status row가 있으면 baseVersion 검증 후 UPDATE. 없으면 first touch로
- * version=1로 INSERT한다. INSERT는 version 검증을 하지 않는다.
+ * 기존 member status row가 있으면 UPDATE, 없으면 first touch로 INSERT.
+ * DBML에 version 컬럼이 없으므로 optimistic lock은 수행하지 않는다.
  */
 @Component
 @Transactional
@@ -54,37 +54,34 @@ public class UpdateChecklistMemberStatusCommandHandler implements CommandHandler
 	public PlanningMutationResponse handle(UpdateChecklistMemberStatusCommand command) {
 		accessChecker.requireMember(command.tripId(), command.actorUserId());
 
-		ChecklistItemRecord item = itemMapper.findById(command.itemId())
+		ChecklistItemRecord item = itemMapper.findById(command.checklistItemId())
 			.filter(r -> !r.isDeleted())
 			.orElseThrow(() -> new PlanningException(ErrorCode.PLANNING_ITEM_NOT_FOUND));
 
 		Instant now = Instant.now();
 		Instant completedAt = command.isCompleted() ? now : null;
 		Optional<ChecklistMemberStatusRecord> existing = statusMapper.findByItemIdAndUserId(
-			command.itemId(), command.actorUserId());
+			command.checklistItemId(), command.actorUserId());
 
 		ChecklistMemberStatusRecord result;
 		if (existing.isEmpty()) {
-			statusMapper.insert(command.itemId(), command.actorUserId(),
-				command.isCompleted(), completedAt, now);
-			result = new ChecklistMemberStatusRecord(command.itemId(), command.actorUserId(),
-				command.isCompleted(), completedAt, 1L, now);
+			statusMapper.insert(command.checklistItemId(), command.actorUserId(),
+				command.isCompleted(), completedAt, command.actorUserId(), now);
+			result = new ChecklistMemberStatusRecord(command.checklistItemId(),
+				command.actorUserId(), command.isCompleted(), completedAt,
+				command.actorUserId(), now);
 		} else {
-			ChecklistMemberStatusRecord record = existing.get();
-			int affected = statusMapper.updateStatus(command.itemId(), command.actorUserId(),
-				command.isCompleted(), completedAt, command.baseVersion(), now);
-			if (affected == 0) {
-				throw new PlanningException(ErrorCode.PLANNING_VERSION_CONFLICT);
-			}
-			result = new ChecklistMemberStatusRecord(command.itemId(), command.actorUserId(),
-				command.isCompleted(), completedAt, record.version() + 1, now);
+			statusMapper.updateStatus(command.checklistItemId(), command.actorUserId(),
+				command.isCompleted(), completedAt, command.actorUserId(), now);
+			result = new ChecklistMemberStatusRecord(command.checklistItemId(),
+				command.actorUserId(), command.isCompleted(), completedAt,
+				command.actorUserId(), now);
 		}
 
 		ChecklistMemberStatus dto = assembler.toMemberStatusDto(result);
-		PlanningMutationResponse response = assembler.toMutationResponse(command.tripId(),
-			result.version(), dto);
+		PlanningMutationResponse response = assembler.toMutationResponse(command.tripId(), dto);
 		broadcaster.broadcast(new ChecklistMemberStatusUpdatedEvent(command.tripId(),
-			command.actorUserId(), command.checklistId(), command.itemId(), dto));
+			command.actorUserId(), command.checklistId(), command.checklistItemId(), dto));
 		return response;
 	}
 }

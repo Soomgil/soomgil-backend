@@ -1,7 +1,6 @@
 package com.soomgil.planning.application.handler;
 
 import com.soomgil.common.cqrs.CommandHandler;
-import com.soomgil.global.error.ErrorCode;
 import com.soomgil.planning.api.dto.Note;
 import com.soomgil.planning.api.dto.PlanningMutationResponse;
 import com.soomgil.planning.application.command.UpsertNoteCommand;
@@ -10,7 +9,6 @@ import com.soomgil.planning.application.service.PlanningAssembler;
 import com.soomgil.planning.application.service.PlanningEventBroadcaster;
 import com.soomgil.planning.application.service.TripMemberAccessChecker;
 import com.soomgil.planning.domain.model.NoteRecord;
-import com.soomgil.planning.domain.model.PlanningException;
 import com.soomgil.planning.domain.policy.PlanningPolicy;
 import com.soomgil.planning.infrastructure.persistence.mapper.NoteMapper;
 import java.time.Instant;
@@ -22,8 +20,8 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * {@link UpsertNoteCommand}를 처리한다.
  *
- * <p>(tripId, scopeType, itineraryDayId) 조합으로 활성 note가 있으면 baseVersion 검증 후
- * UPDATE, 없으면 새로 INSERT한다. INSERT는 version=1로 시작한다.
+ * <p>{@code (tripId, scopeType, itineraryDayId)} 조합으로 활성 note가 있으면 UPDATE,
+ * 없으면 새로 INSERT한다. DBML에 version 컬럼이 없으므로 optimistic lock은 수행하지 않는다.
  */
 @Component
 @Transactional
@@ -55,29 +53,26 @@ public class UpsertNoteCommandHandler implements CommandHandler<UpsertNoteComman
 		Optional<NoteRecord> existing = noteMapper.findByTripScopeDay(
 			command.tripId(), command.scopeType(), command.itineraryDayId());
 
+		NoteRecord record;
 		if (existing.isEmpty()) {
 			UUID noteId = UUID.randomUUID();
 			noteMapper.insert(noteId, command.tripId(), command.scopeType(),
-				command.itineraryDayId(), command.content(), now);
-			NoteRecord created = new NoteRecord(noteId, command.tripId(), command.scopeType(),
-				command.itineraryDayId(), command.content(), 1L, null, now, now);
-			Note dto = assembler.toNoteDto(created);
-			PlanningMutationResponse response = assembler.toMutationResponse(command.tripId(), 1L, dto);
-			broadcaster.broadcast(new NoteUpsertedEvent(command.tripId(), command.actorUserId(), dto));
-			return response;
+				command.itineraryDayId(), command.content(), command.actorUserId(), now);
+			record = new NoteRecord(noteId, command.tripId(), command.scopeType(),
+				command.itineraryDayId(), command.content(),
+				command.actorUserId(), command.actorUserId(), null, null, now, now);
+		} else {
+			NoteRecord current = existing.get();
+			noteMapper.updateContent(current.id(), command.content(),
+				command.actorUserId(), now);
+			record = new NoteRecord(current.id(), current.tripId(), current.scopeType(),
+				current.itineraryDayId(), command.content(),
+				current.createdByUserId(), command.actorUserId(),
+				current.deletedByUserId(), current.deletedAt(), current.createdAt(), now);
 		}
 
-		NoteRecord record = existing.get();
-		int affected = noteMapper.updateContent(record.id(), command.content(),
-			command.baseVersion(), now);
-		if (affected == 0) {
-			throw new PlanningException(ErrorCode.PLANNING_VERSION_CONFLICT);
-		}
-		NoteRecord updated = new NoteRecord(record.id(), record.tripId(), record.scopeType(),
-			record.itineraryDayId(), command.content(), record.version() + 1, null,
-			record.createdAt(), now);
-		Note dto = assembler.toNoteDto(updated);
-		PlanningMutationResponse response = assembler.toMutationResponse(command.tripId(), updated.version(), dto);
+		Note dto = assembler.toNoteDto(record);
+		PlanningMutationResponse response = assembler.toMutationResponse(command.tripId(), dto);
 		broadcaster.broadcast(new NoteUpsertedEvent(command.tripId(), command.actorUserId(), dto));
 		return response;
 	}

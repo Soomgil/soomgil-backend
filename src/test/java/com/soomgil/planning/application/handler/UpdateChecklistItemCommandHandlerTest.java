@@ -1,15 +1,12 @@
 package com.soomgil.planning.application.handler;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.mock;
 
-import com.soomgil.global.error.ErrorCode;
 import com.soomgil.planning.api.dto.ChecklistItem;
 import com.soomgil.planning.api.dto.PlanningMutationResponse;
 import com.soomgil.planning.application.command.UpdateChecklistItemCommand;
@@ -18,7 +15,6 @@ import com.soomgil.planning.application.service.PlanningAssembler;
 import com.soomgil.planning.application.service.PlanningEventBroadcaster;
 import com.soomgil.planning.application.service.TripMemberAccessChecker;
 import com.soomgil.planning.domain.model.ChecklistItemRecord;
-import com.soomgil.planning.domain.model.PlanningException;
 import com.soomgil.planning.infrastructure.persistence.mapper.ChecklistItemMapper;
 import java.time.Instant;
 import java.util.List;
@@ -44,25 +40,25 @@ class UpdateChecklistItemCommandHandlerTest {
 		UUID tripId = UUID.randomUUID();
 		UUID checklistId = UUID.randomUUID();
 		UUID itemId = UUID.randomUUID();
+		UUID actorId = UUID.randomUUID();
 		ChecklistItemRecord existing = new ChecklistItemRecord(itemId, checklistId, 3,
-			"이전 본문", 2L, null, Instant.now(), Instant.now());
+			"이전 본문", actorId, actorId, null, null, Instant.now(), Instant.now());
 
 		when(itemMapper.findById(itemId)).thenReturn(Optional.of(existing));
-		when(itemMapper.update(eq(itemId), eq("새 본문"), eq(null), eq(2L), any())).thenReturn(1);
 		ChecklistItem stubItem = new ChecklistItem(itemId, checklistId, 3, "새 본문",
 			List.of(), null);
 		when(assembler.toItemDto(any(), any())).thenReturn(stubItem);
 		PlanningMutationResponse stubResponse = new PlanningMutationResponse(
-			tripId, 3L, null, false, false, null, null, stubItem, null);
-		when(assembler.toMutationResponse(eq(tripId), eq(3L), any(ChecklistItem.class)))
+			tripId, null, null, false, false, null, null, stubItem, null);
+		when(assembler.toMutationResponse(eq(tripId), any(ChecklistItem.class)))
 			.thenReturn(stubResponse);
 
 		PlanningMutationResponse result = handler.handle(new UpdateChecklistItemCommand(
-			tripId, checklistId, itemId, UUID.randomUUID(), 2L, "새 본문", null
+			tripId, checklistId, itemId, actorId, "새 본문", null
 		));
 
 		assertThat(result).isSameAs(stubResponse);
-		verify(itemMapper).update(eq(itemId), eq("새 본문"), eq(null), eq(2L), any());
+		verify(itemMapper).update(eq(itemId), eq("새 본문"), eq(null), eq(actorId), any());
 		verify(broadcaster).broadcast(any(PlanningRealtimeEvent.class));
 	}
 
@@ -72,42 +68,24 @@ class UpdateChecklistItemCommandHandlerTest {
 		UUID tripId = UUID.randomUUID();
 		UUID checklistId = UUID.randomUUID();
 		UUID itemId = UUID.randomUUID();
+		UUID actorId = UUID.randomUUID();
 		ChecklistItemRecord existing = new ChecklistItemRecord(itemId, checklistId, 3,
-			"본문", 2L, null, Instant.now(), Instant.now());
+			"본문", actorId, actorId, null, null, Instant.now(), Instant.now());
 
 		when(itemMapper.findById(itemId)).thenReturn(Optional.of(existing));
-		when(itemMapper.update(eq(itemId), eq(null), eq(10), eq(2L), any())).thenReturn(1);
 		ChecklistItem stubItem = new ChecklistItem(itemId, checklistId, 10, "본문",
 			List.of(), null);
 		when(assembler.toItemDto(any(), any())).thenReturn(stubItem);
 		PlanningMutationResponse stubResponse = new PlanningMutationResponse(
-			tripId, 3L, null, false, false, null, null, stubItem, null);
-		when(assembler.toMutationResponse(eq(tripId), eq(3L), any(ChecklistItem.class)))
+			tripId, null, null, false, false, null, null, stubItem, null);
+		when(assembler.toMutationResponse(eq(tripId), any(ChecklistItem.class)))
 			.thenReturn(stubResponse);
 
 		PlanningMutationResponse result = handler.handle(new UpdateChecklistItemCommand(
-			tripId, checklistId, itemId, UUID.randomUUID(), 2L, null, 10
+			tripId, checklistId, itemId, actorId, null, 10
 		));
 
 		assertThat(result).isSameAs(stubResponse);
-		verify(itemMapper).update(eq(itemId), eq(null), eq(10), eq(2L), any());
-	}
-
-	@Test
-	@DisplayName("UPDATE 시 affectedRows가 0이면 PLANNING_VERSION_CONFLICT")
-	void versionConflictThrows() {
-		UUID itemId = UUID.randomUUID();
-		ChecklistItemRecord existing = new ChecklistItemRecord(itemId, UUID.randomUUID(), 3,
-			"본문", 2L, null, Instant.now(), Instant.now());
-
-		when(itemMapper.findById(itemId)).thenReturn(Optional.of(existing));
-		when(itemMapper.update(eq(itemId), any(), any(), eq(1L), any())).thenReturn(0);
-
-		assertThatThrownBy(() -> handler.handle(new UpdateChecklistItemCommand(
-			UUID.randomUUID(), UUID.randomUUID(), itemId, UUID.randomUUID(), 1L, "x", null
-		)))
-			.isInstanceOf(PlanningException.class)
-			.satisfies(ex -> assertThat(((PlanningException) ex).errorCode())
-				.isEqualTo(ErrorCode.PLANNING_VERSION_CONFLICT));
+		verify(itemMapper).update(eq(itemId), eq(null), eq(10), eq(actorId), any());
 	}
 }

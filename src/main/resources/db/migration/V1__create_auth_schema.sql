@@ -104,6 +104,24 @@ INSERT INTO auth.auth_providers (code, display_name, auth_type) VALUES
     ('GOOGLE', 'Google', 'OAUTH2');
 
 -- ------------------------------------------------------------
+-- auth.roles: 권한 마스터. SUPER_ADMIN/ADMIN/MODERATOR.
+-- ------------------------------------------------------------
+CREATE TABLE auth.roles (
+    id           smallserial PRIMARY KEY,
+    code         varchar(40) NOT NULL UNIQUE,
+    display_name varchar(80) NOT NULL,
+    description  text,
+    is_system    boolean NOT NULL DEFAULT true,
+    created_at   timestamptz NOT NULL DEFAULT now(),
+    updated_at   timestamptz NOT NULL DEFAULT now()
+);
+
+INSERT INTO auth.roles (code, display_name, description) VALUES
+    ('SUPER_ADMIN', '수퍼 관리자', '시스템 전체 권한'),
+    ('ADMIN',       '관리자',     '운영 관리 권한'),
+    ('MODERATOR',   '운영진',     '커뮤니티 모더레이션 권한');
+
+-- ------------------------------------------------------------
 -- auth.user_password_credentials: bcrypt password hash
 -- ------------------------------------------------------------
 CREATE TABLE auth.user_password_credentials (

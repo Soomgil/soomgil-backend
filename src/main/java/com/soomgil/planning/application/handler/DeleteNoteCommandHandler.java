@@ -13,16 +13,14 @@ import com.soomgil.planning.domain.model.NoteRecord;
 import com.soomgil.planning.domain.model.PlanningException;
 import com.soomgil.planning.infrastructure.persistence.mapper.NoteMapper;
 import java.time.Instant;
-import java.util.Optional;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
  * {@link DeleteNoteCommand}를 처리한다.
  *
- * <p>식별자로 note를 찾고, baseVersion 일치 시 {@code deleted_at}을 설정한다.
- * 찾을 수 없거나 이미 삭제된 note는 {@link ErrorCode#PLANNING_NOTE_NOT_FOUND}.
- * version 충돌은 {@link ErrorCode#PLANNING_VERSION_CONFLICT}.
+ * <p>식별자로 note를 찾고 soft delete. 찾을 수 없거나 이미 삭제된 note는
+ * {@link ErrorCode#PLANNING_NOTE_NOT_FOUND}.
  */
 @Component
 @Transactional
@@ -54,19 +52,16 @@ public class DeleteNoteCommandHandler implements CommandHandler<DeleteNoteComman
 			.orElseThrow(() -> new PlanningException(ErrorCode.PLANNING_NOTE_NOT_FOUND));
 
 		Instant now = Instant.now();
-		int affected = noteMapper.softDelete(record.id(), command.baseVersion(), now);
-		if (affected == 0) {
-			throw new PlanningException(ErrorCode.PLANNING_VERSION_CONFLICT);
-		}
+		noteMapper.softDelete(record.id(), command.actorUserId(), now);
 
 		NoteRecord tombstone = new NoteRecord(record.id(), record.tripId(), record.scopeType(),
-			record.itineraryDayId(), record.content(), record.version() + 1, now,
-			record.createdAt(), now);
+			record.itineraryDayId(), record.content(),
+			record.createdByUserId(), command.actorUserId(), command.actorUserId(),
+			now, record.createdAt(), now);
 		Note dto = assembler.toNoteDto(tombstone);
-		PlanningMutationResponse response = assembler.toMutationResponse(command.tripId(),
-			tombstone.version(), dto);
+		PlanningMutationResponse response = assembler.toMutationResponse(command.tripId(), dto);
 		broadcaster.broadcast(new NoteDeletedEvent(command.tripId(), command.actorUserId(),
-			record.id(), tombstone.version()));
+			record.id()));
 		return response;
 	}
 }

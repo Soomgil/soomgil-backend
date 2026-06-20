@@ -10,7 +10,6 @@ import java.util.UUID;
  *
  * @param tripId 여행방 식별자
  * @param actorUserId 요청자
- * @param baseVersion 기존 checklist의 version
  * @param scopeType 범위
  * @param itineraryDayId DAY scope인 경우 일차 식별자
  * @param title 표시용 제목 (nullable)
@@ -18,7 +17,6 @@ import java.util.UUID;
 public record UpsertChecklistCommand(
 	UUID tripId,
 	UUID actorUserId,
-	long baseVersion,
 	PlanningScopeType scopeType,
 	UUID itineraryDayId,
 	String title

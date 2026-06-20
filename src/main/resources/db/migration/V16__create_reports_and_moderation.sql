@@ -3,13 +3,29 @@
 -- ============================================================
 
 -- ------------------------------------------------------------
--- auth.user_roles: 모더레이터/관리자 역할. JWT 발급 시 roles claim으로 반영된다.
+-- auth.user_roles: 모더레이터/관리자 역할 부여 이력.
+-- DBML 기준: (user_id, role_id) PK + granted/revoked 추적 컬럼.
+-- JWT 발급 시 활성(role_id가 revoked_at IS NULL) 역할만 claim으로 반영된다.
 -- ------------------------------------------------------------
 CREATE TABLE auth.user_roles (
-    user_id uuid       NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-    role    varchar(30) NOT NULL,
-    PRIMARY KEY (user_id, role)
+    user_id           uuid        NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    role_id           smallint    NOT NULL REFERENCES auth.roles(id),
+    granted_by_user_id uuid       REFERENCES auth.users(id),
+    granted_at        timestamptz NOT NULL DEFAULT now(),
+    revoked_at        timestamptz,
+    revoked_by_user_id uuid       REFERENCES auth.users(id),
+    revocation_reason varchar(120),
+    PRIMARY KEY (user_id, role_id)
 );
+
+CREATE INDEX idx_auth_user_roles_role_id
+    ON auth.user_roles (role_id);
+CREATE INDEX idx_auth_user_roles_granted_by_user_id
+    ON auth.user_roles (granted_by_user_id);
+CREATE INDEX idx_auth_user_roles_revoked_by_user_id
+    ON auth.user_roles (revoked_by_user_id);
+CREATE INDEX idx_auth_user_roles_revoked_at
+    ON auth.user_roles (revoked_at);
 
 -- ------------------------------------------------------------
 -- community.report_reasons: 신고 사유 마스터. is_active=false로 비활성화 가능.

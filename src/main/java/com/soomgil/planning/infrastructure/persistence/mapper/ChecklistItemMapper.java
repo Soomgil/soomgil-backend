@@ -14,9 +14,7 @@ import org.apache.ibatis.annotations.Update;
 /**
  * planning.checklist_items 테이블 접근 mapper.
  *
- * <p>모든 UPDATE/DELETE는 {@code WHERE id = ? AND version = ? AND deleted_at IS NULL} 조건으로
- * 낙관적 잠금을 검증한다. reorder는 per-item version check loop를 {@code @Transactional}로 묶어
- * 원자성을 보장한다.
+ * <p>DBML에 version 컬럼이 없으므로 UPDATE/DELETE는 식별자 기반으로 처리한다.
  */
 @Mapper
 public interface ChecklistItemMapper {
@@ -28,13 +26,16 @@ public interface ChecklistItemMapper {
 	 * @param checklistId 소속 checklist
 	 * @param sortOrder 정렬 순서
 	 * @param content 본문
+	 * @param actorUserId 작성자
 	 * @param now 생성 시각
 	 */
 	@Insert("""
 		INSERT INTO planning.checklist_items (
-		    id, checklist_id, sort_order, content, version, created_at, updated_at
+		    id, checklist_id, sort_order, content,
+		    created_by_user_id, updated_by_user_id, created_at, updated_at
 		) VALUES (
-		    #{id}, #{checklistId}, #{sortOrder}, #{content}, 1, #{now}, #{now}
+		    #{id}, #{checklistId}, #{sortOrder}, #{content},
+		    #{actorUserId}, #{actorUserId}, #{now}, #{now}
 		)
 		""")
 	void insert(
@@ -42,6 +43,7 @@ public interface ChecklistItemMapper {
 		@Param("checklistId") UUID checklistId,
 		@Param("sortOrder") int sortOrder,
 		@Param("content") String content,
+		@Param("actorUserId") UUID actorUserId,
 		@Param("now") Instant now
 	);
 
@@ -52,7 +54,8 @@ public interface ChecklistItemMapper {
 	 * @return item. 없으면 empty
 	 */
 	@Select("""
-		SELECT id, checklist_id, sort_order, content, version,
+		SELECT id, checklist_id, sort_order, content,
+		       created_by_user_id, updated_by_user_id, deleted_by_user_id,
 		       deleted_at, created_at, updated_at
 		FROM planning.checklist_items
 		WHERE id = #{id}
@@ -66,7 +69,8 @@ public interface ChecklistItemMapper {
 	 * @return 활성 item 목록 (sort_order ASC)
 	 */
 	@Select("""
-		SELECT id, checklist_id, sort_order, content, version,
+		SELECT id, checklist_id, sort_order, content,
+		       created_by_user_id, updated_by_user_id, deleted_by_user_id,
 		       deleted_at, created_at, updated_at
 		FROM planning.checklist_items
 		WHERE checklist_id = #{checklistId} AND deleted_at IS NULL
@@ -87,50 +91,52 @@ public interface ChecklistItemMapper {
 	Integer findMaxSortOrder(@Param("checklistId") UUID checklistId);
 
 	/**
-	 * item의 content/sortOrder를 갱신하고 version을 1 증가시킨다.
+	 * item의 content/sortOrder를 갱신한다.
 	 * null content/sortOrder는 SQL COALESCE로 기존값 유지.
 	 *
 	 * @param id item 식별자
 	 * @param content 새 content (null이면 기존값 유지)
 	 * @param sortOrder 새 sortOrder (null이면 기존값 유지)
-	 * @param baseVersion 호출자가 읽은 version
+	 * @param actorUserId 수정자
 	 * @param now 수정 시각
-	 * @return 영향받은 row 수. 0이면 버전 충돌
+	 * @return 영향받은 row 수. 0이면 대상이 없거나 이미 삭제됨
 	 */
 	@Update("""
 		UPDATE planning.checklist_items
 		SET content = COALESCE(#{content}, content),
 		    sort_order = COALESCE(#{sortOrder}, sort_order),
-		    version = version + 1,
+		    updated_by_user_id = #{actorUserId},
 		    updated_at = #{now}
-		WHERE id = #{id} AND version = #{baseVersion} AND deleted_at IS NULL
+		WHERE id = #{id} AND deleted_at IS NULL
 		""")
 	int update(
 		@Param("id") UUID id,
 		@Param("content") String content,
 		@Param("sortOrder") Integer sortOrder,
-		@Param("baseVersion") long baseVersion,
+		@Param("actorUserId") UUID actorUserId,
 		@Param("now") Instant now
 	);
 
 	/**
-	 * item의 sortOrder만 갱신하고 version을 1 증가시킨다. reorder용.
+	 * item의 sortOrder만 갱신한다. reorder용.
 	 *
 	 * @param id item 식별자
 	 * @param sortOrder 새 sortOrder
-	 * @param baseVersion 호출자가 읽은 version
+	 * @param actorUserId 수정자
 	 * @param now 수정 시각
-	 * @return 영향받은 row 수. 0이면 버전 충돌
+	 * @return 영향받은 row 수. 0이면 대상이 없거나 이미 삭제됨
 	 */
 	@Update("""
 		UPDATE planning.checklist_items
-		SET sort_order = #{sortOrder}, version = version + 1, updated_at = #{now}
-		WHERE id = #{id} AND version = #{baseVersion} AND deleted_at IS NULL
+		SET sort_order = #{sortOrder},
+		    updated_by_user_id = #{actorUserId},
+		    updated_at = #{now}
+		WHERE id = #{id} AND deleted_at IS NULL
 		""")
 	int updateSortOrder(
 		@Param("id") UUID id,
 		@Param("sortOrder") int sortOrder,
-		@Param("baseVersion") long baseVersion,
+		@Param("actorUserId") UUID actorUserId,
 		@Param("now") Instant now
 	);
 
@@ -138,35 +144,42 @@ public interface ChecklistItemMapper {
 	 * item을 soft delete한다.
 	 *
 	 * @param id item 식별자
-	 * @param baseVersion 호출자가 읽은 version
+	 * @param actorUserId 삭제자
 	 * @param now 삭제 시각
-	 * @return 영향받은 row 수. 0이면 버전 충돌
+	 * @return 영향받은 row 수. 0이면 대상이 없거나 이미 삭제됨
 	 */
 	@Update("""
 		UPDATE planning.checklist_items
-		SET deleted_at = #{now}, version = version + 1, updated_at = #{now}
-		WHERE id = #{id} AND version = #{baseVersion} AND deleted_at IS NULL
+		SET deleted_at = #{now},
+		    deleted_by_user_id = #{actorUserId},
+		    updated_by_user_id = #{actorUserId},
+		    updated_at = #{now}
+		WHERE id = #{id} AND deleted_at IS NULL
 		""")
 	int softDelete(
 		@Param("id") UUID id,
-		@Param("baseVersion") long baseVersion,
+		@Param("actorUserId") UUID actorUserId,
 		@Param("now") Instant now
 	);
 
 	/**
 	 * checklist의 모든 활성 item을 soft delete한다. checklist 삭제 cascade용.
-	 * version 검증 없이 일괄 처리한다.
 	 *
 	 * @param checklistId checklist 식별자
+	 * @param actorUserId 삭제자
 	 * @param now 삭제 시각
 	 */
 	@Update("""
 		UPDATE planning.checklist_items
-		SET deleted_at = #{now}, version = version + 1, updated_at = #{now}
+		SET deleted_at = #{now},
+		    deleted_by_user_id = #{actorUserId},
+		    updated_by_user_id = #{actorUserId},
+		    updated_at = #{now}
 		WHERE checklist_id = #{checklistId} AND deleted_at IS NULL
 		""")
 	void softDeleteByChecklistId(
 		@Param("checklistId") UUID checklistId,
+		@Param("actorUserId") UUID actorUserId,
 		@Param("now") Instant now
 	);
 }

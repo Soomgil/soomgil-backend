@@ -29,7 +29,6 @@ import com.soomgil.planning.api.dto.UpdateChecklistItemRequest;
 import com.soomgil.planning.api.dto.UpdateChecklistMemberStatusRequest;
 import com.soomgil.planning.api.dto.UpsertChecklistRequest;
 import com.soomgil.planning.api.dto.UpsertNoteRequest;
-import com.soomgil.planning.api.dto.VersionedCommandRequest;
 import com.soomgil.planning.application.handler.CreateChecklistItemCommandHandler;
 import com.soomgil.planning.application.handler.DeleteChecklistCommandHandler;
 import com.soomgil.planning.application.handler.DeleteChecklistItemCommandHandler;
@@ -115,7 +114,7 @@ class PlanningControllerWebMvcTest {
 	void getNoteReturns200() throws Exception {
 		UUID tripId = UUID.randomUUID();
 		UUID noteId = UUID.randomUUID();
-		Note stub = new Note(noteId, tripId, PlanningScopeType.TRIP, null, "본문", 1L, null);
+		Note stub = new Note(noteId, tripId, PlanningScopeType.TRIP, null, "본문", null);
 		when(getNoteQueryHandler.handle(any())).thenReturn(stub);
 
 		mockMvc.perform(get("/api/v1/trips/{tripId}/planning/notes", tripId)
@@ -139,11 +138,11 @@ class PlanningControllerWebMvcTest {
 	void upsertNoteReturns200() throws Exception {
 		UUID tripId = UUID.randomUUID();
 		UUID noteId = UUID.randomUUID();
-		Note stub = new Note(noteId, tripId, PlanningScopeType.TRIP, null, "본문", 2L, null);
+		Note stub = new Note(noteId, tripId, PlanningScopeType.TRIP, null, "본문", null);
 		when(upsertNoteCommandHandler.handle(any())).thenReturn(new PlanningMutationResponse(
-			tripId, 2L, null, false, false, stub, null, null, null));
+			tripId, null, null, false, false, stub, null, null, null));
 
-		UpsertNoteRequest body = new UpsertNoteRequest(1L, PlanningScopeType.TRIP, null, "본문");
+		UpsertNoteRequest body = new UpsertNoteRequest(PlanningScopeType.TRIP, null, "본문");
 
 		mockMvc.perform(put("/api/v1/trips/{tripId}/planning/notes", tripId)
 				.with(asUser())
@@ -159,12 +158,8 @@ class PlanningControllerWebMvcTest {
 		UUID tripId = UUID.randomUUID();
 		UUID noteId = UUID.randomUUID();
 
-		VersionedCommandRequest body = new VersionedCommandRequest(2L);
-
 		mockMvc.perform(delete("/api/v1/trips/{tripId}/planning/notes/{noteId}", tripId, noteId)
-				.with(asUser())
-				.contentType(MediaType.APPLICATION_JSON)
-				.content(objectMapper.writeValueAsString(body)))
+				.with(asUser()))
 			.andExpect(status().isNoContent());
 	}
 
@@ -174,7 +169,7 @@ class PlanningControllerWebMvcTest {
 		UUID tripId = UUID.randomUUID();
 		UUID checklistId = UUID.randomUUID();
 		Checklist stub = new Checklist(checklistId, tripId, PlanningScopeType.TRIP, null,
-			"제목", 1L, List.of());
+			"제목", List.of());
 		when(listChecklistsQueryHandler.handle(any())).thenReturn(List.of(stub));
 
 		mockMvc.perform(get("/api/v1/trips/{tripId}/planning/checklists", tripId)
@@ -189,11 +184,11 @@ class PlanningControllerWebMvcTest {
 		UUID tripId = UUID.randomUUID();
 		UUID checklistId = UUID.randomUUID();
 		Checklist stub = new Checklist(checklistId, tripId, PlanningScopeType.TRIP, null,
-			"제목", 1L, List.of());
+			"제목", List.of());
 		when(upsertChecklistCommandHandler.handle(any())).thenReturn(new PlanningMutationResponse(
-			tripId, 1L, null, false, false, null, stub, null, null));
+			tripId, null, null, false, false, null, stub, null, null));
 
-		UpsertChecklistRequest body = new UpsertChecklistRequest(0L, PlanningScopeType.TRIP, null, "제목");
+		UpsertChecklistRequest body = new UpsertChecklistRequest(PlanningScopeType.TRIP, null, "제목");
 
 		mockMvc.perform(put("/api/v1/trips/{tripId}/planning/checklists", tripId)
 				.with(asUser())
@@ -209,16 +204,12 @@ class PlanningControllerWebMvcTest {
 		UUID tripId = UUID.randomUUID();
 		UUID checklistId = UUID.randomUUID();
 		Checklist stub = new Checklist(checklistId, tripId, PlanningScopeType.TRIP, null,
-			"제목", 2L, List.of());
+			"제목", List.of());
 		when(deleteChecklistCommandHandler.handle(any())).thenReturn(new PlanningMutationResponse(
-			tripId, 2L, null, false, false, null, stub, null, null));
-
-		VersionedCommandRequest body = new VersionedCommandRequest(1L);
+			tripId, null, null, false, false, null, stub, null, null));
 
 		mockMvc.perform(delete("/api/v1/trips/{tripId}/planning/checklists/{checklistId}", tripId, checklistId)
-				.with(asUser())
-				.contentType(MediaType.APPLICATION_JSON)
-				.content(objectMapper.writeValueAsString(body)))
+				.with(asUser()))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.checklist.id").value(checklistId.toString()));
 	}
@@ -232,9 +223,9 @@ class PlanningControllerWebMvcTest {
 		ChecklistItem stub = new ChecklistItem(itemId, checklistId, 0, "본문",
 			List.of(), null);
 		when(createChecklistItemCommandHandler.handle(any())).thenReturn(new PlanningMutationResponse(
-			tripId, 1L, null, false, false, null, null, stub, null));
+			tripId, null, null, false, false, null, null, stub, null));
 
-		CreateChecklistItemRequest body = new CreateChecklistItemRequest(1L, "본문", null);
+		CreateChecklistItemRequest body = new CreateChecklistItemRequest("본문", null);
 
 		mockMvc.perform(post("/api/v1/trips/{tripId}/planning/checklists/{checklistId}/items", tripId, checklistId)
 				.with(asUser())
@@ -253,9 +244,9 @@ class PlanningControllerWebMvcTest {
 		ChecklistItem stub = new ChecklistItem(itemId, checklistId, 5, "new",
 			List.of(), null);
 		when(updateChecklistItemCommandHandler.handle(any())).thenReturn(new PlanningMutationResponse(
-			tripId, 2L, null, false, false, null, null, stub, null));
+			tripId, null, null, false, false, null, null, stub, null));
 
-		UpdateChecklistItemRequest body = new UpdateChecklistItemRequest(1L, "new", 5);
+		UpdateChecklistItemRequest body = new UpdateChecklistItemRequest("new", 5);
 
 		mockMvc.perform(patch("/api/v1/trips/{tripId}/planning/checklists/{checklistId}/items/{itemId}",
 				tripId, checklistId, itemId)
@@ -273,13 +264,9 @@ class PlanningControllerWebMvcTest {
 		UUID checklistId = UUID.randomUUID();
 		UUID itemId = UUID.randomUUID();
 
-		VersionedCommandRequest body = new VersionedCommandRequest(1L);
-
 		mockMvc.perform(delete("/api/v1/trips/{tripId}/planning/checklists/{checklistId}/items/{itemId}",
 				tripId, checklistId, itemId)
-				.with(asUser())
-				.contentType(MediaType.APPLICATION_JSON)
-				.content(objectMapper.writeValueAsString(body)))
+				.with(asUser()))
 			.andExpect(status().isNoContent());
 	}
 
@@ -292,9 +279,9 @@ class PlanningControllerWebMvcTest {
 		ChecklistMemberStatus stub = new ChecklistMemberStatus(null, true, null, null);
 		when(updateChecklistMemberStatusCommandHandler.handle(any()))
 			.thenReturn(new PlanningMutationResponse(
-				tripId, 1L, null, false, false, null, null, null, stub));
+				tripId, null, null, false, false, null, null, null, stub));
 
-		UpdateChecklistMemberStatusRequest body = new UpdateChecklistMemberStatusRequest(0L, true);
+		UpdateChecklistMemberStatusRequest body = new UpdateChecklistMemberStatusRequest(true);
 
 		mockMvc.perform(patch("/api/v1/trips/{tripId}/planning/checklists/{checklistId}/items/{itemId}/members/me",
 				tripId, checklistId, itemId)

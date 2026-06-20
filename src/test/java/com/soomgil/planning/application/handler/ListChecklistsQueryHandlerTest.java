@@ -39,18 +39,20 @@ class ListChecklistsQueryHandlerTest {
 		UUID tripId = UUID.randomUUID();
 		UUID viewerId = UUID.randomUUID();
 		ChecklistRecord record1 = new ChecklistRecord(UUID.randomUUID(), tripId,
-			PlanningScopeType.TRIP, null, "A", 1L, null, Instant.now(), Instant.now());
+			PlanningScopeType.TRIP, null, "A", viewerId, viewerId, null, null,
+			Instant.now(), Instant.now());
 		ChecklistRecord record2 = new ChecklistRecord(UUID.randomUUID(), tripId,
-			PlanningScopeType.TRIP, null, "B", 1L, null, Instant.now(), Instant.now());
+			PlanningScopeType.TRIP, null, "B", viewerId, viewerId, null, null,
+			Instant.now(), Instant.now());
 
 		when(checklistMapper.findByTripIdWithFilters(tripId, null, null))
 			.thenReturn(List.of(record1, record2));
 		when(itemMapper.findByChecklistId(any())).thenReturn(List.of());
 		when(statusMapper.findByItemId(any())).thenReturn(List.of());
 		Checklist stub1 = new Checklist(record1.id(), tripId, PlanningScopeType.TRIP,
-			null, "A", 1L, List.of());
+			null, "A", List.of());
 		Checklist stub2 = new Checklist(record2.id(), tripId, PlanningScopeType.TRIP,
-			null, "B", 1L, List.of());
+			null, "B", List.of());
 		when(assembler.toChecklistDto(any(ChecklistRecord.class), any(), any()))
 			.thenReturn(stub1, stub2);
 

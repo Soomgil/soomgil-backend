@@ -13,7 +13,9 @@ import java.util.UUID;
  * @param checklistId 소속 checklist 식별자
  * @param sortOrder 정렬 순서 (0-based)
  * @param content 항목 본문
- * @param version 낙관적 잠금 버전
+ * @param createdByUserId 최초 작성자
+ * @param updatedByUserId 마지막 수정자
+ * @param deletedByUserId 삭제자
  * @param deletedAt soft delete 시각. null이면 활성
  * @param createdAt 생성 시각
  * @param updatedAt 마지막 수정 시각
@@ -23,7 +25,9 @@ public record ChecklistItemRecord(
 	UUID checklistId,
 	int sortOrder,
 	String content,
-	long version,
+	UUID createdByUserId,
+	UUID updatedByUserId,
+	UUID deletedByUserId,
 	Instant deletedAt,
 	Instant createdAt,
 	Instant updatedAt

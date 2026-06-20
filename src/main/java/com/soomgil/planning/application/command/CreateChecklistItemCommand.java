@@ -10,7 +10,6 @@ import java.util.UUID;
  * @param tripId 여행방 식별자
  * @param checklistId 소속 checklist
  * @param actorUserId 요청자
- * @param baseVersion checklist의 version
  * @param content 본문
  * @param sortOrder 정렬 순서. null이면 (max + 1)로 자동 설정
  */
@@ -18,7 +17,6 @@ public record CreateChecklistItemCommand(
 	UUID tripId,
 	UUID checklistId,
 	UUID actorUserId,
-	long baseVersion,
 	String content,
 	Integer sortOrder
 ) implements Command<PlanningMutationResponse> {

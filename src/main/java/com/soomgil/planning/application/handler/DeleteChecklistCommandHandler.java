@@ -24,7 +24,6 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>checklist를 soft delete하고 연결된 모든 활성 item도 cascade로 soft delete한다.
  * 찾을 수 없거나 이미 삭제된 checklist는 {@link ErrorCode#PLANNING_CHECKLIST_NOT_FOUND}.
- * version 충돌은 {@link ErrorCode#PLANNING_VERSION_CONFLICT}.
  */
 @Component
 @Transactional
@@ -59,20 +58,17 @@ public class DeleteChecklistCommandHandler implements CommandHandler<DeleteCheck
 			.orElseThrow(() -> new PlanningException(ErrorCode.PLANNING_CHECKLIST_NOT_FOUND));
 
 		Instant now = Instant.now();
-		int affected = checklistMapper.softDelete(record.id(), command.baseVersion(), now);
-		if (affected == 0) {
-			throw new PlanningException(ErrorCode.PLANNING_VERSION_CONFLICT);
-		}
-		itemMapper.softDeleteByChecklistId(record.id(), now);
+		checklistMapper.softDelete(record.id(), command.actorUserId(), now);
+		itemMapper.softDeleteByChecklistId(record.id(), command.actorUserId(), now);
 
 		ChecklistRecord tombstone = new ChecklistRecord(record.id(), record.tripId(),
 			record.scopeType(), record.itineraryDayId(), record.title(),
-			record.version() + 1, now, record.createdAt(), now);
+			record.createdByUserId(), command.actorUserId(), command.actorUserId(),
+			now, record.createdAt(), now);
 		Checklist dto = assembler.toChecklistDto(tombstone, List.of(), Map.of());
-		PlanningMutationResponse response = assembler.toMutationResponse(command.tripId(),
-			tombstone.version(), dto);
+		PlanningMutationResponse response = assembler.toMutationResponse(command.tripId(), dto);
 		broadcaster.broadcast(new ChecklistDeletedEvent(command.tripId(),
-			command.actorUserId(), record.id(), tombstone.version()));
+			command.actorUserId(), record.id()));
 		return response;
 	}
 }

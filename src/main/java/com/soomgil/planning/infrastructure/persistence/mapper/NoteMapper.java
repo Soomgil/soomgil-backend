@@ -12,30 +12,32 @@ import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Update;
 
 /**
- * planning.notes 테이블 접근 mapper.
+ * planning.trip_notes 테이블 접근 mapper.
  *
- * <p>모든 UPDATE/DELETE는 {@code WHERE id = ? AND version = ? AND deleted_at IS NULL} 조건으로
- * 낙관적 잠금을 검증한다. affectedRows가 0이면 버전 충돌이므로 호출부에서
- * {@link com.soomgil.global.error.ErrorCode#PLANNING_VERSION_CONFLICT}를 던진다.
+ * <p>DBML에 version 컬럼이 없으므로 optimistic lock은 리소스 단위가 아닌
+ * 상위 itinerary_version으로 관리된다. UPDATE/DELETE는 식별자 기반으로 처리한다.
  */
 @Mapper
 public interface NoteMapper {
 
 	/**
-	 * 신규 note를 INSERT한다. version은 1로 시작.
+	 * 신규 note를 INSERT한다.
 	 *
 	 * @param id note 식별자
 	 * @param tripId 여행방 식별자
 	 * @param scopeType scope
 	 * @param itineraryDayId 일차 식별자 (TRIP scope이면 null)
 	 * @param content 본문
+	 * @param actorUserId 작성자
 	 * @param now 생성 시각
 	 */
 	@Insert("""
-		INSERT INTO planning.notes (
-		    id, trip_id, scope_type, itinerary_day_id, content, version, created_at, updated_at
+		INSERT INTO planning.trip_notes (
+		    id, trip_id, scope_type, itinerary_day_id, content,
+		    created_by_user_id, updated_by_user_id, created_at, updated_at
 		) VALUES (
-		    #{id}, #{tripId}, #{scopeType}, #{itineraryDayId}, #{content}, 1, #{now}, #{now}
+		    #{id}, #{tripId}, #{scopeType}, #{itineraryDayId}, #{content},
+		    #{actorUserId}, #{actorUserId}, #{now}, #{now}
 		)
 		""")
 	void insert(
@@ -44,6 +46,7 @@ public interface NoteMapper {
 		@Param("scopeType") PlanningScopeType scopeType,
 		@Param("itineraryDayId") UUID itineraryDayId,
 		@Param("content") String content,
+		@Param("actorUserId") UUID actorUserId,
 		@Param("now") Instant now
 	);
 
@@ -56,9 +59,10 @@ public interface NoteMapper {
 	 * @return note. 없으면 empty
 	 */
 	@Select("""
-		SELECT id, trip_id, scope_type, itinerary_day_id, content, version,
+		SELECT id, trip_id, scope_type, itinerary_day_id, content,
+		       created_by_user_id, updated_by_user_id, deleted_by_user_id,
 		       deleted_at, created_at, updated_at
-		FROM planning.notes
+		FROM planning.trip_notes
 		WHERE trip_id = #{tripId}
 		  AND scope_type = #{scopeType}
 		  AND (itinerary_day_id = #{itineraryDayId}
@@ -78,31 +82,34 @@ public interface NoteMapper {
 	 * @return note. 없으면 empty
 	 */
 	@Select("""
-		SELECT id, trip_id, scope_type, itinerary_day_id, content, version,
+		SELECT id, trip_id, scope_type, itinerary_day_id, content,
+		       created_by_user_id, updated_by_user_id, deleted_by_user_id,
 		       deleted_at, created_at, updated_at
-		FROM planning.notes
+		FROM planning.trip_notes
 		WHERE id = #{id}
 		""")
 	Optional<NoteRecord> findById(@Param("id") UUID id);
 
 	/**
-	 * note 본문을 갱신하고 version을 1 증가시킨다.
+	 * note 본문을 갱신한다.
 	 *
 	 * @param id note 식별자
 	 * @param content 새 본문
-	 * @param baseVersion 호출자가 읽은 version. 충돌 시 0 반환
+	 * @param actorUserId 수정자
 	 * @param now 수정 시각
-	 * @return 영향받은 row 수. 0이면 버전 충돌
+	 * @return 영향받은 row 수. 0이면 대상이 없거나 이미 삭제됨
 	 */
 	@Update("""
-		UPDATE planning.notes
-		SET content = #{content}, version = version + 1, updated_at = #{now}
-		WHERE id = #{id} AND version = #{baseVersion} AND deleted_at IS NULL
+		UPDATE planning.trip_notes
+		SET content = #{content},
+		    updated_by_user_id = #{actorUserId},
+		    updated_at = #{now}
+		WHERE id = #{id} AND deleted_at IS NULL
 		""")
 	int updateContent(
 		@Param("id") UUID id,
 		@Param("content") String content,
-		@Param("baseVersion") long baseVersion,
+		@Param("actorUserId") UUID actorUserId,
 		@Param("now") Instant now
 	);
 
@@ -110,18 +117,21 @@ public interface NoteMapper {
 	 * note를 soft delete한다.
 	 *
 	 * @param id note 식별자
-	 * @param baseVersion 호출자가 읽은 version
+	 * @param actorUserId 삭제자
 	 * @param now 삭제 시각
-	 * @return 영향받은 row 수. 0이면 버전 충돌
+	 * @return 영향받은 row 수. 0이면 대상이 없거나 이미 삭제됨
 	 */
 	@Update("""
-		UPDATE planning.notes
-		SET deleted_at = #{now}, version = version + 1, updated_at = #{now}
-		WHERE id = #{id} AND version = #{baseVersion} AND deleted_at IS NULL
+		UPDATE planning.trip_notes
+		SET deleted_at = #{now},
+		    deleted_by_user_id = #{actorUserId},
+		    updated_by_user_id = #{actorUserId},
+		    updated_at = #{now}
+		WHERE id = #{id} AND deleted_at IS NULL
 		""")
 	int softDelete(
 		@Param("id") UUID id,
-		@Param("baseVersion") long baseVersion,
+		@Param("actorUserId") UUID actorUserId,
 		@Param("now") Instant now
 	);
 }

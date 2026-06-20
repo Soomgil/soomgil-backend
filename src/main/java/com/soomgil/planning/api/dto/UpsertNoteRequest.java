@@ -6,8 +6,6 @@ import java.util.UUID;
 
 public record UpsertNoteRequest(
 	@NotNull
-	Long baseVersion,
-	@NotNull
 	PlanningScopeType scopeType,
 	UUID itineraryDayId,
 	@NotBlank

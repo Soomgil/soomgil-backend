@@ -14,8 +14,6 @@ public record Checklist(
 	PlanningScopeType scopeType,
 	UUID itineraryDayId,
 	String title,
-	@NotNull
-	Long version,
 	@Valid
 	@NotNull
 	List<ChecklistItem> items

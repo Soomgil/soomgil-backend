@@ -3,7 +3,6 @@ package com.soomgil.planning.application.handler;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -41,7 +40,7 @@ class UpsertChecklistCommandHandlerTest {
 	);
 
 	@Test
-	@DisplayName("신규 checklist는 INSERT하고 version=1로 응답한다")
+	@DisplayName("신규 checklist는 INSERT한다")
 	void insertsNewChecklist() {
 		UUID tripId = UUID.randomUUID();
 		UUID actorId = UUID.randomUUID();
@@ -49,22 +48,22 @@ class UpsertChecklistCommandHandlerTest {
 		when(checklistMapper.findByTripScopeDay(tripId, PlanningScopeType.TRIP, null))
 			.thenReturn(Optional.empty());
 		Checklist stubChecklist = new Checklist(UUID.randomUUID(), tripId, PlanningScopeType.TRIP,
-			null, "준비물", 1L, List.of());
+			null, "준비물", List.of());
 		when(assembler.toChecklistDto(any(ChecklistRecord.class), any(), any()))
 			.thenReturn(stubChecklist);
 		PlanningMutationResponse stubResponse = new PlanningMutationResponse(
-			tripId, 1L, null, false, false, null, stubChecklist, null, null);
-		when(assembler.toMutationResponse(eq(tripId), eq(1L), any(Checklist.class)))
+			tripId, null, null, false, false, null, stubChecklist, null, null);
+		when(assembler.toMutationResponse(eq(tripId), any(Checklist.class)))
 			.thenReturn(stubResponse);
 
 		PlanningMutationResponse result = handler.handle(new UpsertChecklistCommand(
-			tripId, actorId, 0L, PlanningScopeType.TRIP, null, "준비물"
+			tripId, actorId, PlanningScopeType.TRIP, null, "준비물"
 		));
 
 		assertThat(result).isSameAs(stubResponse);
 		verify(checklistMapper).insert(any(UUID.class), eq(tripId), eq(PlanningScopeType.TRIP),
-			eq(null), eq("준비물"), any(Instant.class));
-		verify(checklistMapper, never()).updateTitle(any(), any(), anyLong(), any());
+			eq(null), eq("준비물"), eq(actorId), any(Instant.class));
+		verify(checklistMapper, never()).updateTitle(any(), any(), any(), any());
 		verify(broadcaster).broadcast(any(PlanningRealtimeEvent.class));
 	}
 
@@ -75,48 +74,25 @@ class UpsertChecklistCommandHandlerTest {
 		UUID actorId = UUID.randomUUID();
 		UUID checklistId = UUID.randomUUID();
 		ChecklistRecord existing = new ChecklistRecord(checklistId, tripId, PlanningScopeType.TRIP,
-			null, "옛 제목", 2L, null, Instant.now(), Instant.now());
+			null, "옛 제목", actorId, actorId, null, null, Instant.now(), Instant.now());
 
 		when(checklistMapper.findByTripScopeDay(tripId, PlanningScopeType.TRIP, null))
 			.thenReturn(Optional.of(existing));
-		when(checklistMapper.updateTitle(eq(checklistId), eq("새 제목"), eq(2L), any()))
-			.thenReturn(1);
 		Checklist stubChecklist = new Checklist(checklistId, tripId, PlanningScopeType.TRIP,
-			null, "새 제목", 3L, List.of());
+			null, "새 제목", List.of());
 		when(assembler.toChecklistDto(any(ChecklistRecord.class), any(), any()))
 			.thenReturn(stubChecklist);
 		PlanningMutationResponse stubResponse = new PlanningMutationResponse(
-			tripId, 3L, null, false, false, null, stubChecklist, null, null);
-		when(assembler.toMutationResponse(eq(tripId), eq(3L), any(Checklist.class)))
+			tripId, null, null, false, false, null, stubChecklist, null, null);
+		when(assembler.toMutationResponse(eq(tripId), any(Checklist.class)))
 			.thenReturn(stubResponse);
 
 		PlanningMutationResponse result = handler.handle(new UpsertChecklistCommand(
-			tripId, actorId, 2L, PlanningScopeType.TRIP, null, "새 제목"
+			tripId, actorId, PlanningScopeType.TRIP, null, "새 제목"
 		));
 
 		assertThat(result).isSameAs(stubResponse);
-		verify(checklistMapper).updateTitle(eq(checklistId), eq("새 제목"), eq(2L), any());
-	}
-
-	@Test
-	@DisplayName("UPDATE 시 affectedRows가 0이면 PLANNING_VERSION_CONFLICT")
-	void versionConflictThrows() {
-		UUID tripId = UUID.randomUUID();
-		UUID checklistId = UUID.randomUUID();
-		ChecklistRecord existing = new ChecklistRecord(checklistId, tripId, PlanningScopeType.TRIP,
-			null, "옛 제목", 2L, null, Instant.now(), Instant.now());
-
-		when(checklistMapper.findByTripScopeDay(tripId, PlanningScopeType.TRIP, null))
-			.thenReturn(Optional.of(existing));
-		when(checklistMapper.updateTitle(eq(checklistId), eq("new"), eq(1L), any()))
-			.thenReturn(0);
-
-		assertThatThrownBy(() -> handler.handle(new UpsertChecklistCommand(
-			tripId, UUID.randomUUID(), 1L, PlanningScopeType.TRIP, null, "new"
-		)))
-			.isInstanceOf(PlanningException.class)
-			.satisfies(ex -> assertThat(((PlanningException) ex).errorCode())
-				.isEqualTo(ErrorCode.PLANNING_VERSION_CONFLICT));
+		verify(checklistMapper).updateTitle(eq(checklistId), eq("새 제목"), eq(actorId), any());
 	}
 
 	@Test
@@ -125,12 +101,12 @@ class UpsertChecklistCommandHandlerTest {
 		UUID tripId = UUID.randomUUID();
 
 		assertThatThrownBy(() -> handler.handle(new UpsertChecklistCommand(
-			tripId, UUID.randomUUID(), 0L, PlanningScopeType.DAY, null, "제목"
+			tripId, UUID.randomUUID(), PlanningScopeType.DAY, null, "제목"
 		)))
 			.isInstanceOf(PlanningException.class)
 			.satisfies(ex -> assertThat(((PlanningException) ex).errorCode())
 				.isEqualTo(ErrorCode.PLANNING_SCOPE_DAY_MISMATCH));
 
-		verify(checklistMapper, never()).insert(any(), any(), any(), any(), any(), any());
+		verify(checklistMapper, never()).insert(any(), any(), any(), any(), any(), any(), any());
 	}
 }

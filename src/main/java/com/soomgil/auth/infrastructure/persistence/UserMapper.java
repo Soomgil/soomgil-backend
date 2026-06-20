@@ -33,11 +33,18 @@ public interface UserMapper {
 	void updateStatus(@Param("id") UUID id, @Param("status") String status);
 
 	/**
-	 * 사용자에게 부여된 역할 목록을 조회한다({@code auth.user_roles}).
+	 * 사용자에게 부여된 활성 역할 코드 목록을 조회한다({@code auth.user_roles} + {@code auth.roles} JOIN).
+	 *
+	 * <p>revoked_at이 NULL인(활성) 역할만 반환한다.
 	 *
 	 * @param id 사용자 식별자
-	 * @return 역할 문자열 목록 (예: {@code MODERATOR}, {@code ADMIN})
+	 * @return 역할 코드 목록 (예: {@code MODERATOR}, {@code ADMIN})
 	 */
-	@Select("SELECT role FROM auth.user_roles WHERE user_id = #{id}")
+	@Select("""
+		SELECT r.code
+		FROM auth.user_roles ur
+		JOIN auth.roles r ON r.id = ur.role_id
+		WHERE ur.user_id = #{id} AND ur.revoked_at IS NULL
+		""")
 	List<String> findRolesByUserId(@Param("id") UUID id);
 }

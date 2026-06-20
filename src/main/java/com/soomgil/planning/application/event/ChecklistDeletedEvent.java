@@ -10,13 +10,11 @@ import java.util.UUID;
  * @param tripId 여행방 식별자
  * @param actorUserId 삭제 수행자
  * @param checklistId 삭제된 checklist 식별자
- * @param version tombstone version
  */
 public record ChecklistDeletedEvent(
 	UUID tripId,
 	UUID actorUserId,
-	UUID checklistId,
-	long version
+	UUID checklistId
 ) implements PlanningRealtimeEvent {
 
 	@Override

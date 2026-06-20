@@ -3,7 +3,6 @@ package com.soomgil.planning.application.handler;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -40,30 +39,30 @@ class DeleteChecklistItemCommandHandlerTest {
 	);
 
 	@Test
-	@DisplayName("활성 item을 baseVersion 일치로 soft delete한다")
+	@DisplayName("활성 item을 soft delete한다")
 	void deletesItem() {
 		UUID tripId = UUID.randomUUID();
 		UUID checklistId = UUID.randomUUID();
 		UUID itemId = UUID.randomUUID();
+		UUID actorId = UUID.randomUUID();
 		ChecklistItemRecord existing = new ChecklistItemRecord(itemId, checklistId, 2,
-			"본문", 3L, null, Instant.now(), Instant.now());
+			"본문", actorId, actorId, null, null, Instant.now(), Instant.now());
 
 		when(itemMapper.findById(itemId)).thenReturn(Optional.of(existing));
-		when(itemMapper.softDelete(eq(itemId), eq(3L), any())).thenReturn(1);
 		ChecklistItem stubItem = new ChecklistItem(itemId, checklistId, 2, "본문",
 			List.of(), null);
 		when(assembler.toItemDto(any(), any())).thenReturn(stubItem);
 		PlanningMutationResponse stubResponse = new PlanningMutationResponse(
-			tripId, 4L, null, false, false, null, null, stubItem, null);
-		when(assembler.toMutationResponse(eq(tripId), eq(4L), any(ChecklistItem.class)))
+			tripId, null, null, false, false, null, null, stubItem, null);
+		when(assembler.toMutationResponse(eq(tripId), any(ChecklistItem.class)))
 			.thenReturn(stubResponse);
 
 		PlanningMutationResponse result = handler.handle(new DeleteChecklistItemCommand(
-			tripId, checklistId, itemId, UUID.randomUUID(), 3L
+			tripId, checklistId, itemId, actorId
 		));
 
 		assertThat(result).isSameAs(stubResponse);
-		verify(itemMapper).softDelete(eq(itemId), eq(3L), any());
+		verify(itemMapper).softDelete(eq(itemId), eq(actorId), any());
 		verify(broadcaster).broadcast(any(PlanningRealtimeEvent.class));
 	}
 
@@ -75,12 +74,12 @@ class DeleteChecklistItemCommandHandlerTest {
 		when(itemMapper.findById(itemId)).thenReturn(Optional.empty());
 
 		assertThatThrownBy(() -> handler.handle(new DeleteChecklistItemCommand(
-			UUID.randomUUID(), UUID.randomUUID(), itemId, UUID.randomUUID(), 1L
+			UUID.randomUUID(), UUID.randomUUID(), itemId, UUID.randomUUID()
 		)))
 			.isInstanceOf(PlanningException.class)
 			.satisfies(ex -> assertThat(((PlanningException) ex).errorCode())
 				.isEqualTo(ErrorCode.PLANNING_ITEM_NOT_FOUND));
 
-		verify(itemMapper, never()).softDelete(any(), anyLong(), any());
+		verify(itemMapper, never()).softDelete(any(), any(), any());
 	}
 }

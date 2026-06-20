@@ -12,12 +12,10 @@ import java.util.UUID;
  * @param tripId 여행방 식별자
  * @param checklistId checklist 식별자
  * @param actorUserId 요청자
- * @param baseVersion 클라이언트가 읽은 checklist version
  */
 public record DeleteChecklistCommand(
 	UUID tripId,
 	UUID checklistId,
-	UUID actorUserId,
-	long baseVersion
+	UUID actorUserId
 ) implements Command<PlanningMutationResponse> {
 }

@@ -3,7 +3,6 @@ package com.soomgil.planning.application.handler;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -46,65 +45,46 @@ class DeleteChecklistCommandHandlerTest {
 	@DisplayName("checklist를 soft delete하면 연결된 item도 cascade로 soft delete된다")
 	void deletesChecklistAndCascadesItems() {
 		UUID tripId = UUID.randomUUID();
+		UUID actorId = UUID.randomUUID();
 		UUID checklistId = UUID.randomUUID();
 		ChecklistRecord existing = new ChecklistRecord(checklistId, tripId, PlanningScopeType.TRIP,
-			null, "제목", 2L, null, Instant.now(), Instant.now());
+			null, "제목", actorId, actorId, null, null, Instant.now(), Instant.now());
 
 		when(checklistMapper.findById(checklistId)).thenReturn(Optional.of(existing));
-		when(checklistMapper.softDelete(eq(checklistId), eq(2L), any())).thenReturn(1);
 		Checklist stubChecklist = new Checklist(checklistId, tripId, PlanningScopeType.TRIP,
-			null, "제목", 3L, List.of());
+			null, "제목", List.of());
 		when(assembler.toChecklistDto(any(ChecklistRecord.class), any(), any()))
 			.thenReturn(stubChecklist);
 		PlanningMutationResponse stubResponse = new PlanningMutationResponse(
-			tripId, 3L, null, false, false, null, stubChecklist, null, null);
-		when(assembler.toMutationResponse(eq(tripId), eq(3L), any(Checklist.class)))
+			tripId, null, null, false, false, null, stubChecklist, null, null);
+		when(assembler.toMutationResponse(eq(tripId), any(Checklist.class)))
 			.thenReturn(stubResponse);
 
 		PlanningMutationResponse result = handler.handle(new DeleteChecklistCommand(
-			tripId, checklistId, UUID.randomUUID(), 2L
+			tripId, checklistId, actorId
 		));
 
 		assertThat(result).isSameAs(stubResponse);
-		verify(checklistMapper).softDelete(eq(checklistId), eq(2L), any());
-		verify(itemMapper).softDeleteByChecklistId(eq(checklistId), any());
+		verify(checklistMapper).softDelete(eq(checklistId), eq(actorId), any());
+		verify(itemMapper).softDeleteByChecklistId(eq(checklistId), eq(actorId), any());
 		verify(broadcaster).broadcast(any(PlanningRealtimeEvent.class));
 	}
 
 	@Test
 	@DisplayName("식별자로 찾을 수 없으면 PLANNING_CHECKLIST_NOT_FOUND")
 	void notFoundThrows() {
+		UUID tripId = UUID.randomUUID();
 		UUID checklistId = UUID.randomUUID();
 
 		when(checklistMapper.findById(checklistId)).thenReturn(Optional.empty());
 
 		assertThatThrownBy(() -> handler.handle(new DeleteChecklistCommand(
-			UUID.randomUUID(), checklistId, UUID.randomUUID(), 1L
+			tripId, checklistId, UUID.randomUUID()
 		)))
 			.isInstanceOf(PlanningException.class)
 			.satisfies(ex -> assertThat(((PlanningException) ex).errorCode())
 				.isEqualTo(ErrorCode.PLANNING_CHECKLIST_NOT_FOUND));
 
-		verify(itemMapper, never()).softDeleteByChecklistId(any(), any());
-	}
-
-	@Test
-	@DisplayName("soft delete 시 affectedRows가 0이면 PLANNING_VERSION_CONFLICT")
-	void versionConflictThrows() {
-		UUID checklistId = UUID.randomUUID();
-		ChecklistRecord existing = new ChecklistRecord(checklistId, UUID.randomUUID(),
-			PlanningScopeType.TRIP, null, "제목", 2L, null, Instant.now(), Instant.now());
-
-		when(checklistMapper.findById(checklistId)).thenReturn(Optional.of(existing));
-		when(checklistMapper.softDelete(eq(checklistId), eq(1L), any())).thenReturn(0);
-
-		assertThatThrownBy(() -> handler.handle(new DeleteChecklistCommand(
-			UUID.randomUUID(), checklistId, UUID.randomUUID(), 1L
-		)))
-			.isInstanceOf(PlanningException.class)
-			.satisfies(ex -> assertThat(((PlanningException) ex).errorCode())
-				.isEqualTo(ErrorCode.PLANNING_VERSION_CONFLICT));
-
-		verify(itemMapper, never()).softDeleteByChecklistId(any(), any());
+		verify(itemMapper, never()).softDeleteByChecklistId(any(), any(), any());
 	}
 }

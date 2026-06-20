@@ -15,8 +15,6 @@ public record Note(
 	UUID itineraryDayId,
 	@NotBlank
 	String content,
-	@NotNull
-	Long version,
 	OffsetDateTime deletedAt
 ) {
 }

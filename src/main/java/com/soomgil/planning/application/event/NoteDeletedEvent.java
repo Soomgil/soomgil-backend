@@ -10,13 +10,11 @@ import java.util.UUID;
  * @param tripId 여행방 식별자
  * @param actorUserId 삭제 수행자
  * @param noteId 삭제된 note 식별자
- * @param version tombstone version (삭제 후 증가한 값)
  */
 public record NoteDeletedEvent(
 	UUID tripId,
 	UUID actorUserId,
-	UUID noteId,
-	long version
+	UUID noteId
 ) implements PlanningRealtimeEvent {
 
 	@Override

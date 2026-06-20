@@ -27,7 +27,7 @@ import org.springframework.stereotype.Component;
  *
  * <p>{@link PlanningMutationResponse}의 {@code itineraryVersion}/{@code commandEventId}/
  * {@code undoAvailable}/{@code redoAvailable}은 collaboration/itinerary 모듈 연동 전까지 stub.
- * 현재는 mutation 대상 리소스의 version을 itineraryVersion 자리에 채운다.
+ * DBML planning 스키마에는 version 컬럼이 없으므로 resource 단위 version은 노출하지 않는다.
  */
 @Component
 public class PlanningAssembler {
@@ -51,7 +51,6 @@ public class PlanningAssembler {
 			record.scopeType(),
 			record.itineraryDayId(),
 			record.content(),
-			record.version(),
 			toOffsetDateTime(record.deletedAt())
 		);
 	}
@@ -78,7 +77,6 @@ public class PlanningAssembler {
 			record.scopeType(),
 			record.itineraryDayId(),
 			record.title(),
-			record.version(),
 			itemDtos
 		);
 	}
@@ -127,53 +125,49 @@ public class PlanningAssembler {
 	 * note mutation 응답을 조립한다.
 	 *
 	 * @param tripId 여행방 식별자
-	 * @param resourceVersion note의 새 version
 	 * @param note note DTO
 	 * @return mutation 응답
 	 */
-	public PlanningMutationResponse toMutationResponse(UUID tripId, long resourceVersion, Note note) {
+	public PlanningMutationResponse toMutationResponse(UUID tripId, Note note) {
 		return new PlanningMutationResponse(
-			tripId, resourceVersion, null, false, false, note, null, null, null);
+			tripId, null, null, false, false, note, null, null, null);
 	}
 
 	/**
 	 * checklist mutation 응답을 조립한다.
 	 *
 	 * @param tripId 여행방 식별자
-	 * @param resourceVersion checklist의 새 version
 	 * @param checklist checklist DTO
 	 * @return mutation 응답
 	 */
-	public PlanningMutationResponse toMutationResponse(UUID tripId, long resourceVersion, Checklist checklist) {
+	public PlanningMutationResponse toMutationResponse(UUID tripId, Checklist checklist) {
 		return new PlanningMutationResponse(
-			tripId, resourceVersion, null, false, false, null, checklist, null, null);
+			tripId, null, null, false, false, null, checklist, null, null);
 	}
 
 	/**
 	 * checklist item mutation 응답을 조립한다.
 	 *
 	 * @param tripId 여행방 식별자
-	 * @param resourceVersion item의 새 version
 	 * @param item item DTO
 	 * @return mutation 응답
 	 */
-	public PlanningMutationResponse toMutationResponse(UUID tripId, long resourceVersion, ChecklistItem item) {
+	public PlanningMutationResponse toMutationResponse(UUID tripId, ChecklistItem item) {
 		return new PlanningMutationResponse(
-			tripId, resourceVersion, null, false, false, null, null, item, null);
+			tripId, null, null, false, false, null, null, item, null);
 	}
 
 	/**
 	 * member status mutation 응답을 조립한다.
 	 *
 	 * @param tripId 여행방 식별자
-	 * @param resourceVersion status의 새 version
 	 * @param status status DTO
 	 * @return mutation 응답
 	 */
 	public PlanningMutationResponse toMutationResponse(
-		UUID tripId, long resourceVersion, ChecklistMemberStatus status) {
+		UUID tripId, ChecklistMemberStatus status) {
 		return new PlanningMutationResponse(
-			tripId, resourceVersion, null, false, false, null, null, null, status);
+			tripId, null, null, false, false, null, null, null, status);
 	}
 
 	private String resolveDisplayName(UUID userId) {
