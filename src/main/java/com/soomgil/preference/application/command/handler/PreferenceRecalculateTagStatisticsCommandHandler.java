@@ -27,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class PreferenceRecalculateTagStatisticsCommandHandler implements RecalculateTagStatisticsCommandHandler {
 
 	private static final int RATE_SCALE = 12;
+	private static final long MINIMUM_SYNTHETIC_REACTIONS_PER_CORE_TAG = 50;
 
 	private final PreferenceTagStatisticsMapper mapper;
 	private final PreferenceDiscriminationCalculator calculator;
@@ -117,6 +118,14 @@ public class PreferenceRecalculateTagStatisticsCommandHandler implements Recalcu
 		}
 		if (mapper.countActiveSyntheticPersonasWithoutEvents(generatorVersion) > 0) {
 			throw new IllegalStateException("Every active synthetic persona must have at least one event.");
+		}
+		if (mapper.countSyntheticCoreTagsBelowReactionMinimum(
+			generatorVersion,
+			MINIMUM_SYNTHETIC_REACTIONS_PER_CORE_TAG
+		) > 0) {
+			throw new IllegalStateException(
+				"Every active preference tag must have at least 50 synthetic reactions."
+			);
 		}
 	}
 

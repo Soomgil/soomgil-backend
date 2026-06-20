@@ -136,6 +136,24 @@
 			)
 	</select>
 
+	<select id="countSyntheticCoreTagsBelowReactionMinimum" resultType="long">
+		SELECT count(*)
+		FROM (
+			SELECT core_tag.id
+			FROM preference.preference_tags core_tag
+			LEFT JOIN preference.place_tag_enrichment_tags place_tag
+				ON place_tag.tag_id = core_tag.id
+			LEFT JOIN preference.synthetic_swipe_events event
+				ON event.place_tag_enrichment_id = place_tag.enrichment_id
+				AND event.generator_version = #{generatorVersion}
+			WHERE core_tag.tag_type = 'TAG'
+				AND core_tag.is_active = true
+				AND core_tag.is_selectable = true
+			GROUP BY core_tag.id
+			HAVING count(event.id) &lt; #{minimumReactionCount}
+		) unstable_tag
+	</select>
+
 	<insert id="insertRun" parameterType="com.soomgil.preference.infrastructure.persistence.row.TagStatisticRunInsertRow">
 		INSERT INTO preference.tag_statistic_runs (
 			id,

@@ -33,6 +33,11 @@ public interface PreferenceTagStatisticsMapper {
 
 	long countActiveSyntheticPersonasWithoutEvents(@Param("generatorVersion") String generatorVersion);
 
+	long countSyntheticCoreTagsBelowReactionMinimum(
+		@Param("generatorVersion") String generatorVersion,
+		@Param("minimumReactionCount") long minimumReactionCount
+	);
+
 	void insertRun(TagStatisticRunInsertRow row);
 
 	void insertStatistic(TagStatisticInsertRow row);

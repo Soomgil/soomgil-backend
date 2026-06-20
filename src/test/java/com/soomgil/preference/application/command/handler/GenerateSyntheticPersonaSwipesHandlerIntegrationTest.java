@@ -1,6 +1,7 @@
 package com.soomgil.preference.application.command.handler;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.soomgil.TestcontainersConfiguration;
 import com.soomgil.preference.application.command.dto.GenerateSyntheticPersonaSwipesCommand;
@@ -8,6 +9,7 @@ import com.soomgil.preference.application.command.dto.GenerateSyntheticPersonaSw
 import com.soomgil.preference.application.command.dto.RecalculateTagStatisticsCommand;
 import com.soomgil.preference.domain.policy.TagStatisticSource;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -73,6 +75,18 @@ class GenerateSyntheticPersonaSwipesHandlerIntegrationTest {
 	void keepsSyntheticAndRealStatisticsSourcesSeparated() {
 		handler.handle(new GenerateSyntheticPersonaSwipesCommand(10));
 		insertRealReaction();
+		assertThatThrownBy(() -> statisticsHandler.handle(new RecalculateTagStatisticsCommand(
+			new BigDecimal("2"),
+			TagStatisticSource.SYNTHETIC_PERSONA,
+			"synthetic-persona-v1"
+		)))
+			.isInstanceOf(IllegalStateException.class)
+			.hasMessage("Every active preference tag must have at least 50 synthetic reactions.");
+
+		insertCoreTagCoverageEnrichments();
+		GenerateSyntheticPersonaSwipesResult completedGeneration = handler.handle(
+			new GenerateSyntheticPersonaSwipesCommand(100)
+		);
 
 		var syntheticResult = statisticsHandler.handle(new RecalculateTagStatisticsCommand(
 			new BigDecimal("2"),
@@ -91,12 +105,44 @@ class GenerateSyntheticPersonaSwipesHandlerIntegrationTest {
 
 		assertThat(syntheticRun)
 			.containsEntry("source", "SYNTHETIC_PERSONA")
-			.containsEntry("total_reaction_count", 100L)
+			.containsEntry("total_reaction_count", (long) completedGeneration.eventCount())
 			.containsEntry("is_serving", false);
 		assertThat(realRun)
 			.containsEntry("source", "REAL_USER")
 			.containsEntry("total_reaction_count", 1L)
 			.containsEntry("is_serving", true);
+	}
+
+	private void insertCoreTagCoverageEnrichments() {
+		List<UUID> tagIds = jdbcTemplate.queryForList("""
+			SELECT id
+			FROM preference.preference_tags
+			WHERE tag_type = 'TAG'
+				AND is_active = true
+				AND is_selectable = true
+			ORDER BY code
+			""", UUID.class);
+		for (int start = 0; start < tagIds.size(); start += 10) {
+			int group = start / 10;
+			UUID enrichmentId = UUID.nameUUIDFromBytes(
+				("coverage-" + group).getBytes(StandardCharsets.UTF_8)
+			);
+			List<UUID> chunk = tagIds.subList(start, Math.min(start + 10, tagIds.size()));
+			jdbcTemplate.update("""
+				INSERT INTO preference.place_tag_enrichments (
+					id, provider, external_place_id, status, selected_count, enriched_at
+				)
+				VALUES (?, 'KTO', ?, 'SUCCEEDED', ?, now())
+				""", enrichmentId, "coverage-" + group, chunk.size());
+			for (int index = 0; index < chunk.size(); index++) {
+				jdbcTemplate.update("""
+					INSERT INTO preference.place_tag_enrichment_tags (
+						enrichment_id, tag_id, confidence, weight, rank_order
+					)
+					VALUES (?, ?, 1.0, 1.0, ?)
+					""", enrichmentId, chunk.get(index), index + 1);
+			}
+		}
 	}
 
 	private void insertPlaceEnrichments() {
