@@ -1,9 +1,11 @@
 package com.soomgil.preference.application.command.handler;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.soomgil.TestcontainersConfiguration;
 import com.soomgil.preference.application.command.dto.RecalculateTagStatisticsCommand;
+import com.soomgil.preference.domain.policy.TagStatisticSource;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
@@ -63,7 +65,21 @@ class RecalculateTagStatisticsCommandHandlerIntegrationTest {
 
 	@Test
 	void calculatesServingStatisticsFromEachUsersFinalPlaceReaction() {
-		var result = handler.handle(new RecalculateTagStatisticsCommand(new BigDecimal("2")));
+		assertThatThrownBy(() -> handler.handle(new RecalculateTagStatisticsCommand(
+			new BigDecimal("2"),
+			TagStatisticSource.REAL_USER,
+			null,
+			false
+		)))
+			.isInstanceOf(IllegalStateException.class)
+			.hasMessage("Real user statistics have not met the serving transition policy.");
+
+		var result = handler.handle(new RecalculateTagStatisticsCommand(
+			new BigDecimal("2"),
+			TagStatisticSource.REAL_USER,
+			null,
+			true
+		));
 
 		Map<String, Object> run = jdbcTemplate.queryForMap("""
 			SELECT

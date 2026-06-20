@@ -81,7 +81,10 @@ class GenerateSyntheticPersonaSwipesHandlerIntegrationTest {
 		));
 
 		var realResult = statisticsHandler.handle(new RecalculateTagStatisticsCommand(
-			new BigDecimal("2")
+			new BigDecimal("2"),
+			TagStatisticSource.REAL_USER,
+			null,
+			true
 		));
 		Map<String, Object> syntheticRun = statisticRun(syntheticResult.runId());
 		Map<String, Object> realRun = statisticRun(realResult.runId());

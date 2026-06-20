@@ -19,6 +19,8 @@ public interface PreferenceTagStatisticsMapper {
 
 	List<TagReactionAggregateRow> aggregateFinalReactionsByTag();
 
+	List<Long> findRealCoreTagReactionCounts();
+
 	long countSyntheticReactions(@Param("generatorVersion") String generatorVersion);
 
 	long countPositiveSyntheticReactions(@Param("generatorVersion") String generatorVersion);

@@ -4,6 +4,7 @@ import com.soomgil.common.id.Ids;
 import com.soomgil.preference.application.command.dto.RecalculateTagStatisticsCommand;
 import com.soomgil.preference.application.command.dto.RecalculateTagStatisticsResult;
 import com.soomgil.preference.domain.policy.PreferenceDiscriminationCalculator;
+import com.soomgil.preference.domain.policy.RealUserServingTransitionPolicy;
 import com.soomgil.preference.domain.policy.TagPreferenceStatistics;
 import com.soomgil.preference.domain.policy.TagStatisticSource;
 import com.soomgil.preference.infrastructure.persistence.mapper.PreferenceTagStatisticsMapper;
@@ -29,10 +30,12 @@ public class PreferenceRecalculateTagStatisticsCommandHandler implements Recalcu
 
 	private final PreferenceTagStatisticsMapper mapper;
 	private final PreferenceDiscriminationCalculator calculator;
+	private final RealUserServingTransitionPolicy realUserTransitionPolicy;
 
 	public PreferenceRecalculateTagStatisticsCommandHandler(PreferenceTagStatisticsMapper mapper) {
 		this.mapper = mapper;
 		this.calculator = new PreferenceDiscriminationCalculator();
+		this.realUserTransitionPolicy = new RealUserServingTransitionPolicy(10_000, 100);
 	}
 
 	@Transactional
@@ -41,6 +44,8 @@ public class PreferenceRecalculateTagStatisticsCommandHandler implements Recalcu
 		validate(command);
 		if (command.source() == TagStatisticSource.SYNTHETIC_PERSONA) {
 			validateSyntheticQuality(command.generatorVersion());
+		} else {
+			validateRealUserTransition(command);
 		}
 
 		long totalReactionCount = totalReactionCount(command);
@@ -112,6 +117,16 @@ public class PreferenceRecalculateTagStatisticsCommandHandler implements Recalcu
 		}
 		if (mapper.countActiveSyntheticPersonasWithoutEvents(generatorVersion) > 0) {
 			throw new IllegalStateException("Every active synthetic persona must have at least one event.");
+		}
+	}
+
+	private void validateRealUserTransition(RecalculateTagStatisticsCommand command) {
+		if (!realUserTransitionPolicy.canPromote(
+			mapper.countFinalReactions(),
+			mapper.findRealCoreTagReactionCounts(),
+			command.offlineEvaluationApproved()
+		)) {
+			throw new IllegalStateException("Real user statistics have not met the serving transition policy.");
 		}
 	}
 
