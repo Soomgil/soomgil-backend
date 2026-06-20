@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+	PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+	"https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.soomgil.preference.infrastructure.persistence.mapper.PreferenceTagStatisticsMapper">
+
+	<resultMap id="TagReactionAggregateRowMap"
+		type="com.soomgil.preference.infrastructure.persistence.row.TagReactionAggregateRow">
+		<constructor>
+			<arg column="tag_id" javaType="java.lang.String"/>
+			<arg column="positive_count" javaType="java.lang.Long"/>
+			<arg column="reaction_count" javaType="java.lang.Long"/>
+		</constructor>
+	</resultMap>
+
+	<select id="countFinalReactions" resultType="long">
+		SELECT count(*)
+		FROM preference.user_place_reactions
+	</select>
+
+	<select id="countPositiveFinalReactions" resultType="long">
+		SELECT count(*)
+		FROM preference.user_place_reactions
+		WHERE reaction IN ('LIKE', 'SUPER_LIKE')
+	</select>
+
+	<select id="aggregateFinalReactionsByTag" resultMap="TagReactionAggregateRowMap">
+		SELECT
+			CAST(tag.tag_id AS text) AS tag_id,
+			count(*) FILTER (WHERE reaction.reaction IN ('LIKE', 'SUPER_LIKE')) AS positive_count,
+			count(*) AS reaction_count
+		FROM preference.user_place_reactions reaction
+		JOIN LATERAL (
+			SELECT enrichment.id
+			FROM preference.place_tag_enrichments enrichment
+			WHERE enrichment.status = 'SUCCEEDED'
+				AND (
+					enrichment.id = reaction.place_tag_enrichment_id
+					OR (
+						enrichment.provider = reaction.provider
+						AND enrichment.external_place_id = reaction.external_place_id
+					)
+				)
+			ORDER BY
+				CASE WHEN enrichment.id = reaction.place_tag_enrichment_id THEN 0 ELSE 1 END,
+				enrichment.enriched_at DESC NULLS LAST,
+				enrichment.created_at DESC,
+				enrichment.id
+			LIMIT 1
+		) selected_enrichment ON true
+		JOIN preference.place_tag_enrichment_tags tag
+			ON tag.enrichment_id = selected_enrichment.id
+		GROUP BY tag.tag_id
+		ORDER BY tag.tag_id
+	</select>
+
+	<insert id="insertRun" parameterType="com.soomgil.preference.infrastructure.persistence.row.TagStatisticRunInsertRow">
+		INSERT INTO preference.tag_statistic_runs (
+			id,
+			source,
+			status,
+			alpha,
+			global_positive_rate,
+			total_reaction_count,
+			positive_reaction_count,
+			is_serving,
+			started_at
+		)
+		VALUES (
+			CAST(#{id} AS uuid),
+			'REAL_USER',
+			'RUNNING',
+			#{alpha},
+			#{globalPositiveRate},
+			#{totalReactionCount},
+			#{positiveReactionCount},
+			false,
+			now()
+		)
+	</insert>
+
+	<insert id="insertStatistic" parameterType="com.soomgil.preference.infrastructure.persistence.row.TagStatisticInsertRow">
+		INSERT INTO preference.tag_statistics (
+			run_id,
+			tag_id,
+			preference_discrimination,
+			smoothed_positive_rate,
+			positive_count,
+			reaction_count
+		)
+		VALUES (
+			CAST(#{runId} AS uuid),
+			CAST(#{tagId} AS uuid),
+			#{preferenceDiscrimination},
+			#{smoothedPositiveRate},
+			#{positiveCount},
+			#{reactionCount}
+		)
+	</insert>
+
+	<update id="deactivateServingRuns">
+		UPDATE preference.tag_statistic_runs
+		SET is_serving = false
+		WHERE is_serving = true
+	</update>
+
+	<update id="completeAndServeRun">
+		UPDATE preference.tag_statistic_runs
+		SET status = 'SUCCEEDED',
+			is_serving = true,
+			completed_at = now()
+		WHERE id = CAST(#{runId} AS uuid)
+	</update>
+</mapper>
