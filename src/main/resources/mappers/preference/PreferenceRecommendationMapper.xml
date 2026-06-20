@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+	PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+	"https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.soomgil.preference.infrastructure.persistence.mapper.PreferenceRecommendationMapper">
+
+	<resultMap id="RecommendationScoreSourceRowMap"
+		type="com.soomgil.preference.infrastructure.persistence.row.RecommendationScoreSourceRow">
+		<constructor>
+			<arg column="provider" javaType="java.lang.String"/>
+			<arg column="external_place_id" javaType="java.lang.String"/>
+			<arg column="tag_id" javaType="java.lang.String"/>
+			<arg column="confidence" javaType="java.math.BigDecimal"/>
+			<arg column="weight" javaType="java.math.BigDecimal"/>
+			<arg column="user_id" javaType="java.lang.String"/>
+			<arg column="preference_score" javaType="java.math.BigDecimal"/>
+			<arg column="reaction" javaType="java.lang.String"/>
+			<arg column="display_name" javaType="java.lang.String"/>
+			<arg column="profile_image_url" javaType="java.lang.String"/>
+		</constructor>
+	</resultMap>
+
+	<select id="findScoreSources" resultMap="RecommendationScoreSourceRowMap">
+		WITH place_refs(provider, external_place_id) AS (
+			VALUES
+			<foreach collection="places" item="place" separator=",">
+				(#{place.provider}::text, #{place.externalPlaceId})
+			</foreach>
+		),
+		member_refs(user_id) AS (
+			VALUES
+			<foreach collection="memberIds" item="memberId" separator=",">
+				(CAST(#{memberId} AS uuid))
+			</foreach>
+		)
+		SELECT
+			place.provider,
+			place.external_place_id,
+			CAST(tag.tag_id AS text) AS tag_id,
+			tag.confidence,
+			tag.weight,
+			CAST(member.user_id AS text) AS user_id,
+			coalesce(member_weight.preference_score, statistic.smoothed_positive_rate, 0.5)
+				AS preference_score,
+			reaction.reaction,
+			profile.display_name,
+			profile.profile_image_url
+		FROM place_refs place
+		CROSS JOIN member_refs member
+		LEFT JOIN LATERAL (
+			SELECT enrichment.id
+			FROM preference.place_tag_enrichments enrichment
+			WHERE enrichment.provider = place.provider
+				AND enrichment.external_place_id = place.external_place_id
+				AND enrichment.status = 'SUCCEEDED'
+			ORDER BY
+				enrichment.enriched_at DESC NULLS LAST,
+				enrichment.updated_at DESC,
+				enrichment.id
+			LIMIT 1
+		) selected_enrichment ON true
+		LEFT JOIN preference.place_tag_enrichment_tags tag
+			ON tag.enrichment_id = selected_enrichment.id
+		LEFT JOIN preference.user_preference_tag_weights member_weight
+			ON member_weight.user_id = member.user_id
+			AND member_weight.tag_id = tag.tag_id
+		LEFT JOIN preference.tag_statistic_runs serving_run
+			ON serving_run.is_serving = true
+		LEFT JOIN preference.tag_statistics statistic
+			ON statistic.run_id = serving_run.id
+			AND statistic.tag_id = tag.tag_id
+		LEFT JOIN preference.user_place_reactions reaction
+			ON reaction.user_id = member.user_id
+			AND reaction.provider = place.provider
+			AND reaction.external_place_id = place.external_place_id
+		LEFT JOIN auth.user_profiles profile
+			ON profile.user_id = member.user_id
+		ORDER BY
+			place.provider,
+			place.external_place_id,
+			member.user_id,
+			tag.rank_order NULLS LAST,
+			tag.tag_id
+	</select>
+</mapper>

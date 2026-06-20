@@ -8,6 +8,8 @@ import com.soomgil.preference.api.dto.RecommendationTab;
 import com.soomgil.preference.api.dto.SwipeFeedResponse;
 import com.soomgil.preference.api.dto.SwipeReactionRequest;
 import com.soomgil.preference.api.dto.SwipeReactionResponse;
+import com.soomgil.preference.application.query.dto.ListPlaceRecommendationsQuery;
+import com.soomgil.preference.application.query.handler.ListPlaceRecommendationsQueryHandler;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Map;
@@ -28,6 +30,12 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/trips/{tripId}")
 public class PreferenceController extends ApiControllerSupport {
+
+	private final ListPlaceRecommendationsQueryHandler recommendationHandler;
+
+	public PreferenceController(ListPlaceRecommendationsQueryHandler recommendationHandler) {
+		this.recommendationHandler = recommendationHandler;
+	}
 
 	@GetMapping("/swipe-feed")
 	public SwipeFeedResponse getSwipeFeed(
@@ -57,12 +65,22 @@ public class PreferenceController extends ApiControllerSupport {
 	@GetMapping("/place-recommendations")
 	public PagedPlaceRecommendation listPlaceRecommendations(
 		@PathVariable UUID tripId,
+		@RequestParam String bbox,
+		@RequestParam(required = false) Double centerLat,
+		@RequestParam(required = false) Double centerLng,
 		@RequestParam(required = false) RecommendationTab tab,
 		@RequestParam(defaultValue = "0") int page,
-		@RequestParam(defaultValue = "20") int size,
-		@RequestParam(required = false) List<String> sort
+		@RequestParam(defaultValue = "20") int size
 	) {
-		return notImplemented();
+		return recommendationHandler.handle(new ListPlaceRecommendationsQuery(
+			tripId,
+			bbox,
+			centerLat,
+			centerLng,
+			tab,
+			page,
+			size
+		));
 	}
 
 	@GetMapping("/saved-places")
