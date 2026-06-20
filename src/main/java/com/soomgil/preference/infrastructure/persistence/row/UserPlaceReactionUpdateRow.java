@@ -8,6 +8,7 @@ import java.time.OffsetDateTime;
 public record UserPlaceReactionUpdateRow(
 	String id,
 	String reaction,
+	String placeTagEnrichmentId,
 	OffsetDateTime sourceModifiedAt
 ) {
 }

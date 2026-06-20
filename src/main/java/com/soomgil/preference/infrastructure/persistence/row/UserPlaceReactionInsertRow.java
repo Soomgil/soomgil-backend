@@ -11,6 +11,7 @@ public record UserPlaceReactionInsertRow(
 	String provider,
 	String externalPlaceId,
 	String reaction,
+	String placeTagEnrichmentId,
 	OffsetDateTime sourceModifiedAt
 ) {
 }

@@ -11,6 +11,7 @@ public record UserSwipeEventInsertRow(
 	String externalPlaceId,
 	String reaction,
 	String previousReaction,
+	String placeTagEnrichmentId,
 	OffsetDateTime sourceModifiedAt
 ) {
 }

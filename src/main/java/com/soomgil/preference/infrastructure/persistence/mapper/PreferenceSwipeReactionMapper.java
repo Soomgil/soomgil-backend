@@ -4,6 +4,9 @@ import com.soomgil.preference.infrastructure.persistence.row.UserPlaceReactionIn
 import com.soomgil.preference.infrastructure.persistence.row.UserPlaceReactionRow;
 import com.soomgil.preference.infrastructure.persistence.row.UserPlaceReactionUpdateRow;
 import com.soomgil.preference.infrastructure.persistence.row.UserSwipeEventInsertRow;
+import com.soomgil.preference.infrastructure.persistence.row.PlaceTagEvidenceSourceRow;
+import com.soomgil.preference.infrastructure.persistence.row.UserTagEvidenceAdjustmentRow;
+import java.util.List;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -24,4 +27,17 @@ public interface PreferenceSwipeReactionMapper {
 	void updateReaction(UserPlaceReactionUpdateRow row);
 
 	void insertEvent(UserSwipeEventInsertRow row);
+
+	List<PlaceTagEvidenceSourceRow> findLatestConfirmedTags(
+		@Param("provider") String provider,
+		@Param("externalPlaceId") String externalPlaceId
+	);
+
+	List<PlaceTagEvidenceSourceRow> findConfirmedTagsByEnrichment(
+		@Param("enrichmentId") String enrichmentId
+	);
+
+	void removeUserTagEvidence(UserTagEvidenceAdjustmentRow row);
+
+	void addUserTagEvidence(UserTagEvidenceAdjustmentRow row);
 }

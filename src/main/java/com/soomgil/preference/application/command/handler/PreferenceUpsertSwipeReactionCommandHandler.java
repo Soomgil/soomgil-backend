@@ -6,12 +6,18 @@ import com.soomgil.place.api.dto.PlaceRef;
 import com.soomgil.preference.api.dto.SwipeReaction;
 import com.soomgil.preference.api.dto.SwipeReactionResponse;
 import com.soomgil.preference.application.command.dto.UpsertSwipeReactionCommand;
+import com.soomgil.preference.domain.policy.PlaceTagEvidence;
+import com.soomgil.preference.domain.policy.PlaceTagEvidenceCalculator;
+import com.soomgil.preference.domain.policy.PlaceTagEvidenceInput;
 import com.soomgil.preference.infrastructure.persistence.mapper.PreferenceSwipeReactionMapper;
+import com.soomgil.preference.infrastructure.persistence.row.PlaceTagEvidenceSourceRow;
 import com.soomgil.preference.infrastructure.persistence.row.UserPlaceReactionInsertRow;
 import com.soomgil.preference.infrastructure.persistence.row.UserPlaceReactionRow;
 import com.soomgil.preference.infrastructure.persistence.row.UserPlaceReactionUpdateRow;
 import com.soomgil.preference.infrastructure.persistence.row.UserSwipeEventInsertRow;
+import com.soomgil.preference.infrastructure.persistence.row.UserTagEvidenceAdjustmentRow;
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
@@ -25,6 +31,7 @@ public class PreferenceUpsertSwipeReactionCommandHandler implements UpsertSwipeR
 
 	private final ObjectProvider<CurrentUserProvider> currentUserProvider;
 	private final PreferenceSwipeReactionMapper mapper;
+	private final PlaceTagEvidenceCalculator evidenceCalculator;
 
 	public PreferenceUpsertSwipeReactionCommandHandler(
 		ObjectProvider<CurrentUserProvider> currentUserProvider,
@@ -32,6 +39,7 @@ public class PreferenceUpsertSwipeReactionCommandHandler implements UpsertSwipeR
 	) {
 		this.currentUserProvider = currentUserProvider;
 		this.mapper = mapper;
+		this.evidenceCalculator = new PlaceTagEvidenceCalculator();
 	}
 
 	@Transactional
@@ -50,6 +58,15 @@ public class PreferenceUpsertSwipeReactionCommandHandler implements UpsertSwipeR
 			placeProvider,
 			command.externalPlaceId()
 		);
+		List<PlaceTagEvidenceSourceRow> currentTagRows = mapper.findLatestConfirmedTags(
+			placeProvider,
+			command.externalPlaceId()
+		);
+		String currentEnrichmentId = currentTagRows.isEmpty() ? null : currentTagRows.getFirst().enrichmentId();
+
+		if (previous != null && previous.placeTagEnrichmentId() != null) {
+			removePreviousEvidence(userId, previous);
+		}
 
 		if (previous == null) {
 			mapper.insertReaction(new UserPlaceReactionInsertRow(
@@ -58,6 +75,7 @@ public class PreferenceUpsertSwipeReactionCommandHandler implements UpsertSwipeR
 				placeProvider,
 				command.externalPlaceId(),
 				reaction,
+				currentEnrichmentId,
 				command.sourceModifiedAt()
 			));
 		}
@@ -65,6 +83,7 @@ public class PreferenceUpsertSwipeReactionCommandHandler implements UpsertSwipeR
 			mapper.updateReaction(new UserPlaceReactionUpdateRow(
 				previous.id(),
 				reaction,
+				currentEnrichmentId,
 				command.sourceModifiedAt()
 			));
 		}
@@ -75,8 +94,10 @@ public class PreferenceUpsertSwipeReactionCommandHandler implements UpsertSwipeR
 			command.externalPlaceId(),
 			reaction,
 			previous == null ? null : previous.reaction(),
+			currentEnrichmentId,
 			command.sourceModifiedAt()
 		));
+		addCurrentEvidence(userId, reaction, currentTagRows);
 
 		return new SwipeReactionResponse(
 			new PlaceRef(command.provider(), command.externalPlaceId()),
@@ -84,5 +105,40 @@ public class PreferenceUpsertSwipeReactionCommandHandler implements UpsertSwipeR
 			command.reaction() == SwipeReaction.SUPER_LIKE,
 			OffsetDateTime.now()
 		);
+	}
+
+	private void removePreviousEvidence(UUID userId, UserPlaceReactionRow previous) {
+		List<PlaceTagEvidenceSourceRow> previousTagRows = mapper.findConfirmedTagsByEnrichment(
+			previous.placeTagEnrichmentId()
+		);
+		for (PlaceTagEvidence evidence : calculateEvidence(previousTagRows)) {
+			mapper.removeUserTagEvidence(new UserTagEvidenceAdjustmentRow(
+				userId.toString(),
+				evidence.tagId(),
+				evidence.value(),
+				previous.reaction()
+			));
+		}
+	}
+
+	private void addCurrentEvidence(
+		UUID userId,
+		String reaction,
+		List<PlaceTagEvidenceSourceRow> currentTagRows
+	) {
+		for (PlaceTagEvidence evidence : calculateEvidence(currentTagRows)) {
+			mapper.addUserTagEvidence(new UserTagEvidenceAdjustmentRow(
+				userId.toString(),
+				evidence.tagId(),
+				evidence.value(),
+				reaction
+			));
+		}
+	}
+
+	private List<PlaceTagEvidence> calculateEvidence(List<PlaceTagEvidenceSourceRow> rows) {
+		return evidenceCalculator.calculate(rows.stream()
+			.map(row -> new PlaceTagEvidenceInput(row.tagId(), row.confidence(), row.weight()))
+			.toList());
 	}
 }
