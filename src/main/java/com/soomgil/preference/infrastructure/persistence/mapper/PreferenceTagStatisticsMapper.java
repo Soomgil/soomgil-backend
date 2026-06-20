@@ -13,6 +13,10 @@ import org.apache.ibatis.annotations.Param;
 @Mapper
 public interface PreferenceTagStatisticsMapper {
 
+	List<String> findActiveSelectableTagIds();
+
+	String findServingRunSource();
+
 	long countFinalReactions();
 
 	long countPositiveFinalReactions();

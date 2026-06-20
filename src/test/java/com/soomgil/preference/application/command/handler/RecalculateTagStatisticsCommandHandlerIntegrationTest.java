@@ -121,6 +121,45 @@ class RecalculateTagStatisticsCommandHandlerIntegrationTest {
 		assertStatistic(statistics.get(1), "park", 2L, 3L, "0.600000", "0.576000");
 	}
 
+	@Test
+	void initializesAuditableAiOnlyDefaultStatistics() {
+		var result = handler.handle(new RecalculateTagStatisticsCommand(
+			new BigDecimal("100"),
+			TagStatisticSource.AI_ONLY_DEFAULT,
+			null,
+			false
+		));
+
+		Map<String, Object> run = jdbcTemplate.queryForMap("""
+			SELECT source, total_reaction_count, positive_reaction_count, is_serving
+			FROM preference.tag_statistic_runs
+			WHERE id = ?
+			""", result.runId());
+		Long invalidStatisticCount = jdbcTemplate.queryForObject("""
+			SELECT count(*)
+			FROM preference.tag_statistics
+			WHERE run_id = ?
+				AND (
+					preference_discrimination != 0.5
+					OR smoothed_positive_rate != 0.5
+					OR reaction_count != 0
+				)
+			""", Long.class, result.runId());
+		Long activeTagCount = jdbcTemplate.queryForObject("""
+			SELECT count(*)
+			FROM preference.preference_tags
+			WHERE tag_type = 'TAG' AND is_active = true AND is_selectable = true
+			""", Long.class);
+
+		assertThat(run)
+			.containsEntry("source", "AI_ONLY_DEFAULT")
+			.containsEntry("total_reaction_count", 0L)
+			.containsEntry("positive_reaction_count", 0L)
+			.containsEntry("is_serving", true);
+		assertThat(result.statisticCount()).isEqualTo(activeTagCount.intValue());
+		assertThat(invalidStatisticCount).isZero();
+	}
+
 	private void insertEnrichment(UUID enrichmentId, String externalPlaceId, String tagCode) {
 		UUID tagId = jdbcTemplate.queryForObject(
 			"SELECT id FROM preference.preference_tags WHERE code = ?",

@@ -13,6 +13,22 @@
 		</constructor>
 	</resultMap>
 
+	<select id="findActiveSelectableTagIds" resultType="string">
+		SELECT CAST(id AS text)
+		FROM preference.preference_tags
+		WHERE tag_type = 'TAG'
+			AND is_active = true
+			AND is_selectable = true
+		ORDER BY id
+	</select>
+
+	<select id="findServingRunSource" resultType="string">
+		SELECT source
+		FROM preference.tag_statistic_runs
+		WHERE is_serving = true
+		LIMIT 1
+	</select>
+
 	<select id="countFinalReactions" resultType="long">
 		SELECT count(*)
 		FROM preference.user_place_reactions

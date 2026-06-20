@@ -111,6 +111,13 @@ class GenerateSyntheticPersonaSwipesHandlerIntegrationTest {
 			.containsEntry("source", "REAL_USER")
 			.containsEntry("total_reaction_count", 1L)
 			.containsEntry("is_serving", true);
+		assertThatThrownBy(() -> statisticsHandler.handle(new RecalculateTagStatisticsCommand(
+			new BigDecimal("2"),
+			TagStatisticSource.SYNTHETIC_PERSONA,
+			"synthetic-persona-v1"
+		)))
+			.isInstanceOf(IllegalStateException.class)
+			.hasMessage("Synthetic statistics cannot replace REAL_USER serving statistics.");
 	}
 
 	private void insertCoreTagCoverageEnrichments() {

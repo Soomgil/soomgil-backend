@@ -53,7 +53,15 @@ public class PreferenceRecalculateTagStatisticsCommandHandler implements Recalcu
 	@Override
 	public RecalculateTagStatisticsResult handle(RecalculateTagStatisticsCommand command) {
 		validate(command);
+		if (command.source() == TagStatisticSource.AI_ONLY_DEFAULT) {
+			return initializeAiOnlyDefault(command);
+		}
 		if (command.source() == TagStatisticSource.SYNTHETIC_PERSONA) {
+			if (TagStatisticSource.REAL_USER.name().equals(mapper.findServingRunSource())) {
+				throw new IllegalStateException(
+					"Synthetic statistics cannot replace REAL_USER serving statistics."
+				);
+			}
 			validateSyntheticQuality(command.generatorVersion());
 		} else {
 			validateRealUserTransition(command);
@@ -99,6 +107,37 @@ public class PreferenceRecalculateTagStatisticsCommandHandler implements Recalcu
 		mapper.deactivateServingRuns();
 		mapper.completeAndServeRun(runId.toString());
 		return new RecalculateTagStatisticsResult(runId, aggregates.size());
+	}
+
+	private RecalculateTagStatisticsResult initializeAiOnlyDefault(RecalculateTagStatisticsCommand command) {
+		String servingSource = mapper.findServingRunSource();
+		if (servingSource != null && !TagStatisticSource.AI_ONLY_DEFAULT.name().equals(servingSource)) {
+			throw new IllegalStateException("AI only default cannot replace a higher serving statistics source.");
+		}
+		BigDecimal neutralRate = new BigDecimal("0.5");
+		UUID runId = Ids.newUuid();
+		mapper.insertRun(new TagStatisticRunInsertRow(
+			runId.toString(),
+			TagStatisticSource.AI_ONLY_DEFAULT.name(),
+			priorReactionCount(command),
+			neutralRate,
+			0,
+			0
+		));
+		List<String> tagIds = mapper.findActiveSelectableTagIds();
+		for (String tagId : tagIds) {
+			mapper.insertStatistic(new TagStatisticInsertRow(
+				runId.toString(),
+				tagId,
+				neutralRate,
+				neutralRate,
+				0,
+				0
+			));
+		}
+		mapper.deactivateServingRuns();
+		mapper.completeAndServeRun(runId.toString());
+		return new RecalculateTagStatisticsResult(runId, tagIds.size());
 	}
 
 	private long totalReactionCount(RecalculateTagStatisticsCommand command) {
@@ -156,8 +195,8 @@ public class PreferenceRecalculateTagStatisticsCommandHandler implements Recalcu
 		if (command == null || priorReactionCount(command).compareTo(BigDecimal.ZERO) <= 0) {
 			throw new IllegalArgumentException("prior reaction count must be positive");
 		}
-		if (command.source() == null || command.source() == TagStatisticSource.AI_ONLY_DEFAULT) {
-			throw new IllegalArgumentException("statistics source must be REAL_USER or SYNTHETIC_PERSONA");
+		if (command.source() == null) {
+			throw new IllegalArgumentException("statistics source must not be null");
 		}
 		if (command.source() == TagStatisticSource.SYNTHETIC_PERSONA
 			&& (command.generatorVersion() == null || command.generatorVersion().isBlank())) {
