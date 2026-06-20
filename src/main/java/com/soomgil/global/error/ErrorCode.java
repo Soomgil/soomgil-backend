@@ -22,6 +22,9 @@ public enum ErrorCode {
 	MEDIA_METADATA_MISMATCH(HttpStatus.UNPROCESSABLE_ENTITY, "MEDIA_METADATA_MISMATCH", "Media metadata does not match the uploaded object."),
 	MEDIA_LINK_FORBIDDEN(HttpStatus.FORBIDDEN, "MEDIA_LINK_FORBIDDEN", "Media cannot be linked to the resource."),
 	MEDIA_OWNER_REQUIRED(HttpStatus.FORBIDDEN, "MEDIA_OWNER_REQUIRED", "Media owner permission is required."),
+	CANNOT_FOLLOW_SELF(HttpStatus.UNPROCESSABLE_ENTITY, "CANNOT_FOLLOW_SELF", "Users cannot follow themselves."),
+	FOLLOW_NOT_FOUND(HttpStatus.NOT_FOUND, "FOLLOW_NOT_FOUND", "Follow was not found."),
+	FOLLOW_REQUEST_NOT_FOUND(HttpStatus.NOT_FOUND, "FOLLOW_REQUEST_NOT_FOUND", "Follow request was not found."),
 	NOT_IMPLEMENTED(HttpStatus.NOT_IMPLEMENTED, "NOT_IMPLEMENTED", "Endpoint is not implemented yet."),
 	INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR", "Unexpected server error.");
 
