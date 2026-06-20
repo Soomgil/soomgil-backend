@@ -1,0 +1,53 @@
+package com.soomgil.global.config;
+
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import com.soomgil.global.error.ProblemDetailsFactory;
+import com.soomgil.global.security.ProblemDetailsAccessDeniedHandler;
+import com.soomgil.global.security.ProblemDetailsAuthenticationEntryPoint;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@WebMvcTest(controllers = SecurityConfigWebMvcTest.AdminTestController.class)
+@Import({
+	SecurityConfig.class,
+	ProblemDetailsAuthenticationEntryPoint.class,
+	ProblemDetailsAccessDeniedHandler.class,
+	ProblemDetailsFactory.class,
+	SecurityConfigWebMvcTest.AdminTestController.class
+})
+class SecurityConfigWebMvcTest {
+
+	@Autowired
+	private MockMvc mockMvc;
+
+	@Test
+	@WithMockUser(roles = "USER")
+	void rejectsAdminEndpointForRegularUser() throws Exception {
+		mockMvc.perform(get("/api/v1/admin/test"))
+			.andExpect(status().isForbidden());
+	}
+
+	@Test
+	@WithMockUser(roles = "ADMIN")
+	void allowsAdminEndpointForAdminUser() throws Exception {
+		mockMvc.perform(get("/api/v1/admin/test"))
+			.andExpect(status().isOk());
+	}
+
+	@RestController
+	static class AdminTestController {
+
+		@GetMapping("/api/v1/admin/test")
+		String adminOnly() {
+			return "ok";
+		}
+	}
+}

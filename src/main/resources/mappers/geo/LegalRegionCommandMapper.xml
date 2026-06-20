@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.soomgil.geo.infrastructure.persistence.mapper.LegalRegionCommandMapper">
+  <select id="existsLegalRegion" resultType="boolean">
+    SELECT EXISTS (
+      SELECT 1
+      FROM geo.legal_regions
+      WHERE code = #{code}
+    )
+  </select>
+
+  <insert id="upsertLegalRegion">
+    INSERT INTO geo.legal_regions (
+      code,
+      name,
+      full_name,
+      level,
+      parent_code,
+      sido_code,
+      sigungu_code,
+      eupmyeondong_code,
+      raw_status,
+      is_active,
+      synced_at
+    )
+    VALUES (
+      #{region.code},
+      #{region.name},
+      #{region.fullName},
+      #{region.level},
+      #{region.parentCode},
+      #{region.sidoCode},
+      #{region.sigunguCode},
+      #{region.eupmyeondongCode},
+      #{region.rawStatus},
+      #{region.active},
+      #{region.syncedAt}
+    )
+    ON CONFLICT (code) DO UPDATE SET
+      name = EXCLUDED.name,
+      full_name = EXCLUDED.full_name,
+      level = EXCLUDED.level,
+      parent_code = EXCLUDED.parent_code,
+      sido_code = EXCLUDED.sido_code,
+      sigungu_code = EXCLUDED.sigungu_code,
+      eupmyeondong_code = EXCLUDED.eupmyeondong_code,
+      raw_status = EXCLUDED.raw_status,
+      is_active = EXCLUDED.is_active,
+      synced_at = EXCLUDED.synced_at,
+      updated_at = now()
+  </insert>
+
+  <insert id="insertSyncLog">
+    INSERT INTO geo.legal_region_sync_logs (
+      source,
+      source_file_name,
+      total_count,
+      inserted_count,
+      updated_count,
+      deactivated_count,
+      started_at,
+      finished_at,
+      status,
+      error_message
+    )
+    VALUES (
+      #{log.source},
+      #{log.sourceFileName},
+      #{log.totalCount},
+      #{log.insertedCount},
+      #{log.updatedCount},
+      #{log.deactivatedCount},
+      #{log.startedAt},
+      #{log.finishedAt},
+      #{log.status},
+      #{log.errorMessage}
+    )
+  </insert>
+</mapper>

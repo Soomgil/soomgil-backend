@@ -2,11 +2,16 @@ package com.soomgil.itinerary.api;
 
 import com.soomgil.collaboration.api.dto.VersionedCommandRequest;
 import com.soomgil.common.api.ApiControllerSupport;
+import com.soomgil.common.id.Ids;
+import com.soomgil.global.error.BusinessException;
+import com.soomgil.global.error.ErrorCode;
 import com.soomgil.itinerary.api.dto.CreateItineraryDayRequest;
 import com.soomgil.itinerary.api.dto.CreateItineraryItemRequest;
 import com.soomgil.itinerary.api.dto.CreateMapDrawingRequest;
 import com.soomgil.itinerary.api.dto.Itinerary;
+import com.soomgil.itinerary.api.dto.ItineraryDay;
 import com.soomgil.itinerary.api.dto.ItineraryMutationResponse;
+import com.soomgil.itinerary.api.dto.ItineraryItem;
 import com.soomgil.itinerary.api.dto.MapMatchRouteRequest;
 import com.soomgil.itinerary.api.dto.MapMatchRouteResponse;
 import com.soomgil.itinerary.api.dto.ReorderItineraryRequest;
@@ -14,7 +19,52 @@ import com.soomgil.itinerary.api.dto.UpdateItineraryDayRequest;
 import com.soomgil.itinerary.api.dto.UpdateItineraryItemRequest;
 import com.soomgil.itinerary.api.dto.UpdateMapDrawingRequest;
 import com.soomgil.itinerary.api.dto.UpdateRouteRequest;
+import com.soomgil.itinerary.application.command.dto.CreateItineraryDayCommand;
+import com.soomgil.itinerary.application.command.dto.CreateItineraryItemCommand;
+import com.soomgil.itinerary.application.command.dto.CreateMapDrawingCommand;
+import com.soomgil.itinerary.application.command.dto.DeleteItineraryDayCommand;
+import com.soomgil.itinerary.application.command.dto.DeleteRouteSegmentCommand;
+import com.soomgil.itinerary.application.command.dto.DeleteMapDrawingCommand;
+import com.soomgil.itinerary.application.command.dto.DeleteItineraryItemCommand;
+import com.soomgil.itinerary.application.command.dto.UpdateMapDrawingCommand;
+import com.soomgil.itinerary.application.command.dto.UpdateItineraryDayCommand;
+import com.soomgil.itinerary.application.command.dto.UpdateItineraryItemCommand;
+import com.soomgil.itinerary.application.command.dto.UpdateRouteSegmentCommand;
+import com.soomgil.itinerary.application.command.dto.ItineraryDayOrderCommand;
+import com.soomgil.itinerary.application.command.dto.ItineraryItemOrderCommand;
+import com.soomgil.itinerary.application.command.dto.ItineraryDayView;
+import com.soomgil.itinerary.application.command.dto.ItineraryItemView;
+import com.soomgil.itinerary.application.command.dto.MapMatchRouteCommand;
+import com.soomgil.itinerary.application.command.dto.MapMatchRouteResult;
+import com.soomgil.itinerary.application.command.dto.ItineraryMutationResult;
+import com.soomgil.itinerary.application.command.dto.MapDrawingView;
+import com.soomgil.itinerary.application.command.dto.ReorderItineraryCommand;
+import com.soomgil.itinerary.application.command.dto.RouteSegmentView;
+import com.soomgil.itinerary.application.port.RouteCoordinate;
+import com.soomgil.itinerary.application.command.handler.CreateItineraryDayHandler;
+import com.soomgil.itinerary.application.command.handler.CreateItineraryItemHandler;
+import com.soomgil.itinerary.application.command.handler.CreateMapDrawingHandler;
+import com.soomgil.itinerary.application.command.handler.DeleteItineraryDayHandler;
+import com.soomgil.itinerary.application.command.handler.DeleteRouteSegmentHandler;
+import com.soomgil.itinerary.application.command.handler.DeleteMapDrawingHandler;
+import com.soomgil.itinerary.application.command.handler.DeleteItineraryItemHandler;
+import com.soomgil.itinerary.application.command.handler.MapMatchRouteHandler;
+import com.soomgil.itinerary.application.command.handler.ReorderItineraryHandler;
+import com.soomgil.itinerary.application.command.handler.UpdateMapDrawingHandler;
+import com.soomgil.itinerary.application.command.handler.UpdateItineraryDayHandler;
+import com.soomgil.itinerary.application.command.handler.UpdateItineraryItemHandler;
+import com.soomgil.itinerary.application.command.handler.UpdateRouteSegmentHandler;
+import com.soomgil.itinerary.application.query.dto.FindItineraryQuery;
+import com.soomgil.itinerary.application.query.dto.ItineraryDayDetailView;
+import com.soomgil.itinerary.application.query.dto.ItineraryView;
+import com.soomgil.itinerary.application.query.handler.FindItineraryHandler;
+import com.soomgil.place.api.dto.PlaceProvider;
+import com.soomgil.place.api.dto.PlaceRef;
+import com.soomgil.place.api.dto.PlaceSourceStatus;
 import jakarta.validation.Valid;
+import java.security.Principal;
+import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.validation.annotation.Validated;
@@ -34,123 +84,443 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/trips/{tripId}/itinerary")
 public class ItineraryController extends ApiControllerSupport {
 
+	private final CreateItineraryDayHandler createItineraryDayHandler;
+	private final CreateItineraryItemHandler createItineraryItemHandler;
+	private final ReorderItineraryHandler reorderItineraryHandler;
+	private final CreateMapDrawingHandler createMapDrawingHandler;
+	private final MapMatchRouteHandler mapMatchRouteHandler;
+	private final FindItineraryHandler findItineraryHandler;
+	private final DeleteRouteSegmentHandler deleteRouteSegmentHandler;
+	private final DeleteMapDrawingHandler deleteMapDrawingHandler;
+	private final UpdateMapDrawingHandler updateMapDrawingHandler;
+	private final UpdateItineraryDayHandler updateItineraryDayHandler;
+	private final DeleteItineraryItemHandler deleteItineraryItemHandler;
+	private final UpdateItineraryItemHandler updateItineraryItemHandler;
+	private final DeleteItineraryDayHandler deleteItineraryDayHandler;
+	private final UpdateRouteSegmentHandler updateRouteSegmentHandler;
+
+	public ItineraryController(
+		CreateItineraryDayHandler createItineraryDayHandler,
+		CreateItineraryItemHandler createItineraryItemHandler,
+		ReorderItineraryHandler reorderItineraryHandler,
+		CreateMapDrawingHandler createMapDrawingHandler,
+		MapMatchRouteHandler mapMatchRouteHandler,
+		FindItineraryHandler findItineraryHandler,
+		DeleteRouteSegmentHandler deleteRouteSegmentHandler,
+		DeleteMapDrawingHandler deleteMapDrawingHandler,
+		UpdateMapDrawingHandler updateMapDrawingHandler,
+		UpdateItineraryDayHandler updateItineraryDayHandler,
+		DeleteItineraryItemHandler deleteItineraryItemHandler,
+		UpdateItineraryItemHandler updateItineraryItemHandler,
+		DeleteItineraryDayHandler deleteItineraryDayHandler,
+		UpdateRouteSegmentHandler updateRouteSegmentHandler
+	) {
+		this.createItineraryDayHandler = Objects.requireNonNull(
+			createItineraryDayHandler,
+			"createItineraryDayHandler must not be null"
+		);
+		this.createItineraryItemHandler = Objects.requireNonNull(
+			createItineraryItemHandler,
+			"createItineraryItemHandler must not be null"
+		);
+		this.reorderItineraryHandler = Objects.requireNonNull(
+			reorderItineraryHandler,
+			"reorderItineraryHandler must not be null"
+		);
+		this.createMapDrawingHandler = Objects.requireNonNull(
+			createMapDrawingHandler,
+			"createMapDrawingHandler must not be null"
+		);
+		this.mapMatchRouteHandler = Objects.requireNonNull(mapMatchRouteHandler, "mapMatchRouteHandler must not be null");
+		this.findItineraryHandler = Objects.requireNonNull(findItineraryHandler, "findItineraryHandler must not be null");
+		this.deleteRouteSegmentHandler = Objects.requireNonNull(
+			deleteRouteSegmentHandler,
+			"deleteRouteSegmentHandler must not be null"
+		);
+		this.deleteMapDrawingHandler = Objects.requireNonNull(deleteMapDrawingHandler, "deleteMapDrawingHandler must not be null");
+		this.updateMapDrawingHandler = Objects.requireNonNull(updateMapDrawingHandler, "updateMapDrawingHandler must not be null");
+		this.updateItineraryDayHandler = Objects.requireNonNull(updateItineraryDayHandler, "updateItineraryDayHandler must not be null");
+		this.deleteItineraryItemHandler = Objects.requireNonNull(deleteItineraryItemHandler, "deleteItineraryItemHandler must not be null");
+		this.updateItineraryItemHandler = Objects.requireNonNull(updateItineraryItemHandler, "updateItineraryItemHandler must not be null");
+		this.deleteItineraryDayHandler = Objects.requireNonNull(deleteItineraryDayHandler, "deleteItineraryDayHandler must not be null");
+		this.updateRouteSegmentHandler = Objects.requireNonNull(updateRouteSegmentHandler, "updateRouteSegmentHandler must not be null");
+	}
+
 	@GetMapping
-	public Itinerary getItinerary(@PathVariable UUID tripId) {
-		return notImplemented();
+	public Itinerary getItinerary(@PathVariable UUID tripId, Principal principal) {
+		return toItinerary(findItineraryHandler.handle(new FindItineraryQuery(tripId, currentUserId(principal))));
 	}
 
 	@PostMapping("/days")
 	@ResponseStatus(HttpStatus.CREATED)
 	public ItineraryMutationResponse createDay(
 		@PathVariable UUID tripId,
-		@Valid @RequestBody CreateItineraryDayRequest request
+		@Valid @RequestBody CreateItineraryDayRequest request,
+		Principal principal
 	) {
-		return notImplemented();
+		return toResponse(createItineraryDayHandler.handle(new CreateItineraryDayCommand(
+			tripId,
+			currentUserId(principal),
+			request.baseVersion(),
+			com.soomgil.itinerary.domain.model.ItineraryDayGroupType.valueOf(request.groupType().name()),
+			request.dayNumber(),
+			request.date(),
+			request.title(),
+			request.sortOrder()
+		)));
 	}
 
 	@PatchMapping("/days/{dayId}")
 	public ItineraryMutationResponse updateDay(
 		@PathVariable UUID tripId,
 		@PathVariable UUID dayId,
-		@Valid @RequestBody UpdateItineraryDayRequest request
+		@Valid @RequestBody UpdateItineraryDayRequest request,
+		Principal principal
 	) {
-		return notImplemented();
+		return toResponse(updateItineraryDayHandler.handle(new UpdateItineraryDayCommand(
+			tripId,
+			currentUserId(principal),
+			request.baseVersion(),
+			dayId,
+			request.dayNumber(),
+			request.date(),
+			request.title(),
+			request.sortOrder()
+		)));
 	}
 
 	@DeleteMapping("/days/{dayId}")
 	public ItineraryMutationResponse deleteDay(
 		@PathVariable UUID tripId,
 		@PathVariable UUID dayId,
-		@Valid @RequestBody VersionedCommandRequest request
+		@Valid @RequestBody VersionedCommandRequest request,
+		Principal principal
 	) {
-		return notImplemented();
+		return toResponse(deleteItineraryDayHandler.handle(new DeleteItineraryDayCommand(
+			tripId,
+			currentUserId(principal),
+			request.baseVersion(),
+			dayId
+		)));
 	}
 
 	@PostMapping("/items")
 	@ResponseStatus(HttpStatus.CREATED)
 	public ItineraryMutationResponse createItem(
 		@PathVariable UUID tripId,
-		@Valid @RequestBody CreateItineraryItemRequest request
+		@Valid @RequestBody CreateItineraryItemRequest request,
+		Principal principal
 	) {
-		return notImplemented();
+		return toResponse(createItineraryItemHandler.handle(new CreateItineraryItemCommand(
+			tripId,
+			currentUserId(principal),
+			request.baseVersion(),
+			request.itineraryDayId(),
+			request.sortOrder(),
+			com.soomgil.itinerary.domain.model.ItineraryItemType.valueOf(request.itemType().name()),
+			request.place() == null ? null : request.place().provider().name(),
+			request.place() == null ? null : request.place().externalPlaceId(),
+			request.placeName(),
+			request.address(),
+			request.lat(),
+			request.lng(),
+			request.thumbnailUrl()
+		)));
 	}
 
 	@PatchMapping("/items/{itemId}")
 	public ItineraryMutationResponse updateItem(
 		@PathVariable UUID tripId,
 		@PathVariable UUID itemId,
-		@Valid @RequestBody UpdateItineraryItemRequest request
+		@Valid @RequestBody UpdateItineraryItemRequest request,
+		Principal principal
 	) {
-		return notImplemented();
+		return toResponse(updateItineraryItemHandler.handle(new UpdateItineraryItemCommand(
+			tripId,
+			currentUserId(principal),
+			request.baseVersion(),
+			itemId,
+			request.itineraryDayId(),
+			request.sortOrder(),
+			request.placeName(),
+			request.address(),
+			request.lat(),
+			request.lng(),
+			request.thumbnailUrl()
+		)));
 	}
 
 	@DeleteMapping("/items/{itemId}")
 	public ItineraryMutationResponse deleteItem(
 		@PathVariable UUID tripId,
 		@PathVariable UUID itemId,
-		@Valid @RequestBody VersionedCommandRequest request
+		@Valid @RequestBody VersionedCommandRequest request,
+		Principal principal
 	) {
-		return notImplemented();
+		return toResponse(deleteItineraryItemHandler.handle(new DeleteItineraryItemCommand(
+			tripId,
+			currentUserId(principal),
+			request.baseVersion(),
+			itemId
+		)));
 	}
 
 	@PutMapping("/order")
 	public ItineraryMutationResponse reorderItinerary(
 		@PathVariable UUID tripId,
-		@Valid @RequestBody ReorderItineraryRequest request
+		@Valid @RequestBody ReorderItineraryRequest request,
+		Principal principal
 	) {
-		return notImplemented();
+		return toResponse(reorderItineraryHandler.handle(new ReorderItineraryCommand(
+			tripId,
+			currentUserId(principal),
+			request.baseVersion(),
+			request.days().stream()
+				.map(day -> new ItineraryDayOrderCommand(
+					day.dayId(),
+					day.sortOrder(),
+					day.itemOrders().stream()
+						.map(item -> new ItineraryItemOrderCommand(item.itemId(), item.sortOrder()))
+						.toList()
+				))
+				.toList()
+		)));
 	}
 
 	@PostMapping("/routes/map-match")
 	public MapMatchRouteResponse mapMatchRoute(
 		@PathVariable UUID tripId,
-		@Valid @RequestBody MapMatchRouteRequest request
+		@Valid @RequestBody MapMatchRouteRequest request,
+		Principal principal
 	) {
-		return notImplemented();
+		MapMatchRouteResult result = mapMatchRouteHandler.handle(new MapMatchRouteCommand(
+			tripId,
+			currentUserId(principal),
+			request.baseVersion(),
+			request.originItineraryItemId(),
+			request.destinationItineraryItemId(),
+			com.soomgil.itinerary.domain.model.RouteMode.valueOf(request.mode().name()),
+			request.coordinates().stream()
+				.map(coordinate -> new RouteCoordinate(coordinate.lng(), coordinate.lat()))
+				.toList(),
+			request.radiuses(),
+			request.tidy()
+		));
+		ItineraryMutationResult mutation = result.mutation();
+		return new MapMatchRouteResponse(
+			mutation.tripId(),
+			mutation.itineraryVersion(),
+			mutation.day() == null ? null : toDay(mutation.day()),
+			mutation.item() == null ? null : toItem(mutation.item()),
+			mutation.route() == null ? null : toRoute(mutation.route()),
+			mutation.drawing() == null ? null : toDrawing(mutation.drawing()),
+			mutation.affectedRouteIds(),
+			result.matchRequestId(),
+			result.tracepoints(),
+			result.matchingsMetadata()
+		);
 	}
 
 	@PatchMapping("/routes/{routeId}")
 	public ItineraryMutationResponse updateRoute(
 		@PathVariable UUID tripId,
 		@PathVariable UUID routeId,
-		@Valid @RequestBody UpdateRouteRequest request
+		@Valid @RequestBody UpdateRouteRequest request,
+		Principal principal
 	) {
-		return notImplemented();
+		return toResponse(updateRouteSegmentHandler.handle(new UpdateRouteSegmentCommand(
+			tripId,
+			currentUserId(principal),
+			request.baseVersion(),
+			routeId,
+			request.mode() == null ? null : com.soomgil.itinerary.domain.model.RouteMode.valueOf(request.mode().name()),
+			request.geometry(),
+			request.distanceMeters(),
+			request.durationSeconds(),
+			request.confidence()
+		)));
 	}
 
 	@DeleteMapping("/routes/{routeId}")
 	public ItineraryMutationResponse deleteRoute(
 		@PathVariable UUID tripId,
 		@PathVariable UUID routeId,
-		@Valid @RequestBody VersionedCommandRequest request
+		@Valid @RequestBody VersionedCommandRequest request,
+		Principal principal
 	) {
-		return notImplemented();
+		return toResponse(deleteRouteSegmentHandler.handle(new DeleteRouteSegmentCommand(
+			tripId,
+			currentUserId(principal),
+			request.baseVersion(),
+			routeId
+		)));
 	}
 
 	@PostMapping("/drawings")
 	@ResponseStatus(HttpStatus.CREATED)
 	public ItineraryMutationResponse createDrawing(
 		@PathVariable UUID tripId,
-		@Valid @RequestBody CreateMapDrawingRequest request
+		@Valid @RequestBody CreateMapDrawingRequest request,
+		Principal principal
 	) {
-		return notImplemented();
+		return toResponse(createMapDrawingHandler.handle(new CreateMapDrawingCommand(
+			tripId,
+			currentUserId(principal),
+			request.baseVersion(),
+			request.itineraryDayId(),
+			com.soomgil.itinerary.domain.model.DrawingType.valueOf(request.drawingType().name()),
+			request.geometry(),
+			request.style(),
+			request.label(),
+			request.sortOrder()
+		)));
 	}
 
 	@PatchMapping("/drawings/{drawingId}")
 	public ItineraryMutationResponse updateDrawing(
 		@PathVariable UUID tripId,
 		@PathVariable UUID drawingId,
-		@Valid @RequestBody UpdateMapDrawingRequest request
+		@Valid @RequestBody UpdateMapDrawingRequest request,
+		Principal principal
 	) {
-		return notImplemented();
+		return toResponse(updateMapDrawingHandler.handle(new UpdateMapDrawingCommand(
+			tripId,
+			currentUserId(principal),
+			request.baseVersion(),
+			drawingId,
+			request.geometry(),
+			request.style(),
+			request.label(),
+			request.sortOrder(),
+			request.drawingVersion()
+		)));
 	}
 
 	@DeleteMapping("/drawings/{drawingId}")
 	public ItineraryMutationResponse deleteDrawing(
 		@PathVariable UUID tripId,
 		@PathVariable UUID drawingId,
-		@Valid @RequestBody VersionedCommandRequest request
+		@Valid @RequestBody VersionedCommandRequest request,
+		Principal principal
 	) {
-		return notImplemented();
+		return toResponse(deleteMapDrawingHandler.handle(new DeleteMapDrawingCommand(
+			tripId,
+			currentUserId(principal),
+			request.baseVersion(),
+			drawingId
+		)));
+	}
+
+	private UUID currentUserId(Principal principal) {
+		if (principal == null || principal.getName() == null || principal.getName().isBlank()) {
+			throw new BusinessException(ErrorCode.UNAUTHORIZED, "Authenticated user is required.");
+		}
+		try {
+			return Ids.parseUuid(principal.getName(), "currentUserId");
+		}
+		catch (IllegalArgumentException exception) {
+			throw new BusinessException(ErrorCode.UNAUTHORIZED, "Authenticated user id must be a UUID.");
+		}
+	}
+
+	private ItineraryMutationResponse toResponse(ItineraryMutationResult result) {
+		return new ItineraryMutationResponse(
+			result.tripId(),
+			result.itineraryVersion(),
+			result.day() == null ? null : toDay(result.day()),
+			result.item() == null ? null : toItem(result.item()),
+			result.route() == null ? null : toRoute(result.route()),
+			result.drawing() == null ? null : toDrawing(result.drawing()),
+			result.affectedRouteIds()
+		);
+	}
+
+	private Itinerary toItinerary(ItineraryView view) {
+		return new Itinerary(
+			view.tripId(),
+			view.itineraryVersion(),
+			view.days().stream().map(this::toDay).toList(),
+			view.routes().stream().map(this::toRoute).toList(),
+			view.mapDrawings().stream().map(this::toDrawing).toList()
+		);
+	}
+
+	private ItineraryDay toDay(ItineraryDayDetailView view) {
+		return new ItineraryDay(
+			view.id(),
+			view.tripId(),
+			com.soomgil.itinerary.api.dto.ItineraryDayGroupType.valueOf(view.groupType().name()),
+			view.dayNumber(),
+			view.date(),
+			view.title(),
+			view.sortOrder(),
+			view.items().stream().map(this::toItem).toList()
+		);
+	}
+
+	private ItineraryDay toDay(ItineraryDayView view) {
+		return new ItineraryDay(
+			view.id(),
+			view.tripId(),
+			com.soomgil.itinerary.api.dto.ItineraryDayGroupType.valueOf(view.groupType().name()),
+			view.dayNumber(),
+			view.date(),
+			view.title(),
+			view.sortOrder(),
+			List.of()
+		);
+	}
+
+	private ItineraryItem toItem(ItineraryItemView view) {
+		return new ItineraryItem(
+			view.id(),
+			view.itineraryDayId(),
+			view.sortOrder(),
+			com.soomgil.itinerary.api.dto.ItineraryItemType.valueOf(view.itemType().name()),
+			toPlaceRef(view.placeProvider(), view.externalPlaceId()),
+			view.placeName(),
+			view.address(),
+			view.lat(),
+			view.lng(),
+			view.thumbnailUrl(),
+			PlaceSourceStatus.valueOf(view.sourceStatus())
+		);
+	}
+
+	private PlaceRef toPlaceRef(String provider, String externalPlaceId) {
+		if (provider == null || externalPlaceId == null) {
+			return null;
+		}
+		return new PlaceRef(PlaceProvider.valueOf(provider), externalPlaceId);
+	}
+
+	private com.soomgil.itinerary.api.dto.MapDrawing toDrawing(MapDrawingView view) {
+		return new com.soomgil.itinerary.api.dto.MapDrawing(
+			view.id(),
+			view.itineraryDayId(),
+			com.soomgil.itinerary.api.dto.DrawingType.valueOf(view.drawingType().name()),
+			com.soomgil.itinerary.api.dto.GeometryFormat.valueOf(view.geometryFormat().name()),
+			view.geometry(),
+			view.style(),
+			view.label(),
+			view.sortOrder(),
+			view.version()
+		);
+	}
+
+	private com.soomgil.itinerary.api.dto.RouteSegment toRoute(RouteSegmentView view) {
+		return new com.soomgil.itinerary.api.dto.RouteSegment(
+			view.id(),
+			view.originItineraryItemId(),
+			view.destinationItineraryItemId(),
+			com.soomgil.itinerary.api.dto.RouteMode.valueOf(view.mode().name()),
+			view.provider(),
+			view.providerProfile(),
+			com.soomgil.itinerary.api.dto.GeometryFormat.valueOf(view.geometryFormat().name()),
+			view.geometry(),
+			view.distanceMeters(),
+			view.durationSeconds(),
+			view.confidence()
+		);
 	}
 }
