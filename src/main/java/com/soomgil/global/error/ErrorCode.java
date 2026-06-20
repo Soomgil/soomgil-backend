@@ -16,6 +16,12 @@ public enum ErrorCode {
 	RESOURCE_NOT_FOUND(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "Resource was not found."),
 	CONFLICT(HttpStatus.CONFLICT, "CONFLICT", "Request conflicts with current state."),
 	BUSINESS_RULE_VIOLATION(HttpStatus.UNPROCESSABLE_ENTITY, "BUSINESS_RULE_VIOLATION", "Business rule violation."),
+	UNSUPPORTED_MEDIA_TYPE(HttpStatus.UNPROCESSABLE_ENTITY, "UNSUPPORTED_MEDIA_TYPE", "Media type is not supported."),
+	MEDIA_SIZE_LIMIT_EXCEEDED(HttpStatus.UNPROCESSABLE_ENTITY, "MEDIA_SIZE_LIMIT_EXCEEDED", "Media size limit was exceeded."),
+	OBJECT_NOT_FOUND(HttpStatus.UNPROCESSABLE_ENTITY, "OBJECT_NOT_FOUND", "Uploaded object was not found."),
+	MEDIA_METADATA_MISMATCH(HttpStatus.UNPROCESSABLE_ENTITY, "MEDIA_METADATA_MISMATCH", "Media metadata does not match the uploaded object."),
+	MEDIA_LINK_FORBIDDEN(HttpStatus.FORBIDDEN, "MEDIA_LINK_FORBIDDEN", "Media cannot be linked to the resource."),
+	MEDIA_OWNER_REQUIRED(HttpStatus.FORBIDDEN, "MEDIA_OWNER_REQUIRED", "Media owner permission is required."),
 	NOT_IMPLEMENTED(HttpStatus.NOT_IMPLEMENTED, "NOT_IMPLEMENTED", "Endpoint is not implemented yet."),
 	INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR", "Unexpected server error.");
 
