@@ -22,6 +22,17 @@
 		</constructor>
 	</resultMap>
 
+	<resultMap id="UserTagPreferenceScoreSourceRowMap"
+		type="com.soomgil.preference.infrastructure.persistence.row.UserTagPreferenceScoreSourceRow">
+		<constructor>
+			<arg column="tag_id" javaType="java.lang.String"/>
+			<arg column="positive_evidence" javaType="java.math.BigDecimal"/>
+			<arg column="negative_evidence" javaType="java.math.BigDecimal"/>
+			<arg column="smoothed_positive_rate" javaType="java.math.BigDecimal"/>
+			<arg column="preference_discrimination" javaType="java.math.BigDecimal"/>
+		</constructor>
+	</resultMap>
+
 	<select id="findReaction" resultMap="UserPlaceReactionRowMap">
 		SELECT
 			CAST(id AS text) AS id,
@@ -177,4 +188,32 @@
 			nope_count = preference.user_preference_tag_weights.nope_count + excluded.nope_count,
 			updated_at = now()
 	</insert>
+
+	<select id="findUserTagPreferenceScoreSource" resultMap="UserTagPreferenceScoreSourceRowMap">
+		SELECT
+			CAST(projection.tag_id AS text) AS tag_id,
+			projection.positive_evidence,
+			projection.negative_evidence,
+			coalesce(statistic.smoothed_positive_rate, 0.5) AS smoothed_positive_rate,
+			coalesce(statistic.preference_discrimination, 0.5) AS preference_discrimination
+		FROM preference.user_preference_tag_weights projection
+		LEFT JOIN preference.tag_statistic_runs serving_run
+			ON serving_run.is_serving = true
+			AND serving_run.status = 'SUCCEEDED'
+		LEFT JOIN preference.tag_statistics statistic
+			ON statistic.run_id = serving_run.id
+			AND statistic.tag_id = projection.tag_id
+		WHERE projection.user_id = CAST(#{userId} AS uuid)
+			AND projection.tag_id = CAST(#{tagId} AS uuid)
+	</select>
+
+	<update id="updateUserTagPreferenceScore"
+		parameterType="com.soomgil.preference.infrastructure.persistence.row.UserTagPreferenceScoreUpdateRow">
+		UPDATE preference.user_preference_tag_weights
+		SET preference_score = #{preferenceScore},
+			calculation_version = #{calculationVersion},
+			updated_at = now()
+		WHERE user_id = CAST(#{userId} AS uuid)
+			AND tag_id = CAST(#{tagId} AS uuid)
+	</update>
 </mapper>

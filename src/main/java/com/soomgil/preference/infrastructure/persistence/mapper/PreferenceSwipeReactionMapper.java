@@ -6,6 +6,8 @@ import com.soomgil.preference.infrastructure.persistence.row.UserPlaceReactionUp
 import com.soomgil.preference.infrastructure.persistence.row.UserSwipeEventInsertRow;
 import com.soomgil.preference.infrastructure.persistence.row.PlaceTagEvidenceSourceRow;
 import com.soomgil.preference.infrastructure.persistence.row.UserTagEvidenceAdjustmentRow;
+import com.soomgil.preference.infrastructure.persistence.row.UserTagPreferenceScoreSourceRow;
+import com.soomgil.preference.infrastructure.persistence.row.UserTagPreferenceScoreUpdateRow;
 import java.util.List;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -40,4 +42,11 @@ public interface PreferenceSwipeReactionMapper {
 	void removeUserTagEvidence(UserTagEvidenceAdjustmentRow row);
 
 	void addUserTagEvidence(UserTagEvidenceAdjustmentRow row);
+
+	UserTagPreferenceScoreSourceRow findUserTagPreferenceScoreSource(
+		@Param("userId") String userId,
+		@Param("tagId") String tagId
+	);
+
+	void updateUserTagPreferenceScore(UserTagPreferenceScoreUpdateRow row);
 }

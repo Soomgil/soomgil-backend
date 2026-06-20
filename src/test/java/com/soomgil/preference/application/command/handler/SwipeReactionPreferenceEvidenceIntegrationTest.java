@@ -31,6 +31,7 @@ class SwipeReactionPreferenceEvidenceIntegrationTest {
 
 	private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-000000001401");
 	private static final UUID ENRICHMENT_ID = UUID.fromString("00000000-0000-0000-0000-000000001402");
+	private static final UUID STATISTIC_RUN_ID = UUID.fromString("00000000-0000-0000-0000-000000001403");
 
 	@Autowired
 	private UpsertSwipeReactionCommandHandler handler;
@@ -57,6 +58,22 @@ class SwipeReactionPreferenceEvidenceIntegrationTest {
 				(?, ?, 0.8000, 0.5000, 1),
 				(?, ?, 0.6000, 1.0000, 2)
 			""", ENRICHMENT_ID, parkTagId, ENRICHMENT_ID, museumTagId);
+		jdbcTemplate.update("""
+			INSERT INTO preference.tag_statistic_runs (
+				id, source, status, alpha, global_positive_rate,
+				total_reaction_count, positive_reaction_count, is_serving
+			)
+			VALUES (?, 'REAL_USER', 'SUCCEEDED', 100, 0.500000, 1000, 500, true)
+			""", STATISTIC_RUN_ID);
+		jdbcTemplate.update("""
+			INSERT INTO preference.tag_statistics (
+				run_id, tag_id, preference_discrimination, smoothed_positive_rate,
+				positive_count, reaction_count
+			)
+			VALUES
+				(?, ?, 0.800000, 0.600000, 60, 100),
+				(?, ?, 0.200000, 0.400000, 40, 100)
+			""", STATISTIC_RUN_ID, parkTagId, STATISTIC_RUN_ID, museumTagId);
 	}
 
 	@AfterEach
@@ -67,20 +84,20 @@ class SwipeReactionPreferenceEvidenceIntegrationTest {
 	@Test
 	void keepsOnlyTheLatestReactionEvidenceForEachPlace() {
 		react(SwipeReaction.LIKE);
-		assertEvidence("park", "0.40000000", "0.00000000", 1, 0, 0);
-		assertEvidence("museum", "0.60000000", "0.00000000", 1, 0, 0);
+		assertEvidence("park", "0.40000000", "0.00000000", "0.846154", 1, 0, 0);
+		assertEvidence("museum", "0.60000000", "0.00000000", "0.478261", 1, 0, 0);
 
 		react(SwipeReaction.SUPER_LIKE);
-		assertEvidence("park", "0.40000000", "0.00000000", 0, 1, 0);
-		assertEvidence("museum", "0.60000000", "0.00000000", 0, 1, 0);
+		assertEvidence("park", "0.40000000", "0.00000000", "0.846154", 0, 1, 0);
+		assertEvidence("museum", "0.60000000", "0.00000000", "0.478261", 0, 1, 0);
 
 		react(SwipeReaction.NOPE);
-		assertEvidence("park", "0.00000000", "0.40000000", 0, 0, 1);
-		assertEvidence("museum", "0.00000000", "0.60000000", 0, 0, 1);
+		assertEvidence("park", "0.00000000", "0.40000000", "0.230769", 0, 0, 1);
+		assertEvidence("museum", "0.00000000", "0.60000000", "0.347826", 0, 0, 1);
 
 		react(SwipeReaction.NOPE);
-		assertEvidence("park", "0.00000000", "0.40000000", 0, 0, 1);
-		assertEvidence("museum", "0.00000000", "0.60000000", 0, 0, 1);
+		assertEvidence("park", "0.00000000", "0.40000000", "0.230769", 0, 0, 1);
+		assertEvidence("museum", "0.00000000", "0.60000000", "0.347826", 0, 0, 1);
 
 		Integer eventCount = jdbcTemplate.queryForObject("""
 			SELECT count(*)
@@ -112,6 +129,7 @@ class SwipeReactionPreferenceEvidenceIntegrationTest {
 		String tagCode,
 		String positiveEvidence,
 		String negativeEvidence,
+		String preferenceScore,
 		int likeCount,
 		int superLikeCount,
 		int nopeCount
@@ -120,6 +138,7 @@ class SwipeReactionPreferenceEvidenceIntegrationTest {
 			SELECT
 				weight.positive_evidence,
 				weight.negative_evidence,
+				weight.preference_score,
 				weight.like_count,
 				weight.super_like_count,
 				weight.nope_count
@@ -131,6 +150,7 @@ class SwipeReactionPreferenceEvidenceIntegrationTest {
 
 		assertThat((BigDecimal) row.get("positive_evidence")).isEqualByComparingTo(positiveEvidence);
 		assertThat((BigDecimal) row.get("negative_evidence")).isEqualByComparingTo(negativeEvidence);
+		assertThat((BigDecimal) row.get("preference_score")).isEqualByComparingTo(preferenceScore);
 		assertThat(row)
 			.containsEntry("like_count", likeCount)
 			.containsEntry("super_like_count", superLikeCount)
@@ -149,6 +169,8 @@ class SwipeReactionPreferenceEvidenceIntegrationTest {
 		jdbcTemplate.update("DELETE FROM preference.user_preference_tag_weights");
 		jdbcTemplate.update("DELETE FROM preference.user_swipe_events");
 		jdbcTemplate.update("DELETE FROM preference.user_place_reactions");
+		jdbcTemplate.update("DELETE FROM preference.tag_statistics");
+		jdbcTemplate.update("DELETE FROM preference.tag_statistic_runs");
 		jdbcTemplate.update("DELETE FROM preference.place_tag_enrichment_tags");
 		jdbcTemplate.update("DELETE FROM preference.place_tag_enrichment_candidates");
 		jdbcTemplate.update("DELETE FROM preference.place_tag_enrichments");

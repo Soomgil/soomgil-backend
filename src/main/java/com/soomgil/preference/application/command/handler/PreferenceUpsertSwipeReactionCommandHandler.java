@@ -9,6 +9,7 @@ import com.soomgil.preference.application.command.dto.UpsertSwipeReactionCommand
 import com.soomgil.preference.domain.policy.PlaceTagEvidence;
 import com.soomgil.preference.domain.policy.PlaceTagEvidenceCalculator;
 import com.soomgil.preference.domain.policy.PlaceTagEvidenceInput;
+import com.soomgil.preference.domain.policy.UserPreferenceScoreCalculator;
 import com.soomgil.preference.infrastructure.persistence.mapper.PreferenceSwipeReactionMapper;
 import com.soomgil.preference.infrastructure.persistence.row.PlaceTagEvidenceSourceRow;
 import com.soomgil.preference.infrastructure.persistence.row.UserPlaceReactionInsertRow;
@@ -16,8 +17,12 @@ import com.soomgil.preference.infrastructure.persistence.row.UserPlaceReactionRo
 import com.soomgil.preference.infrastructure.persistence.row.UserPlaceReactionUpdateRow;
 import com.soomgil.preference.infrastructure.persistence.row.UserSwipeEventInsertRow;
 import com.soomgil.preference.infrastructure.persistence.row.UserTagEvidenceAdjustmentRow;
+import com.soomgil.preference.infrastructure.persistence.row.UserTagPreferenceScoreSourceRow;
+import com.soomgil.preference.infrastructure.persistence.row.UserTagPreferenceScoreUpdateRow;
 import java.time.OffsetDateTime;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
@@ -32,6 +37,7 @@ public class PreferenceUpsertSwipeReactionCommandHandler implements UpsertSwipeR
 	private final ObjectProvider<CurrentUserProvider> currentUserProvider;
 	private final PreferenceSwipeReactionMapper mapper;
 	private final PlaceTagEvidenceCalculator evidenceCalculator;
+	private final UserPreferenceScoreCalculator preferenceScoreCalculator;
 
 	public PreferenceUpsertSwipeReactionCommandHandler(
 		ObjectProvider<CurrentUserProvider> currentUserProvider,
@@ -40,6 +46,7 @@ public class PreferenceUpsertSwipeReactionCommandHandler implements UpsertSwipeR
 		this.currentUserProvider = currentUserProvider;
 		this.mapper = mapper;
 		this.evidenceCalculator = new PlaceTagEvidenceCalculator();
+		this.preferenceScoreCalculator = new UserPreferenceScoreCalculator();
 	}
 
 	@Transactional
@@ -64,9 +71,11 @@ public class PreferenceUpsertSwipeReactionCommandHandler implements UpsertSwipeR
 		);
 		String currentEnrichmentId = currentTagRows.isEmpty() ? null : currentTagRows.getFirst().enrichmentId();
 
-		if (previous != null && previous.placeTagEnrichmentId() != null) {
-			removePreviousEvidence(userId, previous);
-		}
+		List<PlaceTagEvidence> previousEvidence = previous == null || previous.placeTagEnrichmentId() == null
+			? List.of()
+			: calculateEvidence(mapper.findConfirmedTagsByEnrichment(previous.placeTagEnrichmentId()));
+		List<PlaceTagEvidence> currentEvidence = calculateEvidence(currentTagRows);
+		removePreviousEvidence(userId, previous, previousEvidence);
 
 		if (previous == null) {
 			mapper.insertReaction(new UserPlaceReactionInsertRow(
@@ -97,7 +106,8 @@ public class PreferenceUpsertSwipeReactionCommandHandler implements UpsertSwipeR
 			currentEnrichmentId,
 			command.sourceModifiedAt()
 		));
-		addCurrentEvidence(userId, reaction, currentTagRows);
+		addCurrentEvidence(userId, reaction, currentEvidence);
+		recalculatePreferenceScores(userId, previousEvidence, currentEvidence);
 
 		return new SwipeReactionResponse(
 			new PlaceRef(command.provider(), command.externalPlaceId()),
@@ -107,11 +117,15 @@ public class PreferenceUpsertSwipeReactionCommandHandler implements UpsertSwipeR
 		);
 	}
 
-	private void removePreviousEvidence(UUID userId, UserPlaceReactionRow previous) {
-		List<PlaceTagEvidenceSourceRow> previousTagRows = mapper.findConfirmedTagsByEnrichment(
-			previous.placeTagEnrichmentId()
-		);
-		for (PlaceTagEvidence evidence : calculateEvidence(previousTagRows)) {
+	private void removePreviousEvidence(
+		UUID userId,
+		UserPlaceReactionRow previous,
+		List<PlaceTagEvidence> previousEvidence
+	) {
+		if (previous == null) {
+			return;
+		}
+		for (PlaceTagEvidence evidence : previousEvidence) {
 			mapper.removeUserTagEvidence(new UserTagEvidenceAdjustmentRow(
 				userId.toString(),
 				evidence.tagId(),
@@ -124,14 +138,45 @@ public class PreferenceUpsertSwipeReactionCommandHandler implements UpsertSwipeR
 	private void addCurrentEvidence(
 		UUID userId,
 		String reaction,
-		List<PlaceTagEvidenceSourceRow> currentTagRows
+		List<PlaceTagEvidence> currentEvidence
 	) {
-		for (PlaceTagEvidence evidence : calculateEvidence(currentTagRows)) {
+		for (PlaceTagEvidence evidence : currentEvidence) {
 			mapper.addUserTagEvidence(new UserTagEvidenceAdjustmentRow(
 				userId.toString(),
 				evidence.tagId(),
 				evidence.value(),
 				reaction
+			));
+		}
+	}
+
+	private void recalculatePreferenceScores(
+		UUID userId,
+		List<PlaceTagEvidence> previousEvidence,
+		List<PlaceTagEvidence> currentEvidence
+	) {
+		Set<String> affectedTagIds = new LinkedHashSet<>();
+		previousEvidence.forEach(evidence -> affectedTagIds.add(evidence.tagId()));
+		currentEvidence.forEach(evidence -> affectedTagIds.add(evidence.tagId()));
+
+		for (String tagId : affectedTagIds) {
+			UserTagPreferenceScoreSourceRow source = mapper.findUserTagPreferenceScoreSource(
+				userId.toString(),
+				tagId
+			);
+			if (source == null) {
+				continue;
+			}
+			mapper.updateUserTagPreferenceScore(new UserTagPreferenceScoreUpdateRow(
+				userId.toString(),
+				tagId,
+				preferenceScoreCalculator.calculate(
+					source.smoothedPositiveRate(),
+					source.preferenceDiscrimination(),
+					source.positiveEvidence(),
+					source.negativeEvidence()
+				),
+				"preference-score-odds-v1"
 			));
 		}
 	}
