@@ -4,6 +4,7 @@ import com.soomgil.common.id.Ids;
 import com.soomgil.preference.application.command.dto.SavePlaceTagCandidateCommand;
 import com.soomgil.preference.application.command.dto.SavePlaceTagEnrichmentCommand;
 import com.soomgil.preference.application.command.dto.SavePlaceTagEnrichmentResult;
+import com.soomgil.preference.config.PreferencePolicyProperties;
 import com.soomgil.preference.domain.policy.PlaceTagSelectionDecision;
 import com.soomgil.preference.domain.policy.PlaceTagSelectionInput;
 import com.soomgil.preference.domain.policy.PlaceTagSelector;
@@ -33,9 +34,15 @@ public class PreferenceSavePlaceTagEnrichmentCommandHandler implements SavePlace
 	private final PreferencePlaceTagEnrichmentMapper mapper;
 	private final PlaceTagSelector selector;
 
-	public PreferenceSavePlaceTagEnrichmentCommandHandler(PreferencePlaceTagEnrichmentMapper mapper) {
+	public PreferenceSavePlaceTagEnrichmentCommandHandler(
+		PreferencePlaceTagEnrichmentMapper mapper,
+		PreferencePolicyProperties properties
+	) {
 		this.mapper = mapper;
-		this.selector = new PlaceTagSelector(new BigDecimal("0.55"), 10);
+		this.selector = new PlaceTagSelector(
+			properties.getTagSelection().getMinimumConfidence(),
+			properties.getTagSelection().getMaximumConfirmedTags()
+		);
 	}
 
 	@Transactional

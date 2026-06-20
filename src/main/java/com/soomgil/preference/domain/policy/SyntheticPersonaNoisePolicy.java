@@ -15,7 +15,20 @@ import java.util.Objects;
  */
 public class SyntheticPersonaNoisePolicy {
 
-	private static final BigDecimal MAX_NOISE_RATE = new BigDecimal("0.05");
+	private final BigDecimal maximumNoiseRate;
+
+	public SyntheticPersonaNoisePolicy() {
+		this(new BigDecimal("0.05"));
+	}
+
+	public SyntheticPersonaNoisePolicy(BigDecimal maximumNoiseRate) {
+		if (maximumNoiseRate == null
+			|| maximumNoiseRate.compareTo(BigDecimal.ZERO) < 0
+			|| maximumNoiseRate.compareTo(BigDecimal.ONE) > 0) {
+			throw new IllegalArgumentException("maximum noise rate must be between 0 and 1");
+		}
+		this.maximumNoiseRate = maximumNoiseRate;
+	}
 
 	public BigDecimal apply(SyntheticPersonaNoiseInput input) {
 		validate(input);
@@ -54,8 +67,8 @@ public class SyntheticPersonaNoisePolicy {
 		Objects.requireNonNull(input.score(), "score must not be null");
 		if (input.noiseRate() == null
 			|| input.noiseRate().compareTo(BigDecimal.ZERO) < 0
-			|| input.noiseRate().compareTo(MAX_NOISE_RATE) > 0) {
-			throw new IllegalArgumentException("noise rate must be between 0 and 0.05");
+			|| input.noiseRate().compareTo(maximumNoiseRate) > 0) {
+			throw new IllegalArgumentException("noise rate must be between 0 and " + maximumNoiseRate);
 		}
 	}
 }

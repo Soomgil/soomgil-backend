@@ -1,6 +1,7 @@
 package com.soomgil.preference.infrastructure.persistence.row;
 
 import java.math.BigDecimal;
+import java.time.OffsetDateTime;
 
 /**
  * 장소 태그, 멤버 선호도, 최종 SUPER_LIKE 여부를 함께 읽는 추천 계산 원천 row.
@@ -17,6 +18,7 @@ public record RecommendationScoreSourceRow(
 	String userId,
 	BigDecimal preferenceScore,
 	String reaction,
+	OffsetDateTime lastReactedAt,
 	String displayName,
 	String profileImageUrl
 ) {
@@ -40,6 +42,33 @@ public record RecommendationScoreSourceRow(
 			userId,
 			preferenceScore,
 			reaction,
+			null,
+			null,
+			null
+		);
+	}
+
+	public RecommendationScoreSourceRow(
+		String provider,
+		String externalPlaceId,
+		String tagId,
+		BigDecimal confidence,
+		BigDecimal weight,
+		String userId,
+		BigDecimal preferenceScore,
+		String reaction,
+		OffsetDateTime lastReactedAt
+	) {
+		this(
+			provider,
+			externalPlaceId,
+			tagId,
+			confidence,
+			weight,
+			userId,
+			preferenceScore,
+			reaction,
+			lastReactedAt,
 			null,
 			null
 		);

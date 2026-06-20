@@ -27,6 +27,7 @@ import com.soomgil.trip.domain.model.TripMemberRole;
 import com.soomgil.trip.domain.model.TripMemberStatus;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -141,6 +142,21 @@ class PreferenceListPlaceRecommendationsQueryHandlerTest {
 			.containsExactly(MEMBER_A_ID);
 	}
 
+	@Test
+	void superLikeTabUsesLatestReactionAfterCountAndScoreTie() {
+		when(recommendationMapper.findScoreSources(any(), any())).thenReturn(List.of(
+			sourceWithTime("cafe", MEMBER_A_ID, "2026-06-19T00:00:00Z"),
+			sourceWithTime("cafe", MEMBER_B_ID, null),
+			sourceWithTime("beach", MEMBER_A_ID, null),
+			sourceWithTime("beach", MEMBER_B_ID, "2026-06-20T00:00:00Z")
+		));
+
+		var result = handler.handle(query(RecommendationTab.SUPER_LIKE));
+
+		assertThat(result.items()).extracting(item -> item.place().externalPlaceId())
+			.containsExactly("beach", "cafe");
+	}
+
 	private ListPlaceRecommendationsQuery query(RecommendationTab tab) {
 		return new ListPlaceRecommendationsQuery(TRIP_ID, BBOX, 35.5, 129.5, tab, 0, 20);
 	}
@@ -189,6 +205,24 @@ class PreferenceListPlaceRecommendationsQueryHandlerTest {
 			userId.toString(),
 			new BigDecimal(preferenceScore),
 			reaction
+		);
+	}
+
+	private RecommendationScoreSourceRow sourceWithTime(
+		String externalPlaceId,
+		UUID userId,
+		String superLikedAt
+	) {
+		return new RecommendationScoreSourceRow(
+			PlaceProvider.KTO.name(),
+			externalPlaceId,
+			"quiet",
+			BigDecimal.ONE,
+			BigDecimal.ONE,
+			userId.toString(),
+			new BigDecimal("0.70"),
+			superLikedAt == null ? null : "SUPER_LIKE",
+			superLikedAt == null ? null : OffsetDateTime.parse(superLikedAt)
 		);
 	}
 }

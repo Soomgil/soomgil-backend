@@ -1,6 +1,7 @@
 package com.soomgil.preference.domain.policy;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.math.BigDecimal;
 import org.junit.jupiter.api.Test;
@@ -55,6 +56,13 @@ class SyntheticPersonaSwipeGeneratorTest {
 
 		assertThat(second).isEqualTo(first);
 		assertThat(first).isIn(SyntheticSwipeReaction.LIKE, SyntheticSwipeReaction.NOPE);
+	}
+
+	@Test
+	void rejectsPlaceMatchingHardLikeAndHardDislikeTogether() {
+		assertThatThrownBy(() -> generate("0.00", true, true, 100L))
+			.isInstanceOf(IllegalArgumentException.class)
+			.hasMessage("hard like and hard dislike must not both match");
 	}
 
 	private SyntheticSwipeReaction generate(

@@ -2,6 +2,7 @@ package com.soomgil.preference.application.command.handler;
 
 import com.soomgil.preference.application.command.dto.GenerateSyntheticPersonaSwipesCommand;
 import com.soomgil.preference.application.command.dto.GenerateSyntheticPersonaSwipesResult;
+import com.soomgil.preference.config.PreferencePolicyProperties;
 import com.soomgil.preference.domain.policy.DefaultSyntheticPersonaCatalog;
 import com.soomgil.preference.domain.policy.SyntheticPersonaCatalogValidator;
 import com.soomgil.preference.domain.policy.SyntheticPersonaDefinition;
@@ -39,27 +40,37 @@ import org.springframework.transaction.annotation.Transactional;
 public class PreferenceGenerateSyntheticPersonaSwipesHandler
 	implements GenerateSyntheticPersonaSwipesHandler {
 
-	private static final int REQUIRED_PERSONA_COUNT = 50;
 	private static final int MAX_PLACE_LIMIT = 100;
 	private static final int EVENT_BATCH_SIZE = 500;
-	private static final BigDecimal HARD_STRENGTH = new BigDecimal("1.50");
-	private static final BigDecimal SOFT_STRENGTH = new BigDecimal("0.60");
 
 	private final PreferenceSyntheticPersonaMapper mapper;
 	private final DefaultSyntheticPersonaCatalog catalog = new DefaultSyntheticPersonaCatalog();
-	private final SyntheticPersonaCatalogValidator catalogValidator =
-		new SyntheticPersonaCatalogValidator(REQUIRED_PERSONA_COUNT);
-	private final SyntheticPersonaPlaceScoreCalculator scoreCalculator =
-		new SyntheticPersonaPlaceScoreCalculator(HARD_STRENGTH, SOFT_STRENGTH);
-	private final SyntheticPersonaNoisePolicy noisePolicy = new SyntheticPersonaNoisePolicy();
-	private final SyntheticPersonaSwipeGenerator swipeGenerator = new SyntheticPersonaSwipeGenerator(
-		new BigDecimal("1.20"),
-		new BigDecimal("0.35"),
-		new BigDecimal("-0.35")
-	);
+	private final SyntheticPersonaCatalogValidator catalogValidator;
+	private final SyntheticPersonaPlaceScoreCalculator scoreCalculator;
+	private final SyntheticPersonaNoisePolicy noisePolicy;
+	private final SyntheticPersonaSwipeGenerator swipeGenerator;
+	private final BigDecimal hardStrength;
+	private final BigDecimal softStrength;
 
-	public PreferenceGenerateSyntheticPersonaSwipesHandler(PreferenceSyntheticPersonaMapper mapper) {
+	public PreferenceGenerateSyntheticPersonaSwipesHandler(
+		PreferenceSyntheticPersonaMapper mapper,
+		PreferencePolicyProperties properties
+	) {
 		this.mapper = mapper;
+		PreferencePolicyProperties.SyntheticPersona policy = properties.getSyntheticPersona();
+		this.catalogValidator = new SyntheticPersonaCatalogValidator(
+			policy.getRequiredCount(),
+			policy.getMaximumNoiseRate()
+		);
+		this.hardStrength = policy.getHardPreferenceStrength();
+		this.softStrength = policy.getSoftPreferenceStrength();
+		this.scoreCalculator = new SyntheticPersonaPlaceScoreCalculator(hardStrength, softStrength);
+		this.noisePolicy = new SyntheticPersonaNoisePolicy(policy.getMaximumNoiseRate());
+		this.swipeGenerator = new SyntheticPersonaSwipeGenerator(
+			policy.getSuperLikeThreshold(),
+			policy.getLikeThreshold(),
+			policy.getNopeThreshold()
+		);
 	}
 
 	@Override
@@ -200,10 +211,10 @@ public class PreferenceGenerateSyntheticPersonaSwipesHandler
 		List<SyntheticPersonaTagPreferenceInsertRow> rows = new ArrayList<>();
 		for (SyntheticPersonaDefinition persona : personas) {
 			String personaId = personaIds.get(persona.personaKey());
-			addPreferences(rows, personaId, persona.hardLikeTags(), "HARD_LIKE", HARD_STRENGTH);
-			addPreferences(rows, personaId, persona.hardDislikeTags(), "HARD_DISLIKE", HARD_STRENGTH.negate());
-			addPreferences(rows, personaId, persona.softLikeTags(), "SOFT_LIKE", SOFT_STRENGTH);
-			addPreferences(rows, personaId, persona.softDislikeTags(), "SOFT_DISLIKE", SOFT_STRENGTH.negate());
+			addPreferences(rows, personaId, persona.hardLikeTags(), "HARD_LIKE", hardStrength);
+			addPreferences(rows, personaId, persona.hardDislikeTags(), "HARD_DISLIKE", hardStrength.negate());
+			addPreferences(rows, personaId, persona.softLikeTags(), "SOFT_LIKE", softStrength);
+			addPreferences(rows, personaId, persona.softDislikeTags(), "SOFT_DISLIKE", softStrength.negate());
 			addPreferences(rows, personaId, persona.neutralTags(), "NEUTRAL", BigDecimal.ZERO);
 		}
 		return rows;

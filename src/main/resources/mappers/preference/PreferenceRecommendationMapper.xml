@@ -15,6 +15,7 @@
 			<arg column="user_id" javaType="java.lang.String"/>
 			<arg column="preference_score" javaType="java.math.BigDecimal"/>
 			<arg column="reaction" javaType="java.lang.String"/>
+			<arg column="last_reacted_at" javaType="java.time.OffsetDateTime"/>
 			<arg column="display_name" javaType="java.lang.String"/>
 			<arg column="profile_image_url" javaType="java.lang.String"/>
 		</constructor>
@@ -43,6 +44,7 @@
 			coalesce(member_weight.preference_score, statistic.smoothed_positive_rate, 0.5)
 				AS preference_score,
 			reaction.reaction,
+			reaction.last_reacted_at,
 			profile.display_name,
 			profile.profile_image_url
 		FROM place_refs place

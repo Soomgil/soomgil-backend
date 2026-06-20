@@ -122,12 +122,12 @@ class GenerateSyntheticPersonaSwipesHandlerIntegrationTest {
 				AND is_selectable = true
 			ORDER BY code
 			""", UUID.class);
-		for (int start = 0; start < tagIds.size(); start += 10) {
-			int group = start / 10;
+		for (int start = 0; start < tagIds.size(); start++) {
+			int group = start;
 			UUID enrichmentId = UUID.nameUUIDFromBytes(
 				("coverage-" + group).getBytes(StandardCharsets.UTF_8)
 			);
-			List<UUID> chunk = tagIds.subList(start, Math.min(start + 10, tagIds.size()));
+			List<UUID> chunk = tagIds.subList(start, start + 1);
 			jdbcTemplate.update("""
 				INSERT INTO preference.place_tag_enrichments (
 					id, provider, external_place_id, status, selected_count, enriched_at

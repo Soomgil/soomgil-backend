@@ -98,5 +98,8 @@ public class SyntheticPersonaSwipeGenerator {
 			throw new IllegalArgumentException("externalPlaceId must not be blank");
 		}
 		Objects.requireNonNull(input.personaPlaceScore(), "personaPlaceScore must not be null");
+		if (input.hardLikeMatched() && input.hardDislikeMatched()) {
+			throw new IllegalArgumentException("hard like and hard dislike must not both match");
+		}
 	}
 }

@@ -3,6 +3,7 @@ package com.soomgil.preference.application.command.handler;
 import com.soomgil.common.id.Ids;
 import com.soomgil.preference.application.command.dto.RecalculateTagStatisticsCommand;
 import com.soomgil.preference.application.command.dto.RecalculateTagStatisticsResult;
+import com.soomgil.preference.config.PreferencePolicyProperties;
 import com.soomgil.preference.domain.policy.PreferenceDiscriminationCalculator;
 import com.soomgil.preference.domain.policy.RealUserServingTransitionPolicy;
 import com.soomgil.preference.domain.policy.TagPreferenceStatistics;
@@ -27,16 +28,25 @@ import org.springframework.transaction.annotation.Transactional;
 public class PreferenceRecalculateTagStatisticsCommandHandler implements RecalculateTagStatisticsCommandHandler {
 
 	private static final int RATE_SCALE = 12;
-	private static final long MINIMUM_SYNTHETIC_REACTIONS_PER_CORE_TAG = 50;
-
 	private final PreferenceTagStatisticsMapper mapper;
 	private final PreferenceDiscriminationCalculator calculator;
 	private final RealUserServingTransitionPolicy realUserTransitionPolicy;
+	private final BigDecimal defaultPriorReactionCount;
+	private final long minimumSyntheticReactionsPerCoreTag;
 
-	public PreferenceRecalculateTagStatisticsCommandHandler(PreferenceTagStatisticsMapper mapper) {
+	public PreferenceRecalculateTagStatisticsCommandHandler(
+		PreferenceTagStatisticsMapper mapper,
+		PreferencePolicyProperties properties
+	) {
 		this.mapper = mapper;
 		this.calculator = new PreferenceDiscriminationCalculator();
-		this.realUserTransitionPolicy = new RealUserServingTransitionPolicy(10_000, 100);
+		this.defaultPriorReactionCount = properties.getStatistics().getAlpha();
+		this.minimumSyntheticReactionsPerCoreTag = properties.getSyntheticPersona()
+			.getMinimumCoreTagReactionCount();
+		this.realUserTransitionPolicy = new RealUserServingTransitionPolicy(
+			properties.getRealUser().getMinimumTotalReactionCount(),
+			properties.getRealUser().getMinimumCoreTagReactionCount()
+		);
 	}
 
 	@Transactional
@@ -57,11 +67,12 @@ public class PreferenceRecalculateTagStatisticsCommandHandler implements Recalcu
 		long positiveReactionCount = positiveReactionCount(command);
 		BigDecimal globalPositiveRate = BigDecimal.valueOf(positiveReactionCount)
 			.divide(BigDecimal.valueOf(totalReactionCount), RATE_SCALE, RoundingMode.HALF_UP);
+		BigDecimal priorReactionCount = priorReactionCount(command);
 		UUID runId = Ids.newUuid();
 		mapper.insertRun(new TagStatisticRunInsertRow(
 			runId.toString(),
 			command.source().name(),
-			command.priorReactionCount(),
+			priorReactionCount,
 			globalPositiveRate.setScale(6, RoundingMode.HALF_UP),
 			totalReactionCount,
 			positiveReactionCount
@@ -73,7 +84,7 @@ public class PreferenceRecalculateTagStatisticsCommandHandler implements Recalcu
 				aggregate.positiveCount(),
 				aggregate.reactionCount(),
 				globalPositiveRate,
-				command.priorReactionCount()
+				priorReactionCount
 			);
 			mapper.insertStatistic(new TagStatisticInsertRow(
 				runId.toString(),
@@ -121,10 +132,12 @@ public class PreferenceRecalculateTagStatisticsCommandHandler implements Recalcu
 		}
 		if (mapper.countSyntheticCoreTagsBelowReactionMinimum(
 			generatorVersion,
-			MINIMUM_SYNTHETIC_REACTIONS_PER_CORE_TAG
+			minimumSyntheticReactionsPerCoreTag
 		) > 0) {
 			throw new IllegalStateException(
-				"Every active preference tag must have at least 50 synthetic reactions."
+				"Every active preference tag must have at least "
+					+ minimumSyntheticReactionsPerCoreTag
+					+ " synthetic reactions."
 			);
 		}
 	}
@@ -140,8 +153,7 @@ public class PreferenceRecalculateTagStatisticsCommandHandler implements Recalcu
 	}
 
 	private void validate(RecalculateTagStatisticsCommand command) {
-		if (command == null || command.priorReactionCount() == null
-			|| command.priorReactionCount().compareTo(BigDecimal.ZERO) <= 0) {
+		if (command == null || priorReactionCount(command).compareTo(BigDecimal.ZERO) <= 0) {
 			throw new IllegalArgumentException("prior reaction count must be positive");
 		}
 		if (command.source() == null || command.source() == TagStatisticSource.AI_ONLY_DEFAULT) {
@@ -151,5 +163,9 @@ public class PreferenceRecalculateTagStatisticsCommandHandler implements Recalcu
 			&& (command.generatorVersion() == null || command.generatorVersion().isBlank())) {
 			throw new IllegalArgumentException("generator version is required for synthetic statistics");
 		}
+	}
+
+	private BigDecimal priorReactionCount(RecalculateTagStatisticsCommand command) {
+		return command.priorReactionCount() == null ? defaultPriorReactionCount : command.priorReactionCount();
 	}
 }

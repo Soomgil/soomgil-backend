@@ -11,6 +11,7 @@ import com.soomgil.preference.api.dto.PagedPlaceRecommendation;
 import com.soomgil.preference.api.dto.PlaceRecommendation;
 import com.soomgil.preference.api.dto.RecommendationTab;
 import com.soomgil.preference.application.query.dto.ListPlaceRecommendationsQuery;
+import com.soomgil.preference.config.PreferencePolicyProperties;
 import com.soomgil.preference.domain.policy.PlaceTagEvidence;
 import com.soomgil.preference.domain.policy.PlaceTagEvidenceCalculator;
 import com.soomgil.preference.domain.policy.PlaceTagEvidenceInput;
@@ -25,6 +26,7 @@ import com.soomgil.trip.domain.model.TripMemberStatus;
 import com.soomgil.user.api.dto.UserSummary;
 import java.math.BigDecimal;
 import java.net.URI;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -67,7 +69,8 @@ public class PreferenceListPlaceRecommendationsQueryHandler
 		ObjectProvider<CurrentUserProvider> currentUserProvider,
 		ListTripMembersHandler tripMembersHandler,
 		PlaceViewportCandidateQueryHandler placeCandidatesHandler,
-		PreferenceRecommendationMapper recommendationMapper
+		PreferenceRecommendationMapper recommendationMapper,
+		PreferencePolicyProperties properties
 	) {
 		this(
 			currentUserProvider,
@@ -75,7 +78,9 @@ public class PreferenceListPlaceRecommendationsQueryHandler
 			placeCandidatesHandler,
 			recommendationMapper,
 			new PlaceTagEvidenceCalculator(),
-			new RecommendationScorer(new BigDecimal("0.15"))
+			new RecommendationScorer(
+				properties.getRecommendation().getMatchedMemberLiftThreshold()
+			)
 		);
 	}
 
@@ -161,6 +166,12 @@ public class PreferenceListPlaceRecommendationsQueryHandler
 			.filter(row -> "SUPER_LIKE".equals(row.reaction()))
 			.map(row -> UUID.fromString(row.userId()))
 			.collect(Collectors.toCollection(LinkedHashSet::new));
+		OffsetDateTime latestSuperLikedAt = rows.stream()
+			.filter(row -> "SUPER_LIKE".equals(row.reaction()))
+			.map(RecommendationScoreSourceRow::lastReactedAt)
+			.filter(Objects::nonNull)
+			.max(Comparator.naturalOrder())
+			.orElse(null);
 		List<UserSummary> matchedMembers = memberScores.entrySet().stream()
 			.filter(entry -> recommendationScorer.isMatchedMember(entry.getValue()))
 			.map(Map.Entry::getKey)
@@ -178,6 +189,7 @@ public class PreferenceListPlaceRecommendationsQueryHandler
 			superLikedMemberIds.size(),
 			matchedMembers,
 			superLikedMembers,
+			latestSuperLikedAt,
 			distanceMeters(centerLat, centerLng, candidate.lat(), candidate.lng())
 		);
 	}
@@ -286,6 +298,10 @@ public class PreferenceListPlaceRecommendationsQueryHandler
 			return Comparator.comparingInt(ScoredRecommendation::superLikeCount)
 				.reversed()
 				.thenComparing(ScoredRecommendation::groupScore, Comparator.reverseOrder())
+				.thenComparing(
+					ScoredRecommendation::latestSuperLikedAt,
+					Comparator.nullsLast(Comparator.reverseOrder())
+				)
 				.thenComparing(tieBreakers);
 		}
 		return Comparator.comparing(ScoredRecommendation::groupScore, Comparator.reverseOrder())
@@ -379,6 +395,7 @@ public class PreferenceListPlaceRecommendationsQueryHandler
 		int superLikeCount,
 		List<UserSummary> matchedMembers,
 		List<UserSummary> superLikedMembers,
+		OffsetDateTime latestSuperLikedAt,
 		Double distanceMeters
 	) {
 	}

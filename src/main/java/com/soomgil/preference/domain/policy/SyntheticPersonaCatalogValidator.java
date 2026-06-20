@@ -12,15 +12,24 @@ import java.util.Set;
  */
 public class SyntheticPersonaCatalogValidator {
 
-	private static final BigDecimal MAX_NOISE_RATE = new BigDecimal("0.05");
-
 	private final int requiredPersonaCount;
+	private final BigDecimal maximumNoiseRate;
 
 	public SyntheticPersonaCatalogValidator(int requiredPersonaCount) {
+		this(requiredPersonaCount, new BigDecimal("0.05"));
+	}
+
+	public SyntheticPersonaCatalogValidator(int requiredPersonaCount, BigDecimal maximumNoiseRate) {
 		if (requiredPersonaCount < 1) {
 			throw new IllegalArgumentException("required persona count must be positive");
 		}
+		if (maximumNoiseRate == null
+			|| maximumNoiseRate.compareTo(BigDecimal.ZERO) < 0
+			|| maximumNoiseRate.compareTo(BigDecimal.ONE) > 0) {
+			throw new IllegalArgumentException("maximum noise rate must be between 0 and 1");
+		}
 		this.requiredPersonaCount = requiredPersonaCount;
+		this.maximumNoiseRate = maximumNoiseRate;
 	}
 
 	/**
@@ -45,8 +54,10 @@ public class SyntheticPersonaCatalogValidator {
 				throw new IllegalArgumentException("hard like and hard dislike tags must not overlap");
 			}
 			if (persona.noiseRate().compareTo(BigDecimal.ZERO) < 0
-				|| persona.noiseRate().compareTo(MAX_NOISE_RATE) > 0) {
-				throw new IllegalArgumentException("synthetic persona noise rate must be between 0 and 0.05");
+				|| persona.noiseRate().compareTo(maximumNoiseRate) > 0) {
+				throw new IllegalArgumentException(
+					"synthetic persona noise rate must be between 0 and " + maximumNoiseRate
+				);
 			}
 		}
 	}
