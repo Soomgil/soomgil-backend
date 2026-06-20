@@ -17,6 +17,7 @@ public record PlaceTagEnrichmentInsertRow(
 	String promptVersion,
 	String tagDictionaryVersion,
 	String selectionPolicyVersion,
+	String tagStatisticRunId,
 	int candidateCount,
 	int selectedCount
 ) {

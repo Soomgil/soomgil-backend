@@ -4,15 +4,18 @@ import com.soomgil.common.id.Ids;
 import com.soomgil.preference.application.command.dto.SavePlaceTagCandidateCommand;
 import com.soomgil.preference.application.command.dto.SavePlaceTagEnrichmentCommand;
 import com.soomgil.preference.application.command.dto.SavePlaceTagEnrichmentResult;
+import com.soomgil.preference.domain.policy.PlaceTagSelectionDecision;
+import com.soomgil.preference.domain.policy.PlaceTagSelectionInput;
+import com.soomgil.preference.domain.policy.PlaceTagSelector;
 import com.soomgil.preference.infrastructure.persistence.mapper.PreferencePlaceTagEnrichmentMapper;
 import com.soomgil.preference.infrastructure.persistence.row.PlaceTagEnrichmentCandidateInsertRow;
 import com.soomgil.preference.infrastructure.persistence.row.PlaceTagEnrichmentInsertRow;
 import com.soomgil.preference.infrastructure.persistence.row.PlaceTagEnrichmentTagInsertRow;
 import com.soomgil.preference.infrastructure.persistence.row.PreferenceTagLookupRow;
-import java.util.HashSet;
+import java.math.BigDecimal;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -28,9 +31,11 @@ public class PreferenceSavePlaceTagEnrichmentCommandHandler implements SavePlace
 	private static final String DICTIONARY_VERSION = "preference-tags-v1";
 
 	private final PreferencePlaceTagEnrichmentMapper mapper;
+	private final PlaceTagSelector selector;
 
 	public PreferenceSavePlaceTagEnrichmentCommandHandler(PreferencePlaceTagEnrichmentMapper mapper) {
 		this.mapper = mapper;
+		this.selector = new PlaceTagSelector(new BigDecimal("0.55"), 10);
 	}
 
 	@Transactional
@@ -39,10 +44,20 @@ public class PreferenceSavePlaceTagEnrichmentCommandHandler implements SavePlace
 		UUID enrichmentId = Ids.newUuid();
 		List<SavePlaceTagCandidateCommand> candidates = candidates(command);
 		Map<String, PreferenceTagLookupRow> tagsByCode = findTagsByCode(candidates);
-		List<CandidateDecision> decisions = decideCandidates(candidates, tagsByCode);
+		Map<PlaceTagSelectionInput, SavePlaceTagCandidateCommand> candidatesByInput = new IdentityHashMap<>();
+		List<PlaceTagSelectionInput> inputs = candidates.stream()
+			.map(candidate -> selectionInput(candidate, tagsByCode, candidatesByInput))
+			.toList();
+		List<PlaceTagSelectionDecision> decisions = selector.select(inputs);
 		int selectedCount = (int) decisions.stream()
-			.filter(CandidateDecision::selected)
+			.filter(PlaceTagSelectionDecision::selected)
 			.count();
+		String tagStatisticRunId = decisions.stream()
+			.filter(PlaceTagSelectionDecision::selected)
+			.map(decision -> decision.input().tagStatisticRunId())
+			.filter(runId -> runId != null && !runId.isBlank())
+			.findFirst()
+			.orElse(null);
 
 		mapper.insertEnrichment(new PlaceTagEnrichmentInsertRow(
 			enrichmentId.toString(),
@@ -56,35 +71,37 @@ public class PreferenceSavePlaceTagEnrichmentCommandHandler implements SavePlace
 			command.promptVersion(),
 			DICTIONARY_VERSION,
 			command.selectionPolicyVersion(),
+			tagStatisticRunId,
 			candidates.size(),
 			selectedCount
 		));
 
 		int rankOrder = 1;
-		for (CandidateDecision decision : decisions) {
+		for (PlaceTagSelectionDecision decision : decisions) {
+			SavePlaceTagCandidateCommand candidate = candidatesByInput.get(decision.input());
 			mapper.insertCandidate(new PlaceTagEnrichmentCandidateInsertRow(
 				Ids.newUuid().toString(),
 				enrichmentId.toString(),
-				decision.candidate().candidateCode(),
-				decision.matchedTagId(),
-				decision.candidate().confidence(),
-				decision.candidate().weight(),
-				null,
+				candidate.candidateCode(),
+				decision.input().tagId(),
+				candidate.confidence(),
+				candidate.weight(),
+				decision.selectionScore(),
 				decision.status(),
-				decision.candidate().rationale()
+				candidate.rationale()
 			));
 
 			if (decision.selected()) {
 				mapper.insertSelectedTag(new PlaceTagEnrichmentTagInsertRow(
 					enrichmentId.toString(),
-					decision.matchedTagId(),
-					decision.candidate().confidence(),
-					decision.candidate().weight(),
-					null,
-					null,
+					decision.input().tagId(),
+					candidate.confidence(),
+					candidate.weight(),
+					decision.input().preferenceDiscrimination(),
+					decision.selectionScore(),
 					rankOrder,
-					null,
-					decision.candidate().rationale()
+					decision.input().tagStatisticRunId(),
+					candidate.rationale()
 				));
 				rankOrder++;
 			}
@@ -108,47 +125,27 @@ public class PreferenceSavePlaceTagEnrichmentCommandHandler implements SavePlace
 		if (codes.isEmpty()) {
 			return Map.of();
 		}
-		return mapper.findActiveSelectableTags(codes)
+		return mapper.findTagsByCodes(codes)
 			.stream()
 			.collect(Collectors.toMap(PreferenceTagLookupRow::code, Function.identity()));
 	}
 
-	private List<CandidateDecision> decideCandidates(
-		List<SavePlaceTagCandidateCommand> candidates,
-		Map<String, PreferenceTagLookupRow> tagsByCode
-	) {
-		Set<String> selectedTagIds = new HashSet<>();
-		return candidates.stream()
-			.map(candidate -> decideCandidate(candidate, tagsByCode, selectedTagIds))
-			.toList();
-	}
-
-	private CandidateDecision decideCandidate(
+	private PlaceTagSelectionInput selectionInput(
 		SavePlaceTagCandidateCommand candidate,
 		Map<String, PreferenceTagLookupRow> tagsByCode,
-		Set<String> selectedTagIds
+		Map<PlaceTagSelectionInput, SavePlaceTagCandidateCommand> candidatesByInput
 	) {
 		PreferenceTagLookupRow tag = tagsByCode.get(candidate.candidateCode());
-		if (tag == null) {
-			return new CandidateDecision(candidate, null, "REJECTED_OUT_OF_DICTIONARY");
-		}
-		if (!candidate.selected()) {
-			return new CandidateDecision(candidate, tag.id(), "REJECTED_LOW_SCORE");
-		}
-		if (!selectedTagIds.add(tag.id())) {
-			return new CandidateDecision(candidate, tag.id(), "REJECTED_DUPLICATE");
-		}
-		return new CandidateDecision(candidate, tag.id(), "SELECTED");
-	}
-
-	private record CandidateDecision(
-		SavePlaceTagCandidateCommand candidate,
-		String matchedTagId,
-		String status
-	) {
-
-		private boolean selected() {
-			return "SELECTED".equals(status);
-		}
+		PlaceTagSelectionInput input = new PlaceTagSelectionInput(
+			tag == null ? null : tag.id(),
+			candidate.candidateCode(),
+			tag != null && Boolean.TRUE.equals(tag.activeSelectable()),
+			candidate.confidence(),
+			candidate.weight(),
+			tag == null ? new BigDecimal("0.5") : tag.preferenceDiscrimination(),
+			tag == null ? null : tag.tagStatisticRunId()
+		);
+		candidatesByInput.put(input, candidate);
+		return input;
 	}
 }

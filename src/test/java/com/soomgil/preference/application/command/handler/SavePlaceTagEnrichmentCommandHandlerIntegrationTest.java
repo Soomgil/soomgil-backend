@@ -50,7 +50,7 @@ class SavePlaceTagEnrichmentCommandHandlerIntegrationTest {
 					"park",
 					new BigDecimal("0.9200"),
 					new BigDecimal("0.8000"),
-					true,
+					false,
 					"Place has a clear park context."
 				),
 				new SavePlaceTagCandidateCommand(
@@ -116,7 +116,13 @@ class SavePlaceTagEnrichmentCommandHandlerIntegrationTest {
 			.containsEntry("status", "REJECTED_OUT_OF_DICTIONARY");
 
 		List<Map<String, Object>> selectedTags = jdbcTemplate.queryForList("""
-			SELECT t.code, et.confidence, et.weight, et.rank_order
+			SELECT
+				t.code,
+				et.confidence,
+				et.weight,
+				et.preference_discrimination_snapshot,
+				et.selection_score,
+				et.rank_order
 			FROM preference.place_tag_enrichment_tags et
 			JOIN preference.preference_tags t ON t.id = et.tag_id
 			WHERE et.enrichment_id = ?
@@ -130,5 +136,9 @@ class SavePlaceTagEnrichmentCommandHandlerIntegrationTest {
 			.containsEntry("rank_order", 1);
 		assertThat((BigDecimal) selectedTags.getFirst().get("confidence")).isEqualByComparingTo("0.9200");
 		assertThat((BigDecimal) selectedTags.getFirst().get("weight")).isEqualByComparingTo("0.8000");
+		assertThat((BigDecimal) selectedTags.getFirst().get("preference_discrimination_snapshot"))
+			.isEqualByComparingTo("0.500000");
+		assertThat((BigDecimal) selectedTags.getFirst().get("selection_score"))
+			.isEqualByComparingTo("0.800000");
 	}
 }

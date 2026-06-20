@@ -14,7 +14,7 @@ import org.apache.ibatis.annotations.Param;
 @Mapper
 public interface PreferencePlaceTagEnrichmentMapper {
 
-	List<PreferenceTagLookupRow> findActiveSelectableTags(@Param("codes") List<String> codes);
+	List<PreferenceTagLookupRow> findTagsByCodes(@Param("codes") List<String> codes);
 
 	void insertEnrichment(PlaceTagEnrichmentInsertRow row);
 

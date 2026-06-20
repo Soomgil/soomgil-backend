@@ -8,18 +8,26 @@
 		<constructor>
 			<arg column="id" javaType="java.lang.String"/>
 			<arg column="code" javaType="java.lang.String"/>
+			<arg column="active_selectable" javaType="boolean"/>
+			<arg column="preference_discrimination" javaType="java.math.BigDecimal"/>
+			<arg column="tag_statistic_run_id" javaType="java.lang.String"/>
 		</constructor>
 	</resultMap>
 
-	<select id="findActiveSelectableTags" resultMap="PreferenceTagLookupRowMap">
+	<select id="findTagsByCodes" resultMap="PreferenceTagLookupRowMap">
 		SELECT
-			CAST(id AS text) AS id,
-			code
-		FROM preference.preference_tags
-		WHERE is_active = true
-			AND is_selectable = true
-			AND tag_type = 'TAG'
-			AND code IN
+			CAST(tag.id AS text) AS id,
+			tag.code,
+			(tag.is_active AND tag.is_selectable AND tag.tag_type = 'TAG') AS active_selectable,
+			coalesce(statistic.preference_discrimination, 0.5) AS preference_discrimination,
+			CAST(serving_run.id AS text) AS tag_statistic_run_id
+		FROM preference.preference_tags tag
+		LEFT JOIN preference.tag_statistic_runs serving_run
+			ON serving_run.is_serving = true
+		LEFT JOIN preference.tag_statistics statistic
+			ON statistic.run_id = serving_run.id
+			AND statistic.tag_id = tag.id
+		WHERE tag.code IN
 			<foreach collection="codes" item="code" open="(" separator="," close=")">
 				#{code}
 			</foreach>
@@ -38,6 +46,7 @@
 			prompt_version,
 			tag_dictionary_version,
 			selection_policy_version,
+			tag_statistic_run_id,
 			candidate_count,
 			selected_count,
 			enriched_at
@@ -54,6 +63,7 @@
 			#{promptVersion},
 			#{tagDictionaryVersion},
 			#{selectionPolicyVersion},
+			CAST(#{tagStatisticRunId} AS uuid),
 			#{candidateCount},
 			#{selectedCount},
 			now()
