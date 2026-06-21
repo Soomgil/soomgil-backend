@@ -1,10 +1,13 @@
 package com.soomgil.social.infrastructure.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.soomgil.TestcontainersConfiguration;
 import com.soomgil.social.application.SocialFollowService;
 import com.soomgil.social.api.dto.FollowStatus;
+import com.soomgil.global.error.BusinessException;
+import com.soomgil.global.error.ErrorCode;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -62,6 +65,21 @@ class SocialFollowRepositoryIntegrationTest {
 			"SELECT status FROM social.user_follows WHERE follower_user_id = ? AND following_user_id = ?",
 			String.class, CURRENT, PUBLIC_USER
 		)).isEqualTo("DELETED");
+	}
+
+	@Test
+	void pagesPublicListsAndProtectsPrivateLists() {
+		service.follow(CURRENT, PUBLIC_USER);
+
+		assertThat(service.listFollowers(null, PUBLIC_USER, 0, 20).items())
+			.extracting("displayName")
+			.containsExactly("Current");
+		assertThat(service.listFollowing(CURRENT, CURRENT, 0, 20).items())
+			.extracting("displayName")
+			.containsExactly("Public");
+		assertThatThrownBy(() -> service.listFollowing(null, CURRENT, 0, 20))
+			.isInstanceOfSatisfying(BusinessException.class, exception ->
+				assertThat(exception.errorCode()).isEqualTo(ErrorCode.FORBIDDEN));
 	}
 
 	private void insertProfile(UUID userId, String name, String visibility) {

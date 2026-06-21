@@ -2,6 +2,7 @@ package com.soomgil.social.infrastructure.persistence.mapper;
 
 import com.soomgil.social.domain.model.SocialFollowRecord;
 import com.soomgil.social.domain.model.SocialFollowRequestRecord;
+import com.soomgil.social.domain.model.SocialFollowUserRecord;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -29,4 +30,14 @@ public interface SocialFollowMapper {
 		@Param("offset") int offset, @Param("size") int size);
 
 	long countPending(UUID followingId);
+
+	List<SocialFollowUserRecord> findFollowers(@Param("userId") UUID userId,
+		@Param("offset") int offset, @Param("size") int size);
+
+	long countFollowers(UUID userId);
+
+	List<SocialFollowUserRecord> findFollowing(@Param("userId") UUID userId,
+		@Param("offset") int offset, @Param("size") int size);
+
+	long countFollowing(UUID userId);
 }

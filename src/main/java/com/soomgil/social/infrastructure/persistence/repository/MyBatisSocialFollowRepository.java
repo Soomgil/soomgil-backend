@@ -3,6 +3,7 @@ package com.soomgil.social.infrastructure.persistence.repository;
 import com.soomgil.social.application.port.SocialFollowRepository;
 import com.soomgil.social.domain.model.SocialFollowRecord;
 import com.soomgil.social.domain.model.SocialFollowRequestRecord;
+import com.soomgil.social.domain.model.SocialFollowUserRecord;
 import com.soomgil.social.infrastructure.persistence.mapper.SocialFollowMapper;
 import java.time.Instant;
 import java.util.List;
@@ -53,5 +54,25 @@ public class MyBatisSocialFollowRepository implements SocialFollowRepository {
 	@Override
 	public long countPending(UUID followingId) {
 		return mapper.countPending(followingId);
+	}
+
+	@Override
+	public List<SocialFollowUserRecord> findFollowers(UUID userId, int offset, int size) {
+		return mapper.findFollowers(userId, offset, size);
+	}
+
+	@Override
+	public long countFollowers(UUID userId) {
+		return mapper.countFollowers(userId);
+	}
+
+	@Override
+	public List<SocialFollowUserRecord> findFollowing(UUID userId, int offset, int size) {
+		return mapper.findFollowing(userId, offset, size);
+	}
+
+	@Override
+	public long countFollowing(UUID userId) {
+		return mapper.countFollowing(userId);
 	}
 }

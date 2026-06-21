@@ -7,6 +7,7 @@ import com.soomgil.global.error.ErrorCode;
 import com.soomgil.social.api.dto.Follow;
 import com.soomgil.social.api.dto.PagedFollowRequest;
 import com.soomgil.social.application.SocialFollowService;
+import com.soomgil.user.api.dto.PagedUserSummary;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import java.security.Principal;
@@ -43,6 +44,28 @@ public class SocialController extends ApiControllerSupport {
 		followService.unfollow(currentUserId(principal), userId);
 	}
 
+	/** 공개 프로필 또는 본인 비공개 프로필의 팔로워 목록을 조회한다. */
+	@GetMapping("/users/{userId}/followers")
+	public PagedUserSummary listFollowers(
+		@PathVariable UUID userId,
+		@RequestParam(defaultValue = "0") @Min(0) int page,
+		@RequestParam(defaultValue = "20") @Min(1) @Max(100) int size,
+		Principal principal
+	) {
+		return followService.listFollowers(currentUserIdOrNull(principal), userId, page, size);
+	}
+
+	/** 공개 프로필 또는 본인 비공개 프로필의 팔로잉 목록을 조회한다. */
+	@GetMapping("/users/{userId}/following")
+	public PagedUserSummary listFollowing(
+		@PathVariable UUID userId,
+		@RequestParam(defaultValue = "0") @Min(0) int page,
+		@RequestParam(defaultValue = "20") @Min(1) @Max(100) int size,
+		Principal principal
+	) {
+		return followService.listFollowing(currentUserIdOrNull(principal), userId, page, size);
+	}
+
 	@GetMapping("/me/follow-requests")
 	public PagedFollowRequest listReceivedFollowRequests(
 		@RequestParam(defaultValue = "0") @Min(0) int page,
@@ -73,5 +96,9 @@ public class SocialController extends ApiControllerSupport {
 		catch (IllegalArgumentException exception) {
 			throw new BusinessException(ErrorCode.UNAUTHORIZED);
 		}
+	}
+
+	private UUID currentUserIdOrNull(Principal principal) {
+		return principal == null ? null : currentUserId(principal);
 	}
 }

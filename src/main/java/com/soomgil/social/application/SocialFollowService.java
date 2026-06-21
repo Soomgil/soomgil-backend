@@ -10,6 +10,7 @@ import com.soomgil.social.api.dto.FollowStatus;
 import com.soomgil.social.api.dto.PagedFollowRequest;
 import com.soomgil.social.application.port.SocialFollowRepository;
 import com.soomgil.social.domain.model.SocialFollowRecord;
+import com.soomgil.user.api.dto.PagedUserSummary;
 import com.soomgil.user.api.dto.UserSummary;
 import java.net.URI;
 import java.time.Instant;
@@ -54,9 +55,7 @@ public class SocialFollowService {
 
 	@Transactional(readOnly = true)
 	public PagedFollowRequest listPending(UUID currentUserId, int page, int size) {
-		if (page < 0 || size < 1 || size > 100) {
-			throw new BusinessException(ErrorCode.VALIDATION_FAILED, "page or size is out of range.");
-		}
+		validatePage(page, size);
 		long total = repository.countPending(currentUserId);
 		List<FollowRequest> items = repository.findPending(currentUserId, page * size, size).stream()
 			.map(row -> new FollowRequest(
@@ -66,6 +65,36 @@ public class SocialFollowService {
 			.toList();
 		int totalPages = total == 0 ? 0 : (int) Math.ceil((double) total / size);
 		return new PagedFollowRequest(items, new PageMeta(page, size, total, totalPages, List.of()));
+	}
+
+	/**
+	 * 사용자의 ACTIVE 팔로워를 최신 관계순으로 조회한다.
+	 *
+	 * <p>PUBLIC 프로필은 비로그인 사용자도 조회할 수 있다. PRIVATE 프로필은 본인만 조회할 수 있다.
+	 */
+	@Transactional(readOnly = true)
+	public PagedUserSummary listFollowers(UUID viewerUserId, UUID targetUserId, int page, int size) {
+		validateFollowListAccess(viewerUserId, targetUserId, page, size);
+		long total = repository.countFollowers(targetUserId);
+		List<UserSummary> items = repository.findFollowers(targetUserId, page * size, size).stream()
+			.map(row -> new UserSummary(row.userId(), row.displayName(), uri(row.profileImageUrl())))
+			.toList();
+		return new PagedUserSummary(items, pageMeta(page, size, total));
+	}
+
+	/**
+	 * 사용자가 ACTIVE 상태로 팔로우하는 사람을 최신 관계순으로 조회한다.
+	 *
+	 * <p>PUBLIC 프로필은 비로그인 사용자도 조회할 수 있다. PRIVATE 프로필은 본인만 조회할 수 있다.
+	 */
+	@Transactional(readOnly = true)
+	public PagedUserSummary listFollowing(UUID viewerUserId, UUID targetUserId, int page, int size) {
+		validateFollowListAccess(viewerUserId, targetUserId, page, size);
+		long total = repository.countFollowing(targetUserId);
+		List<UserSummary> items = repository.findFollowing(targetUserId, page * size, size).stream()
+			.map(row -> new UserSummary(row.userId(), row.displayName(), uri(row.profileImageUrl())))
+			.toList();
+		return new PagedUserSummary(items, pageMeta(page, size, total));
 	}
 
 	@Transactional
@@ -89,6 +118,28 @@ public class SocialFollowService {
 			value.followerUserId(), value.followingUserId(), FollowStatus.valueOf(value.status()),
 			offset(value.createdAt())
 		);
+	}
+
+	private void validateFollowListAccess(UUID viewerUserId, UUID targetUserId, int page, int size) {
+		validatePage(page, size);
+		String visibility = repository.findProfileVisibility(targetUserId);
+		if (visibility == null) {
+			throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "User was not found.");
+		}
+		if ("PRIVATE".equals(visibility) && !targetUserId.equals(viewerUserId)) {
+			throw new BusinessException(ErrorCode.FORBIDDEN, "Private follow lists are visible only to the owner.");
+		}
+	}
+
+	private void validatePage(int page, int size) {
+		if (page < 0 || size < 1 || size > 100) {
+			throw new BusinessException(ErrorCode.VALIDATION_FAILED, "page or size is out of range.");
+		}
+	}
+
+	private PageMeta pageMeta(int page, int size, long total) {
+		int totalPages = total == 0 ? 0 : (int) Math.ceil((double) total / size);
+		return new PageMeta(page, size, total, totalPages, List.of());
 	}
 
 	private OffsetDateTime offset(Instant value) {
