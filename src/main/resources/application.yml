@@ -1,6 +1,16 @@
 spring:
   application:
     name: soomgil-backend
+  ai:
+    model:
+      chat: ${AI_CHAT_MODEL:none}
+    google:
+      genai:
+        api-key: ${GEMINI_API_KEY:}
+        chat:
+          options:
+            model: ${GEMINI_CHAT_MODEL:gemini-2.5-flash}
+            temperature: 0.3
   datasource:
     url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:soomgil}
     username: ${DB_USERNAME:soomgil}

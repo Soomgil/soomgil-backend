@@ -61,7 +61,8 @@ public enum ErrorCode {
 	PLANNING_CHECKLIST_NOT_FOUND(HttpStatus.NOT_FOUND, "PLANNING_CHECKLIST_NOT_FOUND", "Planning checklist was not found."),
 	PLANNING_ITEM_NOT_FOUND(HttpStatus.NOT_FOUND, "PLANNING_ITEM_NOT_FOUND", "Planning checklist item was not found."),
 	PLANNING_VERSION_CONFLICT(HttpStatus.CONFLICT, "PLANNING_VERSION_CONFLICT", "Planning resource version has changed since last read."),
-	PLANNING_SCOPE_DAY_MISMATCH(HttpStatus.UNPROCESSABLE_ENTITY, "PLANNING_SCOPE_DAY_MISMATCH", "Scope type and itinerary day id are inconsistent.");
+	PLANNING_SCOPE_DAY_MISMATCH(HttpStatus.UNPROCESSABLE_ENTITY, "PLANNING_SCOPE_DAY_MISMATCH", "Scope type and itinerary day id are inconsistent."),
+	AI_PROVIDER_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "AI_PROVIDER_UNAVAILABLE", "AI guide is temporarily unavailable.");
 
 	private final HttpStatus status;
 	private final String code;
