@@ -12,6 +12,7 @@ import com.soomgil.trip.application.port.TripAccessSnapshot;
 import com.soomgil.trip.application.port.TripCommandRepository;
 import com.soomgil.trip.application.port.TripInviteCodeGenerator;
 import com.soomgil.trip.application.port.TripInviteReadModel;
+import com.soomgil.trip.application.port.TripInviteNotificationPublisher;
 import com.soomgil.trip.application.port.TripQueryRepository;
 import com.soomgil.trip.application.port.TripSettingsUpdate;
 import com.soomgil.trip.domain.model.InviteStatus;
@@ -34,11 +35,13 @@ class CreateTripInviteHandlerTest {
 	private final UUID inviteeUserId = UUID.randomUUID();
 	private final CapturingTripCommandRepository commandRepository = new CapturingTripCommandRepository();
 	private final StubTripQueryRepository queryRepository = new StubTripQueryRepository();
+	private final TripInviteNotificationPublisher notificationPublisher = org.mockito.Mockito.mock(TripInviteNotificationPublisher.class);
 	private final CreateTripInviteHandler handler = new CreateTripInviteHandler(
 		commandRepository,
 		queryRepository,
 		fixedTime(),
-		fixedCodeGenerator()
+		fixedCodeGenerator(),
+		notificationPublisher
 	);
 
 	@Test
@@ -66,6 +69,9 @@ class CreateTripInviteHandlerTest {
 		assertThat(result.expiresAt()).isNull();
 		assertThat(commandRepository.savedInvite.createdByUserId()).isEqualTo(ownerUserId);
 		assertThat(commandRepository.savedInvite.inviteTokenHash()).isNotBlank();
+		org.mockito.Mockito.verify(notificationPublisher).publish(
+			result.id(), tripId, ownerUserId, inviteeUserId, "ABCD1234", now()
+		);
 	}
 
 	@Test
