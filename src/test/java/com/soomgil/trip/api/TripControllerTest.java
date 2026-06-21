@@ -67,7 +67,10 @@ class TripControllerTest {
 		TripAccessGuard accessGuard = new TripAccessGuard(queryRepository);
 		return new TripController(
 			new CreateTripHandler(new NoopTripCommandRepository(), fixedTime()),
-			new CreateTripInviteHandler(new NoopTripCommandRepository(), queryRepository, fixedTime(), fixedCodeGenerator()),
+			new CreateTripInviteHandler(
+				new NoopTripCommandRepository(), queryRepository, fixedTime(), fixedCodeGenerator(),
+				(inviteId, tripId, actorUserId, recipientUserId, inviteCode, createdAt) -> { }
+			),
 			new RevokeTripInviteHandler(new NoopTripCommandRepository(), queryRepository, fixedTime()),
 			new UpdateTripHandler(new NoopTripCommandRepository(), queryRepository, fixedTime()),
 			new DeleteTripHandler(new NoopTripCommandRepository(), queryRepository, fixedTime()),
@@ -95,6 +98,10 @@ class TripControllerTest {
 
 		@Override
 		public void saveCreatedTrip(Trip trip, TripMember initialMember, List<String> legalRegionCodes) {
+		}
+
+		@Override
+		public void saveCreatedRetrip(Trip trip, TripMember initialMember, UUID sourcePostId, int snapshotVersion) {
 		}
 
 		@Override

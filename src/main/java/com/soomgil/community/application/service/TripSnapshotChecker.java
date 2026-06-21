@@ -6,9 +6,7 @@ import java.util.UUID;
 /**
  * 게시글 발행 시 원본 여행방의 snapshot을 가져온다.
  *
- * <p>여행방(trip) 모듈은 아직 구현되지 않았으므로, 기본 구현체
- * {@link NoOpTripSnapshotChecker}는 빈 snapshot을 반환한다.
- * trip 모듈 완성 후 실제 구현체로 교체한다.
+ * <p>실제 구현체는 여행방 멤버 권한과 일정 version을 검증한 뒤 발행 시점 snapshot을 반환한다.
  */
 public interface TripSnapshotChecker {
 

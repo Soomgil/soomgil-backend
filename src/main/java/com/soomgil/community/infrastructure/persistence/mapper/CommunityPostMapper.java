@@ -39,12 +39,12 @@ public interface CommunityPostMapper {
 	@org.apache.ibatis.annotations.Insert("""
 		INSERT INTO community.posts (
 		    id, source_trip_id, source_trip_version, published_by_user_id,
-		    visibility, title, summary, cover_media_file_id, snapshot_version,
+		    visibility, title, summary, cover_media_file_id, snapshot_version, snapshot,
 		    share_token_hash, share_token_created_at, share_token_rotated_at,
 		    moderation_status, published_at, created_at, updated_at
 		) VALUES (
 		    #{id}, #{sourceTripId}, #{sourceTripVersion}, #{publishedByUserId},
-		    #{visibility}, #{title}, #{summary}, #{coverMediaFileId}, #{snapshotVersion},
+		    #{visibility}, #{title}, #{summary}, #{coverMediaFileId}, #{snapshotVersion}, #{snapshotJson}::jsonb,
 		    #{shareTokenHash}, #{shareTokenCreatedAt}, #{shareTokenRotatedAt},
 		    'VISIBLE', #{now}, #{now}, #{now}
 		)
@@ -59,6 +59,7 @@ public interface CommunityPostMapper {
 		@Param("summary") String summary,
 		@Param("coverMediaFileId") UUID coverMediaFileId,
 		@Param("snapshotVersion") int snapshotVersion,
+		@Param("snapshotJson") String snapshotJson,
 		@Param("shareTokenHash") String shareTokenHash,
 		@Param("shareTokenCreatedAt") Instant shareTokenCreatedAt,
 		@Param("shareTokenRotatedAt") Instant shareTokenRotatedAt,
@@ -75,7 +76,7 @@ public interface CommunityPostMapper {
 		SELECT id, source_trip_id, source_trip_version, published_by_user_id,
 		       visibility, title, summary, cover_media_file_id, snapshot_version,
 		       share_token_hash, share_token_created_at, share_token_rotated_at,
-		       moderation_status, published_at, deleted_at
+		       moderation_status, published_at, deleted_at, snapshot::text AS snapshot_json
 		FROM community.posts
 		WHERE id = #{id}
 		""")
@@ -95,7 +96,7 @@ public interface CommunityPostMapper {
 		SELECT id, source_trip_id, source_trip_version, published_by_user_id,
 		       visibility, title, summary, cover_media_file_id, snapshot_version,
 		       share_token_hash, share_token_created_at, share_token_rotated_at,
-		       moderation_status, published_at, deleted_at
+		       moderation_status, published_at, deleted_at, snapshot::text AS snapshot_json
 		FROM community.posts
 		WHERE deleted_at IS NULL
 		  AND moderation_status = 'VISIBLE'
@@ -131,7 +132,7 @@ public interface CommunityPostMapper {
 		SELECT id, source_trip_id, source_trip_version, published_by_user_id,
 		       visibility, title, summary, cover_media_file_id, snapshot_version,
 		       share_token_hash, share_token_created_at, share_token_rotated_at,
-		       moderation_status, published_at, deleted_at
+		       moderation_status, published_at, deleted_at, snapshot::text AS snapshot_json
 		FROM community.posts
 		WHERE published_by_user_id = #{userId}
 		  AND deleted_at IS NULL

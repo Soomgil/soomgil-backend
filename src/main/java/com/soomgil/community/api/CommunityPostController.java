@@ -31,6 +31,7 @@ import com.soomgil.community.application.handler.ListCommunityPostsQueryHandler;
 import com.soomgil.community.application.handler.RotatePostShareTokenCommandHandler;
 import com.soomgil.community.application.handler.UnlikePostCommandHandler;
 import com.soomgil.community.application.handler.UpdateCommunityPostCommandHandler;
+import com.soomgil.community.application.service.RetripCommunityPostService;
 import com.soomgil.community.application.query.GetCommunityPostQuery;
 import com.soomgil.community.application.query.ListCommentsQuery;
 import com.soomgil.community.application.query.ListCommunityPostsQuery;
@@ -59,7 +60,7 @@ import org.springframework.web.bind.annotation.RestController;
  *
  * <p>Phase 1: 게시글 CRUD + 공개 feed + 공유 토큰 rotate.
  * Phase 2: 좋아요, 댓글 CRUD.
- * Retrip은 trip 모듈 구축 후 구현한다.
+ * Retrip은 저장된 게시글 snapshot을 독립된 새 여행방으로 복제한다.
  */
 @Validated
 @RestController
@@ -78,6 +79,7 @@ public class CommunityPostController extends ApiControllerSupport {
 	private final CreateCommunityCommentCommandHandler createCommunityCommentCommandHandler;
 	private final DeleteCommunityCommentCommandHandler deleteCommunityCommentCommandHandler;
 	private final ListCommentsQueryHandler listCommentsQueryHandler;
+	private final RetripCommunityPostService retripCommunityPostService;
 
 	public CommunityPostController(
 		CreateCommunityPostCommandHandler createCommunityPostCommandHandler,
@@ -90,7 +92,8 @@ public class CommunityPostController extends ApiControllerSupport {
 		UnlikePostCommandHandler unlikePostCommandHandler,
 		CreateCommunityCommentCommandHandler createCommunityCommentCommandHandler,
 		DeleteCommunityCommentCommandHandler deleteCommunityCommentCommandHandler,
-		ListCommentsQueryHandler listCommentsQueryHandler
+		ListCommentsQueryHandler listCommentsQueryHandler,
+		RetripCommunityPostService retripCommunityPostService
 	) {
 		this.createCommunityPostCommandHandler = createCommunityPostCommandHandler;
 		this.updateCommunityPostCommandHandler = updateCommunityPostCommandHandler;
@@ -103,6 +106,7 @@ public class CommunityPostController extends ApiControllerSupport {
 		this.createCommunityCommentCommandHandler = createCommunityCommentCommandHandler;
 		this.deleteCommunityCommentCommandHandler = deleteCommunityCommentCommandHandler;
 		this.listCommentsQueryHandler = listCommentsQueryHandler;
+		this.retripCommunityPostService = retripCommunityPostService;
 	}
 
 	@GetMapping
@@ -205,9 +209,12 @@ public class CommunityPostController extends ApiControllerSupport {
 	@ResponseStatus(HttpStatus.CREATED)
 	public TripDetail retrip(
 		@PathVariable UUID postId,
-		@Valid @RequestBody RetripRequest request
+		@Valid @RequestBody(required = false) RetripRequest request,
+		@AuthenticationPrincipal CurrentUser currentUser
 	) {
-		return notImplemented();
+		return retripCommunityPostService.retrip(
+			postId, currentUser.userId(), request == null ? null : request.title()
+		);
 	}
 
 	@PostMapping("/{postId}/share-token")

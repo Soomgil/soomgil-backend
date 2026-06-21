@@ -7,6 +7,7 @@ import com.soomgil.trip.application.command.dto.CreateTripInviteCommand;
 import com.soomgil.trip.application.command.dto.CreateTripInviteResult;
 import com.soomgil.trip.application.port.TripCommandRepository;
 import com.soomgil.trip.application.port.TripInviteCodeGenerator;
+import com.soomgil.trip.application.port.TripInviteNotificationPublisher;
 import com.soomgil.trip.application.port.TripQueryRepository;
 import com.soomgil.trip.application.query.dto.TripAccessView;
 import com.soomgil.trip.application.query.handler.TripAccessGuard;
@@ -32,17 +33,20 @@ public class CreateTripInviteHandler implements CommandHandler<CreateTripInviteC
 	private final TripAccessGuard accessGuard;
 	private final TimeProvider timeProvider;
 	private final TripInviteCodeGenerator codeGenerator;
+	private final TripInviteNotificationPublisher notificationPublisher;
 
 	public CreateTripInviteHandler(
 		TripCommandRepository commandRepository,
 		TripQueryRepository queryRepository,
 		TimeProvider timeProvider,
-		TripInviteCodeGenerator codeGenerator
+		TripInviteCodeGenerator codeGenerator,
+		TripInviteNotificationPublisher notificationPublisher
 	) {
 		this.commandRepository = Objects.requireNonNull(commandRepository, "commandRepository must not be null");
 		this.accessGuard = new TripAccessGuard(queryRepository);
 		this.timeProvider = Objects.requireNonNull(timeProvider, "timeProvider must not be null");
 		this.codeGenerator = Objects.requireNonNull(codeGenerator, "codeGenerator must not be null");
+		this.notificationPublisher = Objects.requireNonNull(notificationPublisher, "notificationPublisher must not be null");
 	}
 
 	@Override
@@ -62,6 +66,11 @@ public class CreateTripInviteHandler implements CommandHandler<CreateTripInviteC
 			now
 		);
 		commandRepository.saveTripInvite(invite);
+		if (invite.inviteeUserId() != null) {
+			notificationPublisher.publish(
+				invite.id(), invite.tripId(), command.actorUserId(), invite.inviteeUserId(), inviteCode, now
+			);
+		}
 		return new CreateTripInviteResult(
 			invite.id(),
 			invite.tripId(),

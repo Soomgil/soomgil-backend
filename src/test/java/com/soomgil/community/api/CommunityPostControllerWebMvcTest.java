@@ -43,6 +43,7 @@ import com.soomgil.community.application.handler.ListCommunityPostsQueryHandler;
 import com.soomgil.community.application.handler.RotatePostShareTokenCommandHandler;
 import com.soomgil.community.application.handler.UnlikePostCommandHandler;
 import com.soomgil.community.application.handler.UpdateCommunityPostCommandHandler;
+import com.soomgil.community.application.service.RetripCommunityPostService;
 import com.soomgil.community.application.query.GetCommunityPostQuery;
 import com.soomgil.community.application.query.ListCommentsQuery;
 import com.soomgil.community.application.query.ListCommunityPostsQuery;
@@ -117,6 +118,8 @@ class CommunityPostControllerWebMvcTest {
 	private DeleteCommunityCommentCommandHandler deleteCommunityCommentCommandHandler;
 	@MockBean
 	private ListCommentsQueryHandler listCommentsQueryHandler;
+	@MockBean
+	private RetripCommunityPostService retripCommunityPostService;
 
 	static RequestPostProcessor asCurrentUser() {
 		var authentication =

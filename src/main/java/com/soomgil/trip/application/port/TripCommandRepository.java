@@ -23,6 +23,13 @@ public interface TripCommandRepository {
 	 */
 	void saveCreatedTrip(Trip trip, TripMember initialMember, List<String> legalRegionCodes);
 
+	void saveCreatedRetrip(
+		Trip trip,
+		TripMember initialMember,
+		UUID sourcePostId,
+		int snapshotVersion
+	);
+
 	/**
 	 * 여행방 초대를 저장한다.
 	 *

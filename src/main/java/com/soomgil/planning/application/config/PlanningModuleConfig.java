@@ -1,11 +1,5 @@
 package com.soomgil.planning.application.config;
 
-import com.soomgil.planning.application.service.NoOpPlanningEventBroadcaster;
-import com.soomgil.planning.application.service.NoOpTripMemberAccessChecker;
-import com.soomgil.planning.application.service.PlanningEventBroadcaster;
-import com.soomgil.planning.application.service.TripMemberAccessChecker;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
@@ -18,27 +12,4 @@ import org.springframework.context.annotation.Configuration;
  */
 @Configuration
 public class PlanningModuleConfig {
-
-	/**
-	 * trip 모듈 구현 전까지 사용할 stub {@link TripMemberAccessChecker}.
-	 *
-	 * @return 아무 검증도 하지 않는 checker
-	 */
-	@Bean
-	@ConditionalOnMissingBean(TripMemberAccessChecker.class)
-	TripMemberAccessChecker tripMemberAccessChecker() {
-		return new NoOpTripMemberAccessChecker();
-	}
-
-	/**
-	 * realtime 인프라 구현 전까지 사용할 stub {@link PlanningEventBroadcaster}.
-	 *
-	 * @return 이벤트를 무시하는 broadcaster
-	 */
-	@Bean
-	@ConditionalOnMissingBean(PlanningEventBroadcaster.class)
-	PlanningEventBroadcaster planningEventBroadcaster() {
-		return new NoOpPlanningEventBroadcaster();
-	}
 }
-

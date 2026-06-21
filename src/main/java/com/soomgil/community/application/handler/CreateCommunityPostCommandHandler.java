@@ -5,6 +5,7 @@ import com.soomgil.community.api.dto.CommunityPostDetail;
 import com.soomgil.community.api.dto.PostVisibility;
 import com.soomgil.community.application.command.CreateCommunityPostCommand;
 import com.soomgil.community.application.service.CommunityPostAssembler;
+import com.soomgil.community.application.service.CommunityPostSnapshotCodec;
 import com.soomgil.community.application.service.ShareTokenService;
 import com.soomgil.community.application.service.TripSnapshotChecker;
 import com.soomgil.community.domain.model.CommunityException;
@@ -44,6 +45,7 @@ public class CreateCommunityPostCommandHandler
 	private final PostMediaMapper postMediaMapper;
 	private final ShareTokenService shareTokenService;
 	private final TripSnapshotChecker tripSnapshotChecker;
+	private final CommunityPostSnapshotCodec snapshotCodec;
 	private final CommunityPostAssembler assembler;
 
 	public CreateCommunityPostCommandHandler(
@@ -53,6 +55,7 @@ public class CreateCommunityPostCommandHandler
 		PostMediaMapper postMediaMapper,
 		ShareTokenService shareTokenService,
 		TripSnapshotChecker tripSnapshotChecker,
+		CommunityPostSnapshotCodec snapshotCodec,
 		CommunityPostAssembler assembler
 	) {
 		this.postMapper = postMapper;
@@ -61,6 +64,7 @@ public class CreateCommunityPostCommandHandler
 		this.postMediaMapper = postMediaMapper;
 		this.shareTokenService = shareTokenService;
 		this.tripSnapshotChecker = tripSnapshotChecker;
+		this.snapshotCodec = snapshotCodec;
 		this.assembler = assembler;
 	}
 
@@ -70,9 +74,10 @@ public class CreateCommunityPostCommandHandler
 
 		// trip 모듈 구축 전까지 stub이 권한/version 검증을 건너뛰고 빈 snapshot 반환.
 		// 실제 구현체에서는 TRIP_MEMBER_REQUIRED 또는 SOURCE_TRIP_VERSION_CONFLICT를 던질 수 있다.
-		tripSnapshotChecker.fetchSnapshot(
+		var snapshot = tripSnapshotChecker.fetchSnapshot(
 			command.sourceTripId(), command.baseVersion(), command.publishedByUserId()
 		);
+		String snapshotJson = snapshotCodec.encode(snapshot);
 
 		Instant now = Instant.now();
 		UUID postId = UUID.randomUUID();
@@ -97,6 +102,7 @@ public class CreateCommunityPostCommandHandler
 			command.summary(),
 			command.coverMediaFileId(),
 			SNAPSHOT_VERSION_INITIAL,
+			snapshotJson,
 			shareTokenHash,
 			shareTokenCreatedAt,
 			shareTokenCreatedAt,

@@ -1,9 +1,5 @@
 package com.soomgil.community.application.config;
 
-import com.soomgil.community.application.service.NoOpTripSnapshotChecker;
-import com.soomgil.community.application.service.TripSnapshotChecker;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
@@ -15,15 +11,4 @@ import org.springframework.context.annotation.Configuration;
  */
 @Configuration
 public class CommunityModuleConfig {
-
-	/**
-	 * trip 모듈 구현 전까지 사용할 stub {@link TripSnapshotChecker}.
-	 *
-	 * @return 빈 snapshot을 반환하는 checker
-	 */
-	@Bean
-	@ConditionalOnMissingBean(TripSnapshotChecker.class)
-	TripSnapshotChecker tripSnapshotChecker() {
-		return new NoOpTripSnapshotChecker();
-	}
 }

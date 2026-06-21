@@ -12,6 +12,7 @@ import com.soomgil.community.infrastructure.persistence.mapper.CommunityCommentM
 import com.soomgil.community.infrastructure.persistence.mapper.PostHashtagMapper;
 import com.soomgil.community.infrastructure.persistence.mapper.PostLikeMapper;
 import com.soomgil.community.infrastructure.persistence.mapper.PostMediaMapper;
+import com.soomgil.community.infrastructure.persistence.mapper.PostRetripMapper;
 import com.soomgil.media.api.dto.MediaFile;
 import com.soomgil.media.application.MediaFileQueryService;
 import com.soomgil.user.api.dto.UserSummary;
@@ -34,26 +35,29 @@ public class CommunityPostAssembler {
 	private final FindDisplayNameQueryHandler displayNameQueryHandler;
 	private final PostHashtagMapper postHashtagMapper;
 	private final PostMediaMapper postMediaMapper;
-	private final TripSnapshotChecker tripSnapshotChecker;
+	private final CommunityPostSnapshotCodec snapshotCodec;
 	private final PostLikeMapper postLikeMapper;
 	private final CommunityCommentMapper communityCommentMapper;
+	private final PostRetripMapper postRetripMapper;
 	private final MediaFileQueryService mediaFileQueryService;
 
 	public CommunityPostAssembler(
 		FindDisplayNameQueryHandler displayNameQueryHandler,
 		PostHashtagMapper postHashtagMapper,
 		PostMediaMapper postMediaMapper,
-		TripSnapshotChecker tripSnapshotChecker,
+		CommunityPostSnapshotCodec snapshotCodec,
 		PostLikeMapper postLikeMapper,
 		CommunityCommentMapper communityCommentMapper,
+		PostRetripMapper postRetripMapper,
 		MediaFileQueryService mediaFileQueryService
 	) {
 		this.displayNameQueryHandler = displayNameQueryHandler;
 		this.postHashtagMapper = postHashtagMapper;
 		this.postMediaMapper = postMediaMapper;
-		this.tripSnapshotChecker = tripSnapshotChecker;
+		this.snapshotCodec = snapshotCodec;
 		this.postLikeMapper = postLikeMapper;
 		this.communityCommentMapper = communityCommentMapper;
+		this.postRetripMapper = postRetripMapper;
 		this.mediaFileQueryService = mediaFileQueryService;
 	}
 
@@ -82,12 +86,12 @@ public class CommunityPostAssembler {
 		int mediaCount = media.size();
 		int likeCount = postLikeMapper.countByPostId(post.id());
 		int commentCount = communityCommentMapper.countByPostId(post.id());
+		int retripCount = postRetripMapper.countByPostId(post.id());
 		boolean likedByMe = viewerUserId != null
 			&& postLikeMapper.existsByPostIdAndUserId(post.id(), viewerUserId);
 
 		CommunityPostSnapshot snapshot = includeSnapshot
-			? tripSnapshotChecker.fetchSnapshot(
-				post.sourceTripId(), post.sourceTripVersion(), post.publishedByUserId())
+			? snapshotCodec.decode(post.snapshotJson())
 			: new CommunityPostSnapshot(List.of(), List.of(), null);
 
 		return new CommunityPostDetail(
@@ -100,7 +104,7 @@ public class CommunityPostAssembler {
 			post.summary(),
 			hashtags,
 			likeCount,
-			0,    // retripCount — post_retrips 추가 후 계산
+			retripCount,
 			commentCount,
 			mediaCount,
 			likedByMe,
@@ -130,6 +134,7 @@ public class CommunityPostAssembler {
 		MediaFile coverMedia = mediaFileQueryService.findById(post.coverMediaFileId()).orElse(null);
 		int likeCount = postLikeMapper.countByPostId(post.id());
 		int commentCount = communityCommentMapper.countByPostId(post.id());
+		int retripCount = postRetripMapper.countByPostId(post.id());
 		boolean likedByMe = viewerUserId != null
 			&& postLikeMapper.existsByPostIdAndUserId(post.id(), viewerUserId);
 
@@ -142,7 +147,7 @@ public class CommunityPostAssembler {
 			post.title(),
 			post.summary(),
 			hashtags,
-			likeCount, 0, commentCount, mediaCount,
+			likeCount, retripCount, commentCount, mediaCount,
 			likedByMe,
 			post.moderationStatus(),
 			toOffsetDateTime(post.publishedAt())

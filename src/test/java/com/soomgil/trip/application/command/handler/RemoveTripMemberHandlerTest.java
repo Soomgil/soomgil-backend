@@ -130,6 +130,10 @@ class RemoveTripMemberHandlerTest {
 		}
 
 		@Override
+		public void saveCreatedRetrip(Trip trip, TripMember initialMember, UUID sourcePostId, int snapshotVersion) {
+		}
+
+		@Override
 		public void saveTripInvite(TripInvite invite) {
 		}
 

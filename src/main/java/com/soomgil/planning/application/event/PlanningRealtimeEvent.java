@@ -9,9 +9,6 @@ import java.util.UUID;
  * com.soomgil.planning.application.service.PlanningEventBroadcaster}에 전달한다.
  * broadcaster 구현체가 WebSocket/STOMP topic으로 변환해 같은 여행방 참여자에게 브로드캐스트한다.
  *
- * <p>인프라가 아직 구축되지 않은 시점에는 {@code NoOpPlanningEventBroadcaster}가
- * 이벤트를 무시한다. 인프라 팀이 실제 구현체를 bean으로 등록하면 자동 교체된다.
- *
  * <p>이벤트는 다음 정보를 반드시 포함한다:
  * <ul>
  *   <li>{@code tripId} - 어느 여행방에 브로드캐스트할지 결정</li>

@@ -8,9 +8,7 @@ import com.soomgil.planning.application.event.PlanningRealtimeEvent;
  * <p>구현체는 WebSocket/STOMP topic으로 변환해 메시지를 전송한다. 분산 환경에서는 Redis
  * Pub/Sub 등을 통해 다른 인스턴스에 연결된 클라이언트에게도 전달한다.
  *
- * <p>실제 인프라 구축 전에는 {@link NoOpPlanningEventBroadcaster}가 어떤 동작도 수행하지 않는다.
- * {@code global/realtime} 인프라 팀이 구현체를 bean으로 등록하면
- * {@code @ConditionalOnMissingBean}에 의해 자동으로 교체된다.
+ * <p>현재 구현체는 transaction commit 이후 여행방 planning STOMP topic으로 전송한다.
  */
 public interface PlanningEventBroadcaster {
 
