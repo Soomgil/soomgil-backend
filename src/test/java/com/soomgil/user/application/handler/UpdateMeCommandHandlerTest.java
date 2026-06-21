@@ -22,6 +22,8 @@ import com.soomgil.user.application.command.UpdateMeCommand;
 import com.soomgil.user.domain.model.UserProfileRecord;
 import com.soomgil.user.infrastructure.persistence.UserMeMapper;
 import com.soomgil.user.infrastructure.persistence.UserMeSettingsMapper;
+import com.soomgil.media.infrastructure.persistence.MediaFileMapper;
+import com.soomgil.media.infrastructure.persistence.MediaFileRecord;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
@@ -37,8 +39,9 @@ class UpdateMeCommandHandlerTest {
 	private final UserMeSettingsMapper settingsMapper = mock(UserMeSettingsMapper.class);
 	private final UserMapper authUserMapper = mock(UserMapper.class);
 	private final EmailAddressMapper emailAddressMapper = mock(EmailAddressMapper.class);
+	private final MediaFileMapper mediaFileMapper = mock(MediaFileMapper.class);
 	private final UpdateMeCommandHandler handler = new UpdateMeCommandHandler(
-		userMeMapper, settingsMapper, authUserMapper, emailAddressMapper
+		userMeMapper, settingsMapper, authUserMapper, emailAddressMapper, mediaFileMapper
 	);
 
 	@Test
@@ -54,6 +57,11 @@ class UpdateMeCommandHandlerTest {
 			"minji@example.com", true, Instant.now());
 
 		when(userMeMapper.findFull(userId)).thenReturn(Optional.of(current));
+		MediaFileRecord mediaFile = new MediaFileRecord(
+			mediaFileId, userId, "LOCAL", "default-bucket", "filename.jpg", "http://localhost:8080/uploads/filename.jpg",
+			"image/jpeg", 1024L, null, null, null, null, "ACTIVE", Instant.now()
+		);
+		when(mediaFileMapper.findById(mediaFileId)).thenReturn(Optional.of(mediaFile));
 		when(userMeMapper.updateRecord(any(UserProfileRecord.class))).thenReturn(1);
 		when(authUserMapper.findById(userId)).thenReturn(Optional.of(authUser));
 		when(emailAddressMapper.findPrimaryByUserId(userId)).thenReturn(Optional.of(email));

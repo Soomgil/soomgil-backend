@@ -42,7 +42,11 @@ class GetCurrentUserQueryHandlerTest {
 
 		when(userMapper.findById(userId)).thenReturn(Optional.of(user));
 		when(emailAddressMapper.findPrimaryByUserId(userId)).thenReturn(Optional.of(email));
-		when(userProfileMapper.findDisplayName(userId)).thenReturn(Optional.of("민지"));
+		when(userProfileMapper.findFull(userId)).thenReturn(Optional.of(
+			new com.soomgil.user.domain.model.UserProfileRecord(
+				userId, "민지", null, null, null, com.soomgil.user.api.dto.UserProfileVisibility.PUBLIC
+			)
+		));
 
 		User result = handler.handle(new GetCurrentUserQuery(userId));
 
@@ -73,7 +77,7 @@ class GetCurrentUserQueryHandlerTest {
 
 		when(userMapper.findById(userId)).thenReturn(Optional.of(user));
 		when(emailAddressMapper.findPrimaryByUserId(userId)).thenReturn(Optional.empty());
-		when(userProfileMapper.findDisplayName(userId)).thenReturn(Optional.empty());
+		when(userProfileMapper.findFull(userId)).thenReturn(Optional.empty());
 
 		User result = handler.handle(new GetCurrentUserQuery(userId));
 

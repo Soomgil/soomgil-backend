@@ -15,6 +15,8 @@ public record AuthTokenResponse(
 	Integer expiresIn,
 	@Valid
 	@NotNull
-	User user
+	User user,
+	/** 온보딩 완료 여부. false면 프론트가 /register?oauth=1로 라우팅해 추가 정보를 받는다. */
+	boolean onboarded
 ) {
 }

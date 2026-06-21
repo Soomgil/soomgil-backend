@@ -3,6 +3,7 @@ package com.soomgil.auth.application.handler;
 import com.soomgil.auth.application.query.FindDisplayNameQuery;
 import com.soomgil.auth.infrastructure.persistence.UserProfileMapper;
 import com.soomgil.common.cqrs.QueryHandler;
+import java.net.URI;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,5 +31,17 @@ public class FindDisplayNameQueryHandler implements QueryHandler<FindDisplayName
 	public String handle(FindDisplayNameQuery query) {
 		return userProfileMapper.findDisplayName(query.userId())
 			.orElse(DEFAULT_DISPLAY_NAME);
+	}
+
+	/**
+	 * 사용자의 공개 프로필 이미지 URL을 조회한다.
+	 *
+	 * @param query 조회할 사용자 식별자를 담은 query
+	 * @return 프로필 이미지 URL. 프로필 또는 이미지가 없으면 {@code null}
+	 */
+	public URI findProfileImageUrl(FindDisplayNameQuery query) {
+		return userProfileMapper.findFull(query.userId())
+			.map(profile -> profile.profileImageUrl() == null ? null : URI.create(profile.profileImageUrl()))
+			.orElse(null);
 	}
 }

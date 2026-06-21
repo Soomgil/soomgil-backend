@@ -23,8 +23,10 @@ import com.soomgil.auth.infrastructure.persistence.PasswordCredentialMapper;
 import com.soomgil.auth.infrastructure.persistence.UserMapper;
 import com.soomgil.auth.infrastructure.persistence.UserProfileMapper;
 import com.soomgil.auth.infrastructure.persistence.UserSettingsMapper;
+import com.soomgil.auth.infrastructure.persistence.UserPolicyAcceptanceMapper;
 import com.soomgil.global.error.ErrorCode;
 import java.util.Optional;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -36,6 +38,7 @@ class RegisterCommandHandlerTest {
 	private final PasswordCredentialMapper passwordCredentialMapper = mock(PasswordCredentialMapper.class);
 	private final UserProfileMapper userProfileMapper = mock(UserProfileMapper.class);
 	private final UserSettingsMapper userSettingsMapper = mock(UserSettingsMapper.class);
+	private final UserPolicyAcceptanceMapper userPolicyAcceptanceMapper = mock(UserPolicyAcceptanceMapper.class);
 	private final PasswordHasher passwordHasher = mock(PasswordHasher.class);
 	private final EmailVerificationService emailVerificationService = mock(EmailVerificationService.class);
 
@@ -45,6 +48,7 @@ class RegisterCommandHandlerTest {
 		passwordCredentialMapper,
 		userProfileMapper,
 		userSettingsMapper,
+		userPolicyAcceptanceMapper,
 		passwordHasher,
 		emailVerificationService
 	);
@@ -63,7 +67,7 @@ class RegisterCommandHandlerTest {
 			.thenReturn(Optional.of(emailAddress));
 
 		RegisterResult result = handler.handle(new RegisterCommand(
-			"user@example.com", "P@ssw0rd!", "민지"
+			"user@example.com", "P@ssw0rd!", "민지", List.of()
 		));
 
 		assertThat(result.email()).isEqualTo("user@example.com");
@@ -91,7 +95,7 @@ class RegisterCommandHandlerTest {
 		when(emailAddressMapper.findActiveByNormalizedEmail("user@example.com"))
 			.thenReturn(Optional.of(emailAddress));
 
-		handler.handle(new RegisterCommand("USER@Example.COM", "pw", "이름"));
+		handler.handle(new RegisterCommand("USER@Example.COM", "pw", "이름", List.of()));
 
 		verify(emailAddressMapper).existsActiveByNormalizedEmail("user@example.com");
 	}
@@ -102,7 +106,7 @@ class RegisterCommandHandlerTest {
 		when(emailAddressMapper.existsActiveByNormalizedEmail(anyString())).thenReturn(true);
 
 		assertThatThrownBy(() -> handler.handle(new RegisterCommand(
-			"user@example.com", "P@ssw0rd!", "민지"
+			"user@example.com", "P@ssw0rd!", "민지", List.of()
 		)))
 			.isInstanceOf(AuthException.class)
 			.extracting(e -> ((AuthException) e).errorCode())

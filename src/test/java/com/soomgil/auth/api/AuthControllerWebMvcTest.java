@@ -135,6 +135,8 @@ class AuthControllerWebMvcTest {
 	private OAuthClient oauthClient;
 	@MockBean
 	private JwtProperties jwtProperties;
+	@MockBean
+	private com.soomgil.auth.application.handler.OnboardCommandHandler onboardCommandHandler;
 
 	static RequestPostProcessor asCurrentUser() {
 		org.springframework.security.authentication.UsernamePasswordAuthenticationToken authentication =
@@ -382,7 +384,8 @@ class AuthControllerWebMvcTest {
 			"refresh-token-value",
 			AUTHENTICATED_USER_ID,
 			"minji@example.com",
-			"민지"
+			"민지",
+			true
 		);
 	}
 

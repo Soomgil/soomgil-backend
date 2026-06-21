@@ -20,7 +20,7 @@ import java.util.UUID;
 public record UserProfileRecord(
 	UUID userId,
 	String displayName,
-	URI profileImageUrl,
+	String profileImageUrl,
 	UUID profileMediaFileId,
 	String bio,
 	UserProfileVisibility profileVisibility

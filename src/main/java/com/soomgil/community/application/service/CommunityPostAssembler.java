@@ -12,6 +12,8 @@ import com.soomgil.community.infrastructure.persistence.mapper.CommunityCommentM
 import com.soomgil.community.infrastructure.persistence.mapper.PostHashtagMapper;
 import com.soomgil.community.infrastructure.persistence.mapper.PostLikeMapper;
 import com.soomgil.community.infrastructure.persistence.mapper.PostMediaMapper;
+import com.soomgil.media.api.dto.MediaFile;
+import com.soomgil.media.application.MediaFileQueryService;
 import com.soomgil.user.api.dto.UserSummary;
 import java.net.URI;
 import java.time.OffsetDateTime;
@@ -23,8 +25,8 @@ import org.springframework.stereotype.Component;
 /**
  * {@link CommunityPostRecord}를 API 응답 DTO로 조립한다.
  *
- * <p>발행자 display name, 해시태그, 미디어 count, 좋아요 수, likedByMe, 댓글 수 등을 붙인다.
- * 미디어 모듈이 아직 구축되지 않았으므로 {@code MediaFile}은 stub으로 채운다.
+ * <p>발행자 display name, 해시태그, 커버/갤러리 미디어, 좋아요 수,
+ * likedByMe, 댓글 수 등을 붙인다.
  */
 @Component
 public class CommunityPostAssembler {
@@ -35,6 +37,7 @@ public class CommunityPostAssembler {
 	private final TripSnapshotChecker tripSnapshotChecker;
 	private final PostLikeMapper postLikeMapper;
 	private final CommunityCommentMapper communityCommentMapper;
+	private final MediaFileQueryService mediaFileQueryService;
 
 	public CommunityPostAssembler(
 		FindDisplayNameQueryHandler displayNameQueryHandler,
@@ -42,7 +45,8 @@ public class CommunityPostAssembler {
 		PostMediaMapper postMediaMapper,
 		TripSnapshotChecker tripSnapshotChecker,
 		PostLikeMapper postLikeMapper,
-		CommunityCommentMapper communityCommentMapper
+		CommunityCommentMapper communityCommentMapper,
+		MediaFileQueryService mediaFileQueryService
 	) {
 		this.displayNameQueryHandler = displayNameQueryHandler;
 		this.postHashtagMapper = postHashtagMapper;
@@ -50,6 +54,7 @@ public class CommunityPostAssembler {
 		this.tripSnapshotChecker = tripSnapshotChecker;
 		this.postLikeMapper = postLikeMapper;
 		this.communityCommentMapper = communityCommentMapper;
+		this.mediaFileQueryService = mediaFileQueryService;
 	}
 
 	/**
@@ -69,7 +74,12 @@ public class CommunityPostAssembler {
 	) {
 		UserSummary publisher = resolvePublisher(post.publishedByUserId());
 		List<String> hashtags = postHashtagMapper.findHashtagNamesByPostId(post.id());
-		int mediaCount = postMediaMapper.countByPostId(post.id());
+		List<UUID> mediaFileIds = postMediaMapper.findByPostId(post.id()).stream()
+			.map(media -> media.mediaFileId())
+			.toList();
+		List<MediaFile> media = mediaFileQueryService.findByIds(mediaFileIds);
+		MediaFile coverMedia = mediaFileQueryService.findById(post.coverMediaFileId()).orElse(null);
+		int mediaCount = media.size();
 		int likeCount = postLikeMapper.countByPostId(post.id());
 		int commentCount = communityCommentMapper.countByPostId(post.id());
 		boolean likedByMe = viewerUserId != null
@@ -84,7 +94,7 @@ public class CommunityPostAssembler {
 			post.id(),
 			post.sourceTripId(),
 			publisher,
-			null,  // coverMedia — MediaFile 모듈 구축 전까지 null
+			coverMedia,
 			post.visibility(),
 			post.title(),
 			post.summary(),
@@ -98,7 +108,7 @@ public class CommunityPostAssembler {
 			toOffsetDateTime(post.publishedAt()),
 			post.snapshotVersion(),
 			snapshot,
-			List.of(), // media — MediaFile 모듈 구축 후 채움
+			media,
 			rawShareToken,
 			buildShareUrl(post.id(), rawShareToken),
 			toOffsetDateTime(post.shareTokenCreatedAt()),
@@ -117,6 +127,7 @@ public class CommunityPostAssembler {
 		UserSummary publisher = resolvePublisher(post.publishedByUserId());
 		List<String> hashtags = postHashtagMapper.findHashtagNamesByPostId(post.id());
 		int mediaCount = postMediaMapper.countByPostId(post.id());
+		MediaFile coverMedia = mediaFileQueryService.findById(post.coverMediaFileId()).orElse(null);
 		int likeCount = postLikeMapper.countByPostId(post.id());
 		int commentCount = communityCommentMapper.countByPostId(post.id());
 		boolean likedByMe = viewerUserId != null
@@ -126,12 +137,12 @@ public class CommunityPostAssembler {
 			post.id(),
 			post.sourceTripId(),
 			publisher,
-			null,
+			coverMedia,
 			post.visibility(),
 			post.title(),
 			post.summary(),
 			hashtags,
-			likeCount, commentCount, 0, mediaCount,
+			likeCount, 0, commentCount, mediaCount,
 			likedByMe,
 			post.moderationStatus(),
 			toOffsetDateTime(post.publishedAt())
@@ -161,7 +172,8 @@ public class CommunityPostAssembler {
 
 	private UserSummary resolvePublisher(UUID userId) {
 		String displayName = displayNameQueryHandler.handle(new FindDisplayNameQuery(userId));
-		return new UserSummary(userId, displayName, null);
+		URI profileImageUrl = displayNameQueryHandler.findProfileImageUrl(new FindDisplayNameQuery(userId));
+		return new UserSummary(userId, displayName, profileImageUrl);
 	}
 
 	private URI buildShareUrl(UUID postId, String rawShareToken) {

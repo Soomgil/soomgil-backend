@@ -22,8 +22,8 @@ import org.springframework.transaction.annotation.Transactional;
  * </ul>
  *
  * <p>follow 관련 필드({@code followerCount}, {@code followingCount}, {@code followedByMe},
- * {@code followStatus})는 social 모듈(민경철) 데이터가 필요하다. 모듈 연동 전까지는
- * {@code null}로 반환한다.
+ * {@code followStatus})는 social 모듈(민경철) 데이터가 필요하다. social 모듈의
+ * {@link com.soomgil.social.infrastructure.persistence.UserFollowMapper}를 통해 실제 데이터를 연동하여 제공한다.
  */
 @Component
 @Transactional(readOnly = true)
@@ -31,9 +31,14 @@ public class GetUserPublicProfileQueryHandler
 	implements QueryHandler<GetUserPublicProfileQuery, UserPublicProfile> {
 
 	private final UserPublicProfileMapper userPublicProfileMapper;
+	private final com.soomgil.social.infrastructure.persistence.UserFollowMapper userFollowMapper;
 
-	public GetUserPublicProfileQueryHandler(UserPublicProfileMapper userPublicProfileMapper) {
+	public GetUserPublicProfileQueryHandler(
+		UserPublicProfileMapper userPublicProfileMapper,
+		com.soomgil.social.infrastructure.persistence.UserFollowMapper userFollowMapper
+	) {
 		this.userPublicProfileMapper = userPublicProfileMapper;
+		this.userFollowMapper = userFollowMapper;
 	}
 
 	@Override
@@ -45,15 +50,35 @@ public class GetUserPublicProfileQueryHandler
 		boolean isPrivate = record.profileVisibility() == UserProfileVisibility.PRIVATE;
 		String bio = isPrivate ? null : record.bio();
 
+		// social 모듈 데이터 조회
+		int followerCount = userFollowMapper.countFollowers(query.targetUserId());
+		int followingCount = userFollowMapper.countFollowing(query.targetUserId());
+
+		// 로그인한 사용자가 대상 사용자를 팔로우하는지 여부 및 상태 조회
+		com.soomgil.social.infrastructure.persistence.UserFollowRecord followRecord = userFollowMapper.find(
+			query.viewerUserId(), query.targetUserId()
+		).orElse(null);
+
+		Boolean followedByMe = false;
+		com.soomgil.social.api.dto.FollowStatus followStatus = null;
+
+		if (followRecord != null) {
+			String statusStr = followRecord.status();
+			if ("ACTIVE".equals(statusStr) || "PENDING".equals(statusStr) || "DELETED".equals(statusStr)) {
+				followStatus = com.soomgil.social.api.dto.FollowStatus.valueOf(statusStr);
+			}
+			followedByMe = "ACTIVE".equals(statusStr);
+		}
+
 		return new UserPublicProfile(
 			record.userId(),
 			record.displayName(),
-			record.profileImageUrl(),
+			record.profileImageUrl() != null ? java.net.URI.create(record.profileImageUrl()) : null,
 			bio,
-			null,
-			null,
-			null,
-			null,
+			followerCount,
+			followingCount,
+			followedByMe,
+			followStatus,
 			record.profileVisibility()
 		);
 	}

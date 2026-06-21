@@ -18,6 +18,8 @@ import com.soomgil.user.domain.model.UserSettingsRecord;
 import com.soomgil.user.domain.policy.UserProfilePolicy;
 import com.soomgil.user.infrastructure.persistence.UserMeMapper;
 import com.soomgil.user.infrastructure.persistence.UserMeSettingsMapper;
+import com.soomgil.media.infrastructure.persistence.MediaFileMapper;
+import com.soomgil.media.infrastructure.persistence.MediaFileRecord;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.UUID;
@@ -48,17 +50,20 @@ public class UpdateMeCommandHandler implements CommandHandler<UpdateMeCommand, U
 	private final UserMeSettingsMapper userSettingsMapper;
 	private final UserMapper userMapper;
 	private final EmailAddressMapper emailAddressMapper;
+	private final MediaFileMapper mediaFileMapper;
 
 	public UpdateMeCommandHandler(
 		UserMeMapper userMeMapper,
 		UserMeSettingsMapper userSettingsMapper,
 		UserMapper userMapper,
-		EmailAddressMapper emailAddressMapper
+		EmailAddressMapper emailAddressMapper,
+		MediaFileMapper mediaFileMapper
 	) {
 		this.userMeMapper = userMeMapper;
 		this.userSettingsMapper = userSettingsMapper;
 		this.userMapper = userMapper;
 		this.emailAddressMapper = emailAddressMapper;
+		this.mediaFileMapper = mediaFileMapper;
 	}
 
 	@Override
@@ -78,10 +83,20 @@ public class UpdateMeCommandHandler implements CommandHandler<UpdateMeCommand, U
 		UserProfilePolicy.validateDisplayName(displayName);
 		UserProfilePolicy.validateBio(bio);
 
+		String profileImageUrl = current.profileImageUrl();
+		if (command.profileMediaFileId() != null) {
+			if (!command.profileMediaFileId().equals(current.profileMediaFileId())) {
+				MediaFileRecord mediaFile = mediaFileMapper.findById(command.profileMediaFileId())
+					.orElseThrow(() -> new UserException(ErrorCode.PROFILE_NOT_FOUND,
+						"Media file not found: " + command.profileMediaFileId()));
+				profileImageUrl = mediaFile.publicUrl();
+			}
+		}
+
 		UserProfileRecord merged = new UserProfileRecord(
 			command.userId(),
 			displayName,
-			current.profileImageUrl(),
+			profileImageUrl,
 			profileMediaFileId,
 			bio,
 			visibility
@@ -108,7 +123,7 @@ public class UpdateMeCommandHandler implements CommandHandler<UpdateMeCommand, U
 
 		UserProfile profile = new UserProfile(
 			profileRecord.displayName(),
-			profileRecord.profileImageUrl(),
+			profileRecord.profileImageUrl() != null ? java.net.URI.create(profileRecord.profileImageUrl()) : null,
 			profileRecord.profileMediaFileId(),
 			profileRecord.bio(),
 			profileRecord.profileVisibility()

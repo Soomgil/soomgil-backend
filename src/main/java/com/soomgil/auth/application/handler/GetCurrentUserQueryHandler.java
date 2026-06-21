@@ -14,6 +14,7 @@ import com.soomgil.user.api.dto.UserProfile;
 import com.soomgil.user.api.dto.UserProfileVisibility;
 import com.soomgil.user.api.dto.UserSettings;
 import com.soomgil.user.api.dto.UserStatus;
+import com.soomgil.user.domain.model.UserProfileRecord;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import org.springframework.stereotype.Component;
@@ -53,12 +54,17 @@ public class GetCurrentUserQueryHandler implements QueryHandler<GetCurrentUserQu
 			? OffsetDateTime.ofInstant(emailAddress.verifiedAt(), ZoneOffset.UTC)
 			: null;
 
-		String displayName = userProfileMapper.findDisplayName(user.id()).orElse(null);
+		// 전체 프로필 row 조회 — bio/visibility/프로필 미디어까지 응답에 포함.
+		// findDisplayName만 쓰면 GET /me가 bio를 항상 null로 반환해서 저장 후 화면 반영이 안 됨.
+		UserProfileRecord profileRow = userProfileMapper.findFull(user.id()).orElse(null);
 
 		UserProfile profile = new UserProfile(
-			displayName != null ? displayName : "",
-			null, null, null,
-			UserProfileVisibility.PUBLIC
+			profileRow != null && profileRow.displayName() != null ? profileRow.displayName() : "",
+			profileRow != null && profileRow.profileImageUrl() != null ? java.net.URI.create(profileRow.profileImageUrl()) : null,
+			profileRow != null ? profileRow.profileMediaFileId() : null,
+			profileRow != null ? profileRow.bio() : null,
+			profileRow != null && profileRow.profileVisibility() != null
+				? profileRow.profileVisibility() : UserProfileVisibility.PUBLIC
 		);
 		UserSettings settings = new UserSettings("ko", "Asia/Seoul", false, null, null, true);
 		OffsetDateTime createdAt = user.createdAt() != null

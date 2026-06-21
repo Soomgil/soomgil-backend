@@ -122,12 +122,16 @@ public class OAuthLoginCommandHandler implements CommandHandler<OAuthLoginComman
 			UUID.randomUUID(), userId, refresh.hash(), UUID.randomUUID(), refresh.expiresAt()
 		);
 
-		return new AuthTokenResult(accessToken, refresh.raw(), userId, email, displayName);
+		boolean onboarded = userMapper.findById(userId)
+			.map(u -> u.status() == UserStatus.ACTIVE)
+			.orElse(false);
+
+		return new AuthTokenResult(accessToken, refresh.raw(), userId, email, displayName, onboarded);
 	}
 
 	private UUID createNewOAuthUser(OAuthClient.ProviderUserInfo providerUser, short providerId) {
 		UUID userId = UUID.randomUUID();
-		userMapper.insert(userId, UserStatus.ACTIVE.name());
+		userMapper.insert(userId, UserStatus.PENDING_ONBOARDING.name());
 
 		if (providerUser.email() != null) {
 			String normalizedEmail = EmailAddress.normalize(providerUser.email());

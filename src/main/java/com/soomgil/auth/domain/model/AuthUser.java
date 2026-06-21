@@ -26,6 +26,6 @@ public record AuthUser(
 	 * @return ACTIVE 상태면 true
 	 */
 	public boolean canLogin() {
-		return status == UserStatus.ACTIVE;
+		return status == UserStatus.ACTIVE || status == UserStatus.PENDING_ONBOARDING;
 	}
 }

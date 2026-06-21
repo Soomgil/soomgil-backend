@@ -39,6 +39,7 @@ public class RegisterCommandHandler implements CommandHandler<RegisterCommand, R
 	private final PasswordCredentialMapper passwordCredentialMapper;
 	private final UserProfileMapper userProfileMapper;
 	private final UserSettingsMapper userSettingsMapper;
+	private final com.soomgil.auth.infrastructure.persistence.UserPolicyAcceptanceMapper userPolicyAcceptanceMapper;
 	private final PasswordHasher passwordHasher;
 	private final EmailVerificationService emailVerificationService;
 
@@ -48,6 +49,7 @@ public class RegisterCommandHandler implements CommandHandler<RegisterCommand, R
 		PasswordCredentialMapper passwordCredentialMapper,
 		UserProfileMapper userProfileMapper,
 		UserSettingsMapper userSettingsMapper,
+		com.soomgil.auth.infrastructure.persistence.UserPolicyAcceptanceMapper userPolicyAcceptanceMapper,
 		PasswordHasher passwordHasher,
 		EmailVerificationService emailVerificationService
 	) {
@@ -56,6 +58,7 @@ public class RegisterCommandHandler implements CommandHandler<RegisterCommand, R
 		this.passwordCredentialMapper = passwordCredentialMapper;
 		this.userProfileMapper = userProfileMapper;
 		this.userSettingsMapper = userSettingsMapper;
+		this.userPolicyAcceptanceMapper = userPolicyAcceptanceMapper;
 		this.passwordHasher = passwordHasher;
 		this.emailVerificationService = emailVerificationService;
 	}
@@ -75,6 +78,12 @@ public class RegisterCommandHandler implements CommandHandler<RegisterCommand, R
 		userProfileMapper.insert(userId, command.displayName());
 		userSettingsMapper.insertDefaults(userId);
 		passwordCredentialMapper.insert(userId, passwordHasher.hash(command.password()));
+
+		if (command.acceptedPolicyDocumentIds() != null) {
+			for (UUID policyId : command.acceptedPolicyDocumentIds()) {
+				userPolicyAcceptanceMapper.insert(userId, policyId);
+			}
+		}
 
 		// 인증 메일 발송을 위해 방금 생성한 email_address row의 id를 조회한다.
 		UUID emailAddressId = emailAddressMapper.findActiveByNormalizedEmail(normalizedEmail)

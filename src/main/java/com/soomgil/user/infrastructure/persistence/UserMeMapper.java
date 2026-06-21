@@ -47,6 +47,7 @@ public interface UserMeMapper {
 	@Update("""
 		UPDATE auth.user_profiles
 		SET display_name = #{displayName},
+		    profile_image_url = #{profileImageUrl},
 		    profile_media_file_id = #{profileMediaFileId},
 		    bio = #{bio},
 		    profile_visibility = #{profileVisibility},
@@ -55,14 +56,13 @@ public interface UserMeMapper {
 		""")
 	int update(@Param("userId") UUID userId,
 		@Param("displayName") String displayName,
+		@Param("profileImageUrl") String profileImageUrl,
 		@Param("profileMediaFileId") UUID profileMediaFileId,
 		@Param("bio") String bio,
 		@Param("profileVisibility") String profileVisibility);
 
 	/**
 	 * {@link UserProfileRecord}의 필드를 풀어서 {@link #update}에 전달하는 편의 메서드.
-	 *
-	 * <p>{@code profileImageUrl}은 media 모듈 연동 전이므로 update에 포함하지 않는다.
 	 *
 	 * @param record 갱신할 프로필 값
 	 * @return 갱신된 행 수
@@ -71,6 +71,7 @@ public interface UserMeMapper {
 		return update(
 			record.userId(),
 			record.displayName(),
+			record.profileImageUrl(),
 			record.profileMediaFileId(),
 			record.bio(),
 			record.profileVisibility() == null ? null : record.profileVisibility().name()

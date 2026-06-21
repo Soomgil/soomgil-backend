@@ -1,3 +1,7 @@
 /gradlew text eol=lf
 *.bat text eol=crlf
 *.jar binary
+
+# Flyway 마이그레이션은 항상 LF로 고정 — CRLF/LF 섞임으로 인한
+# 체크섬 불일치(Windows 체크아웃 시 autocrlf로 인한 변형) 방지.
+*.sql text eol=lf

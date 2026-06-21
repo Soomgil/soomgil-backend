@@ -14,6 +14,7 @@ import com.soomgil.auth.api.dto.RegisterRequest;
 import com.soomgil.auth.api.dto.RegisterResponse;
 import com.soomgil.auth.api.dto.ResetPasswordRequest;
 import com.soomgil.auth.api.dto.VerifyEmailRequest;
+import com.soomgil.auth.api.dto.OnboardRequest;
 import com.soomgil.auth.application.command.AuthTokenResult;
 import com.soomgil.auth.application.command.LoginCommand;
 import com.soomgil.auth.application.command.RegisterResult;
@@ -21,11 +22,13 @@ import com.soomgil.auth.application.command.LogoutCommand;
 import com.soomgil.auth.application.command.OAuthLoginCommand;
 import com.soomgil.auth.application.command.RefreshCommand;
 import com.soomgil.auth.application.command.RegisterCommand;
+import com.soomgil.auth.application.command.OnboardCommand;
 import com.soomgil.auth.application.command.RequestPasswordResetCommand;
 import com.soomgil.auth.application.command.ResetPasswordCommand;
 import com.soomgil.auth.application.command.SendEmailVerificationCommand;
 import com.soomgil.auth.application.command.VerifyEmailCommand;
 import com.soomgil.auth.application.handler.GetCurrentUserQueryHandler;
+import com.soomgil.auth.application.handler.OnboardCommandHandler;
 import com.soomgil.auth.application.handler.ListPoliciesQueryHandler;
 import com.soomgil.auth.application.handler.LoginCommandHandler;
 import com.soomgil.auth.application.handler.LogoutCommandHandler;
@@ -84,6 +87,7 @@ public class AuthController extends ApiControllerSupport {
 	private final RequestPasswordResetCommandHandler requestPasswordResetCommandHandler;
 	private final ResetPasswordCommandHandler resetPasswordCommandHandler;
 	private final OAuthLoginCommandHandler oauthLoginCommandHandler;
+	private final OnboardCommandHandler onboardCommandHandler;
 	private final ListPoliciesQueryHandler listPoliciesQueryHandler;
 	private final GetCurrentUserQueryHandler getCurrentUserQueryHandler;
 	private final OAuthClient oauthClient;
@@ -99,6 +103,7 @@ public class AuthController extends ApiControllerSupport {
 		RequestPasswordResetCommandHandler requestPasswordResetCommandHandler,
 		ResetPasswordCommandHandler resetPasswordCommandHandler,
 		OAuthLoginCommandHandler oauthLoginCommandHandler,
+		OnboardCommandHandler onboardCommandHandler,
 		ListPoliciesQueryHandler listPoliciesQueryHandler,
 		GetCurrentUserQueryHandler getCurrentUserQueryHandler,
 		OAuthClient oauthClient,
@@ -113,6 +118,7 @@ public class AuthController extends ApiControllerSupport {
 		this.requestPasswordResetCommandHandler = requestPasswordResetCommandHandler;
 		this.resetPasswordCommandHandler = resetPasswordCommandHandler;
 		this.oauthLoginCommandHandler = oauthLoginCommandHandler;
+		this.onboardCommandHandler = onboardCommandHandler;
 		this.listPoliciesQueryHandler = listPoliciesQueryHandler;
 		this.getCurrentUserQueryHandler = getCurrentUserQueryHandler;
 		this.oauthClient = oauthClient;
@@ -129,7 +135,7 @@ public class AuthController extends ApiControllerSupport {
 	@ResponseStatus(HttpStatus.CREATED)
 	public RegisterResponse register(@Valid @RequestBody RegisterRequest request) {
 		RegisterCommand command = new RegisterCommand(
-			request.email(), request.password(), request.displayName()
+			request.email(), request.password(), request.displayName(), request.acceptedPolicyDocumentIds()
 		);
 		RegisterResult result = registerCommandHandler.handle(command);
 		return new RegisterResponse(
@@ -190,8 +196,11 @@ public class AuthController extends ApiControllerSupport {
 		@RequestParam URI redirectUri,
 		@RequestParam(required = false) String state
 	) {
-		String url = oauthClient.getAuthorizationUrl(provider, redirectUri.toString(), state);
+		// state를 한 번만 생성해서 URL과 응답 body에 동일 값 사용.
+		// 순서가 바뀌면 OAuthClient 내부에서 새 UUID를 만들어 URL에 넣고,
+		// body엔 또 다른 UUID가 들어가 콜백 시 state 불일치로 CSRF 검증이 실패한다.
 		String actualState = state != null ? state : UUID.randomUUID().toString();
+		String url = oauthClient.getAuthorizationUrl(provider, redirectUri.toString(), actualState);
 		return new OAuthAuthorizationUrlResponse(URI.create(url), actualState);
 	}
 
@@ -204,6 +213,19 @@ public class AuthController extends ApiControllerSupport {
 			provider, request.code(), request.redirectUri().toString()
 		);
 		return toAuthTokenResponse(oauthLoginCommandHandler.handle(command));
+	}
+
+	@PostMapping("/onboard")
+	public AuthTokenResponse onboard(
+		@org.springframework.security.core.annotation.AuthenticationPrincipal CurrentUser currentUser,
+		@Valid @RequestBody OnboardRequest request
+	) {
+		OnboardCommand command = new OnboardCommand(
+			currentUser.userId(),
+			request.displayName(),
+			request.acceptedPolicyDocumentIds()
+		);
+		return toAuthTokenResponse(onboardCommandHandler.handle(command));
 	}
 
 	@GetMapping("/policy-documents")
@@ -223,11 +245,12 @@ public class AuthController extends ApiControllerSupport {
 			result.displayName(), null, null, null, UserProfileVisibility.PUBLIC
 		);
 		UserSettings settings = new UserSettings("ko", "Asia/Seoul", false, null, null, true);
+		UserStatus status = result.onboarded() ? UserStatus.ACTIVE : UserStatus.PENDING_ONBOARDING;
 		User user = new User(
 			result.userId(),
 			result.email(),
 			null,
-			UserStatus.ACTIVE,
+			status,
 			null,
 			null,
 			null,
@@ -240,7 +263,8 @@ public class AuthController extends ApiControllerSupport {
 			result.refreshToken(),
 			"Bearer",
 			(int) jwtProperties.accessTokenTtlSeconds(),
-			user
+			user,
+			result.onboarded()
 		);
 	}
 }

@@ -24,30 +24,35 @@ import org.junit.jupiter.api.Test;
 class GetUserPublicProfileQueryHandlerTest {
 
 	private final UserPublicProfileMapper mapper = mock(UserPublicProfileMapper.class);
+	private final com.soomgil.social.infrastructure.persistence.UserFollowMapper userFollowMapper =
+		mock(com.soomgil.social.infrastructure.persistence.UserFollowMapper.class);
 	private final GetUserPublicProfileQueryHandler handler =
-		new GetUserPublicProfileQueryHandler(mapper);
+		new GetUserPublicProfileQueryHandler(mapper, userFollowMapper);
 
 	@Test
 	@DisplayName("PUBLIC 프로필은 자기소개를 포함한 전체 정보를 반환한다")
 	void returnsFullProfileForPublic() {
 		UUID viewerId = UUID.randomUUID();
 		UUID targetId = UUID.randomUUID();
-		URI imageUrl = URI.create("https://cdn.example.com/minji.png");
+		String imageUrl = "https://cdn.example.com/minji.png";
 		UserProfileRecord record = new UserProfileRecord(
 			targetId, "민지", imageUrl, null, "안녕하세요", UserProfileVisibility.PUBLIC
 		);
 		when(mapper.findByUserId(targetId)).thenReturn(Optional.of(record));
+		when(userFollowMapper.countFollowers(targetId)).thenReturn(5);
+		when(userFollowMapper.countFollowing(targetId)).thenReturn(10);
+		when(userFollowMapper.find(viewerId, targetId)).thenReturn(Optional.empty());
 
 		UserPublicProfile result = handler.handle(new GetUserPublicProfileQuery(viewerId, targetId));
 
 		assertThat(result.id()).isEqualTo(targetId);
 		assertThat(result.displayName()).isEqualTo("민지");
-		assertThat(result.profileImageUrl()).isEqualTo(imageUrl);
+		assertThat(result.profileImageUrl()).isEqualTo(URI.create(imageUrl));
 		assertThat(result.bio()).isEqualTo("안녕하세요");
 		assertThat(result.profileVisibility()).isEqualTo(UserProfileVisibility.PUBLIC);
-		assertThat(result.followerCount()).isNull();
-		assertThat(result.followingCount()).isNull();
-		assertThat(result.followedByMe()).isNull();
+		assertThat(result.followerCount()).isEqualTo(5);
+		assertThat(result.followingCount()).isEqualTo(10);
+		assertThat(result.followedByMe()).isFalse();
 		assertThat(result.followStatus()).isNull();
 	}
 
@@ -60,6 +65,9 @@ class GetUserPublicProfileQueryHandlerTest {
 			targetId, "현우", null, null, "비공개 자기소개", UserProfileVisibility.PRIVATE
 		);
 		when(mapper.findByUserId(targetId)).thenReturn(Optional.of(record));
+		when(userFollowMapper.countFollowers(targetId)).thenReturn(0);
+		when(userFollowMapper.countFollowing(targetId)).thenReturn(0);
+		when(userFollowMapper.find(viewerId, targetId)).thenReturn(Optional.empty());
 
 		UserPublicProfile result = handler.handle(new GetUserPublicProfileQuery(viewerId, targetId));
 

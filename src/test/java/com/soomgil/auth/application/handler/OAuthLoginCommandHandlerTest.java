@@ -118,7 +118,7 @@ class OAuthLoginCommandHandlerTest {
 		assertThat(result.email()).isEqualTo("new@example.com");
 		assertThat(result.displayName()).isEqualTo("새이름");
 
-		verify(userMapper).insert(any(UUID.class), eq("ACTIVE"));
+		verify(userMapper).insert(any(UUID.class), eq("PENDING_ONBOARDING"));
 		verify(emailAddressMapper).insertPrimary(
 			any(UUID.class), eq("new@example.com"), eq("new@example.com"), any(Instant.class)
 		);

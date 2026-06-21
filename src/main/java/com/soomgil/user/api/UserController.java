@@ -190,7 +190,7 @@ public class UserController extends ApiControllerSupport {
 		@PathVariable UUID userId
 	) {
 		return getUserPublicProfileQueryHandler.handle(
-			new GetUserPublicProfileQuery(currentUser.userId(), userId)
+			new GetUserPublicProfileQuery(currentUser == null ? null : currentUser.userId(), userId)
 		);
 	}
 }

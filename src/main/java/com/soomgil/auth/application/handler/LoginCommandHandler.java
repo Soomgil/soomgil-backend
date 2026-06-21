@@ -97,6 +97,6 @@ public class LoginCommandHandler implements CommandHandler<LoginCommand, AuthTok
 			UUID.randomUUID(), user.id(), refresh.hash(), UUID.randomUUID(), refresh.expiresAt()
 		);
 
-		return new AuthTokenResult(accessToken, refresh.raw(), user.id(), emailAddress.email(), displayName);
+		return new AuthTokenResult(accessToken, refresh.raw(), user.id(), emailAddress.email(), displayName, true);
 	}
 }
