@@ -34,7 +34,7 @@ class SwipeReactionPreferenceEvidenceIntegrationTest {
 	private static final UUID STATISTIC_RUN_ID = UUID.fromString("00000000-0000-0000-0000-000000001403");
 
 	@Autowired
-	private UpsertSwipeReactionCommandHandler handler;
+	private PreferenceUpsertSwipeReactionCommandHandler handler;
 
 	@Autowired
 	private JdbcTemplate jdbcTemplate;
@@ -114,6 +114,35 @@ class SwipeReactionPreferenceEvidenceIntegrationTest {
 				AND external_place_id = '126508'
 			""", UUID.class, USER_ID);
 		assertThat(linkedEnrichmentId).isEqualTo(ENRICHMENT_ID);
+	}
+
+	@Test
+	void reappliesAStoredReactionWhenAsyncTaggingFinishes() {
+		react(SwipeReaction.LIKE);
+		UUID refreshedEnrichmentId = UUID.fromString("00000000-0000-0000-0000-000000001404");
+		UUID parkTagId = findTagId("park");
+		jdbcTemplate.update("""
+			INSERT INTO preference.place_tag_enrichments (
+				id, provider, external_place_id, status, selected_count, enriched_at
+			) VALUES (?, 'KTO', '126508', 'SUCCEEDED', 1, now() + interval '1 second')
+			""", refreshedEnrichmentId);
+		jdbcTemplate.update("""
+			INSERT INTO preference.place_tag_enrichment_tags (
+				enrichment_id, tag_id, confidence, weight, rank_order
+			) VALUES (?, ?, 1.0000, 1.0000, 1)
+			""", refreshedEnrichmentId, parkTagId);
+
+		handler.refreshPlaceEnrichment("KTO", "126508", null);
+
+		UUID linked = jdbcTemplate.queryForObject("""
+			SELECT place_tag_enrichment_id FROM preference.user_place_reactions
+			WHERE user_id = ? AND provider = 'KTO' AND external_place_id = '126508'
+			""", UUID.class, USER_ID);
+		assertThat(linked).isEqualTo(refreshedEnrichmentId);
+		assertEvidence("park", "1.00000000", "0.00000000", "0.920000", 1, 0, 0);
+		assertThat(jdbcTemplate.queryForObject(
+			"SELECT count(*) FROM preference.user_swipe_events WHERE user_id = ?", Integer.class, USER_ID
+		)).isEqualTo(1);
 	}
 
 	private void react(SwipeReaction reaction) {

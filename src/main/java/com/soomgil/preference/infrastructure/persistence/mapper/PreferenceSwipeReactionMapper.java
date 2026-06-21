@@ -8,6 +8,8 @@ import com.soomgil.preference.infrastructure.persistence.row.PlaceTagEvidenceSou
 import com.soomgil.preference.infrastructure.persistence.row.UserTagEvidenceAdjustmentRow;
 import com.soomgil.preference.infrastructure.persistence.row.UserTagPreferenceScoreSourceRow;
 import com.soomgil.preference.infrastructure.persistence.row.UserTagPreferenceScoreUpdateRow;
+import com.soomgil.preference.infrastructure.persistence.row.SwipeReactionRefreshRow;
+import java.time.OffsetDateTime;
 import java.util.List;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -49,4 +51,16 @@ public interface PreferenceSwipeReactionMapper {
 	);
 
 	void updateUserTagPreferenceScore(UserTagPreferenceScoreUpdateRow row);
+
+	List<SwipeReactionRefreshRow> findReactionsNeedingEnrichmentRefresh(
+		@Param("provider") String provider,
+		@Param("externalPlaceId") String externalPlaceId,
+		@Param("enrichmentId") String enrichmentId
+	);
+
+	void updateReactionEnrichment(
+		@Param("id") String id,
+		@Param("enrichmentId") String enrichmentId,
+		@Param("sourceModifiedAt") OffsetDateTime sourceModifiedAt
+	);
 }

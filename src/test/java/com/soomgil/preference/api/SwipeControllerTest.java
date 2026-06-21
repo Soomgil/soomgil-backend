@@ -43,6 +43,9 @@ import org.springframework.http.converter.json.Jackson2ObjectMapperBuilder;
 import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import com.soomgil.preference.application.service.SwipeTagPreparationService;
+import com.soomgil.preference.api.dto.SwipeTagStatus;
+import com.soomgil.preference.api.dto.TagPreparationStatus;
 
 class SwipeControllerTest {
 
@@ -53,6 +56,7 @@ class SwipeControllerTest {
 	private RecordingListSavedPlacesQueryHandler listSavedPlacesHandler;
 	private ObjectMapper objectMapper;
 	private MockMvc mockMvc;
+	private SwipeTagPreparationService tagPreparationService;
 
 	@BeforeEach
 	void setUp() {
@@ -64,12 +68,14 @@ class SwipeControllerTest {
 		objectMapper = Jackson2ObjectMapperBuilder.json()
 			.featuresToDisable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
 			.build();
+		tagPreparationService = org.mockito.Mockito.mock(SwipeTagPreparationService.class);
 		mockMvc = MockMvcBuilders.standaloneSetup(new SwipeController(
 				feedHandler,
 				reactionHandler,
 				saveHandler,
 				unsaveHandler,
-				listSavedPlacesHandler
+				listSavedPlacesHandler,
+				tagPreparationService
 			))
 			.setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
 			.build();
@@ -92,6 +98,21 @@ class SwipeControllerTest {
 		assertThat(feedHandler.lastQuery.limit()).isEqualTo(10);
 		assertThat(feedHandler.lastQuery.excludeRecent()).isTrue();
 		assertThat(feedHandler.lastQuery.seed()).isEqualTo("abc");
+	}
+
+	@Test
+	void getsTagPreparationStatusesForBufferedCards() throws Exception {
+		org.mockito.Mockito.when(tagPreparationService.findStatuses(List.of("126508", "999999")))
+			.thenReturn(List.of(
+				new SwipeTagStatus("126508", List.of("바다"), TagPreparationStatus.READY),
+				new SwipeTagStatus("999999", List.of(), TagPreparationStatus.PENDING)
+			));
+
+		mockMvc.perform(get("/api/v1/swipe/tags")
+				.param("externalPlaceIds", "126508,999999"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$[0].status").value("READY"))
+			.andExpect(jsonPath("$[1].status").value("PENDING"));
 	}
 
 	@Test

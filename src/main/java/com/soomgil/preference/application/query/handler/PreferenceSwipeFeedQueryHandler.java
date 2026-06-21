@@ -12,9 +12,10 @@ import com.soomgil.preference.api.dto.SwipeFeedPlace;
 import com.soomgil.preference.api.dto.SwipeFeedResponse;
 import com.soomgil.preference.api.dto.SwipeReaction;
 import com.soomgil.preference.application.query.dto.SwipeFeedQuery;
+import com.soomgil.preference.application.service.SwipeTagPreparation;
+import com.soomgil.preference.application.service.SwipeTagPreparationService;
 import com.soomgil.preference.infrastructure.persistence.mapper.PreferenceSwipeFeedMapper;
 import com.soomgil.preference.infrastructure.persistence.row.SwipeFeedReactionRow;
-import com.soomgil.preference.infrastructure.persistence.row.SwipeFeedTagRow;
 import com.soomgil.social.application.query.dto.FindFolloweePlaceReactionsQuery;
 import com.soomgil.social.application.query.dto.FolloweePlaceReaction;
 import com.soomgil.social.application.query.handler.FindFolloweePlaceReactionsQueryHandler;
@@ -40,17 +41,20 @@ public class PreferenceSwipeFeedQueryHandler implements SwipeFeedQueryHandler {
 	private final TourismPlaceFeedClient placeFeedClient;
 	private final PreferenceSwipeFeedMapper mapper;
 	private final FindFolloweePlaceReactionsQueryHandler followeeReactionQueryHandler;
+	private final SwipeTagPreparationService tagPreparationService;
 
 	public PreferenceSwipeFeedQueryHandler(
 		ObjectProvider<CurrentUserProvider> currentUserProvider,
 		TourismPlaceFeedClient placeFeedClient,
 		PreferenceSwipeFeedMapper mapper,
-		FindFolloweePlaceReactionsQueryHandler followeeReactionQueryHandler
+		FindFolloweePlaceReactionsQueryHandler followeeReactionQueryHandler,
+		SwipeTagPreparationService tagPreparationService
 	) {
 		this.currentUserProvider = currentUserProvider;
 		this.placeFeedClient = placeFeedClient;
 		this.mapper = mapper;
 		this.followeeReactionQueryHandler = followeeReactionQueryHandler;
+		this.tagPreparationService = tagPreparationService;
 	}
 
 	@Transactional(readOnly = true)
@@ -76,14 +80,11 @@ public class PreferenceSwipeFeedQueryHandler implements SwipeFeedQueryHandler {
 			.limit(limit)
 			.toList();
 		List<String> selectedIds = selectedPlaces.stream().map(TourismPlaceFeedItem::externalPlaceId).toList();
-		Map<String, List<String>> tags = selectedIds.isEmpty() ? Map.of() : mapper.findTags(selectedIds).stream()
-			.collect(Collectors.groupingBy(
-				SwipeFeedTagRow::externalPlaceId,
-				Collectors.mapping(SwipeFeedTagRow::displayName, Collectors.toList())
-			));
+		Map<String, SwipeTagPreparation> tagPreparations = selectedIds.isEmpty()
+			? Map.of() : tagPreparationService.prepare(selectedPlaces);
 		Map<PlaceRef, List<UserSummary>> likedByFollowees = findLikedByFollowees(selectedPlaces);
 		List<SwipeFeedItem> items = selectedPlaces.stream()
-			.map(place -> toItem(place, reactions, tags, likedByFollowees))
+			.map(place -> toItem(place, reactions, tagPreparations, likedByFollowees))
 			.toList();
 
 		return new SwipeFeedResponse(items, remoteFeed.nextSeed());
@@ -113,10 +114,14 @@ public class PreferenceSwipeFeedQueryHandler implements SwipeFeedQueryHandler {
 	private SwipeFeedItem toItem(
 		TourismPlaceFeedItem place,
 		Map<String, SwipeReaction> reactions,
-		Map<String, List<String>> tags,
+		Map<String, SwipeTagPreparation> tagPreparations,
 		Map<PlaceRef, List<UserSummary>> likedByFollowees
 	) {
 		PlaceRef placeRef = toPlaceRef(place);
+		SwipeTagPreparation tagPreparation = tagPreparations.getOrDefault(
+			place.externalPlaceId(),
+			new SwipeTagPreparation(List.of(), com.soomgil.preference.api.dto.TagPreparationStatus.PENDING)
+		);
 		return new SwipeFeedItem(
 			new SwipeFeedPlace(
 				PlaceProvider.KTO,
@@ -130,7 +135,8 @@ public class PreferenceSwipeFeedQueryHandler implements SwipeFeedQueryHandler {
 				PlaceSourceStatus.AVAILABLE,
 				place.description(),
 				place.photos(),
-				tags.getOrDefault(place.externalPlaceId(), List.of())
+				tagPreparation.tags(),
+				tagPreparation.status()
 			),
 			reactions.get(place.externalPlaceId()),
 			likedByFollowees.getOrDefault(placeRef, List.of())

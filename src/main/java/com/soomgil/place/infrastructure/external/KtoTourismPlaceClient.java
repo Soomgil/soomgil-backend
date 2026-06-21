@@ -6,6 +6,10 @@ import com.soomgil.place.application.port.TourismPlaceFeedItem;
 import com.soomgil.place.application.port.TourismPlaceFeedRequest;
 import com.soomgil.place.application.port.TourismPlaceFeedResult;
 import java.net.URI;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -138,7 +142,8 @@ public class KtoTourismPlaceClient implements TourismPlaceFeedClient {
 				photos.isEmpty() ? null : photos.getFirst(),
 				CONTENT_TYPE_NAMES.getOrDefault(contentType, contentType),
 				null,
-				photos
+				photos,
+				modifiedAt(text(item, "modifiedtime"))
 			));
 		}
 		return result;
@@ -165,8 +170,28 @@ public class KtoTourismPlaceClient implements TourismPlaceFeedClient {
 			place.thumbnailUrl(),
 			place.category(),
 			plainText(text(detail, "overview")),
-			photos
+			photos,
+			newer(place.sourceModifiedAt(), modifiedAt(text(detail, "modifiedtime")))
 		);
+	}
+
+	private static OffsetDateTime modifiedAt(String value) {
+		if (value == null || value.length() != 14) {
+			return null;
+		}
+		try {
+			return LocalDateTime.parse(value, DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))
+				.atOffset(ZoneOffset.ofHours(9));
+		}
+		catch (java.time.format.DateTimeParseException exception) {
+			return null;
+		}
+	}
+
+	private static OffsetDateTime newer(OffsetDateTime first, OffsetDateTime second) {
+		if (first == null) return second;
+		if (second == null) return first;
+		return first.isAfter(second) ? first : second;
 	}
 
 	private static JsonNode successfulBody(JsonNode response) {

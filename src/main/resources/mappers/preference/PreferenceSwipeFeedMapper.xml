@@ -19,6 +19,14 @@
 		</constructor>
 	</resultMap>
 
+	<resultMap id="SwipeFeedTagStateRowMap" type="com.soomgil.preference.infrastructure.persistence.row.SwipeFeedTagStateRow">
+		<constructor>
+			<arg column="external_place_id" javaType="java.lang.String"/>
+			<arg column="source_modified_at" javaType="java.time.OffsetDateTime"/>
+			<arg column="source_hash" javaType="java.lang.String"/>
+		</constructor>
+	</resultMap>
+
 	<select id="findReactions" resultMap="SwipeFeedReactionRowMap">
 		SELECT
 			external_place_id,
@@ -54,5 +62,20 @@
 		JOIN preference.place_tag_enrichment_tags selected ON selected.enrichment_id = latest.id
 		JOIN preference.preference_tags tag ON tag.id = selected.tag_id
 		ORDER BY latest.external_place_id, selected.rank_order
+	</select>
+
+	<select id="findTagStates" resultMap="SwipeFeedTagStateRowMap">
+		SELECT DISTINCT ON (external_place_id)
+			external_place_id,
+			source_modified_at,
+			source_hash
+		FROM preference.place_tag_enrichments
+		WHERE provider = 'KTO'
+			AND status = 'SUCCEEDED'
+			AND external_place_id IN
+			<foreach collection="externalPlaceIds" item="placeId" open="(" separator="," close=")">
+				#{placeId}
+			</foreach>
+		ORDER BY external_place_id, enriched_at DESC, updated_at DESC
 	</select>
 </mapper>

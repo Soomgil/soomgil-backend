@@ -186,4 +186,30 @@ public class PreferenceUpsertSwipeReactionCommandHandler implements UpsertSwipeR
 			.map(row -> new PlaceTagEvidenceInput(row.tagId(), row.confidence(), row.weight()))
 			.toList());
 	}
+
+	@Transactional
+	public void refreshPlaceEnrichment(
+		String provider,
+		String externalPlaceId,
+		OffsetDateTime sourceModifiedAt
+	) {
+		List<PlaceTagEvidenceSourceRow> currentTagRows = mapper.findLatestConfirmedTags(provider, externalPlaceId);
+		if (currentTagRows.isEmpty()) {
+			return;
+		}
+		String enrichmentId = currentTagRows.getFirst().enrichmentId();
+		List<PlaceTagEvidence> currentEvidence = calculateEvidence(currentTagRows);
+		for (var reaction : mapper.findReactionsNeedingEnrichmentRefresh(provider, externalPlaceId, enrichmentId)) {
+			UUID userId = UUID.fromString(reaction.userId());
+			List<PlaceTagEvidence> previousEvidence = reaction.placeTagEnrichmentId() == null
+				? List.of() : calculateEvidence(mapper.findConfirmedTagsByEnrichment(reaction.placeTagEnrichmentId()));
+			UserPlaceReactionRow previous = new UserPlaceReactionRow(
+				reaction.id(), reaction.reaction(), reaction.placeTagEnrichmentId()
+			);
+			removePreviousEvidence(userId, previous, previousEvidence);
+			mapper.updateReactionEnrichment(reaction.id(), enrichmentId, sourceModifiedAt);
+			addCurrentEvidence(userId, reaction.reaction(), currentEvidence);
+			recalculatePreferenceScores(userId, previousEvidence, currentEvidence);
+		}
+	}
 }

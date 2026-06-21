@@ -2,6 +2,7 @@ package com.soomgil.preference.infrastructure.persistence.mapper;
 
 import com.soomgil.preference.infrastructure.persistence.row.SwipeFeedReactionRow;
 import com.soomgil.preference.infrastructure.persistence.row.SwipeFeedTagRow;
+import com.soomgil.preference.infrastructure.persistence.row.SwipeFeedTagStateRow;
 import java.util.List;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -18,4 +19,6 @@ public interface PreferenceSwipeFeedMapper {
 	);
 
 	List<SwipeFeedTagRow> findTags(@Param("externalPlaceIds") List<String> externalPlaceIds);
+
+	List<SwipeFeedTagStateRow> findTagStates(@Param("externalPlaceIds") List<String> externalPlaceIds);
 }

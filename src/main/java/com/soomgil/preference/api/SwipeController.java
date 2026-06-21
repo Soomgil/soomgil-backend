@@ -6,6 +6,7 @@ import com.soomgil.preference.api.dto.SavedPlace;
 import com.soomgil.preference.api.dto.SwipeFeedResponse;
 import com.soomgil.preference.api.dto.SwipeReactionRequest;
 import com.soomgil.preference.api.dto.SwipeReactionResponse;
+import com.soomgil.preference.api.dto.SwipeTagStatus;
 import com.soomgil.preference.application.command.dto.SavePlaceCommand;
 import com.soomgil.preference.application.command.dto.UnsavePlaceCommand;
 import com.soomgil.preference.application.command.dto.UpsertSwipeReactionCommand;
@@ -16,6 +17,7 @@ import com.soomgil.preference.application.query.dto.ListSavedPlacesQuery;
 import com.soomgil.preference.application.query.dto.SwipeFeedQuery;
 import com.soomgil.preference.application.query.handler.ListSavedPlacesQueryHandler;
 import com.soomgil.preference.application.query.handler.SwipeFeedQueryHandler;
+import com.soomgil.preference.application.service.SwipeTagPreparationService;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.http.HttpStatus;
@@ -40,19 +42,29 @@ public class SwipeController {
 	private final SavePlaceCommandHandler savePlaceCommandHandler;
 	private final UnsavePlaceCommandHandler unsavePlaceCommandHandler;
 	private final ListSavedPlacesQueryHandler listSavedPlacesQueryHandler;
+	private final SwipeTagPreparationService swipeTagPreparationService;
 
 	public SwipeController(
 		SwipeFeedQueryHandler swipeFeedQueryHandler,
 		UpsertSwipeReactionCommandHandler upsertSwipeReactionCommandHandler,
 		SavePlaceCommandHandler savePlaceCommandHandler,
 		UnsavePlaceCommandHandler unsavePlaceCommandHandler,
-		ListSavedPlacesQueryHandler listSavedPlacesQueryHandler
+		ListSavedPlacesQueryHandler listSavedPlacesQueryHandler,
+		SwipeTagPreparationService swipeTagPreparationService
 	) {
 		this.swipeFeedQueryHandler = swipeFeedQueryHandler;
 		this.upsertSwipeReactionCommandHandler = upsertSwipeReactionCommandHandler;
 		this.savePlaceCommandHandler = savePlaceCommandHandler;
 		this.unsavePlaceCommandHandler = unsavePlaceCommandHandler;
 		this.listSavedPlacesQueryHandler = listSavedPlacesQueryHandler;
+		this.swipeTagPreparationService = swipeTagPreparationService;
+	}
+
+	@GetMapping("/swipe/tags")
+	public List<SwipeTagStatus> getSwipeTagStatuses(
+		@RequestParam List<String> externalPlaceIds
+	) {
+		return swipeTagPreparationService.findStatuses(externalPlaceIds);
 	}
 
 	@GetMapping("/swipe/feed")

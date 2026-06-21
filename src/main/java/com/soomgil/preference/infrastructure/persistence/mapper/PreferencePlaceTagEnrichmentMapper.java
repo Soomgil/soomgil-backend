@@ -4,6 +4,7 @@ import com.soomgil.preference.infrastructure.persistence.row.PlaceTagEnrichmentC
 import com.soomgil.preference.infrastructure.persistence.row.PlaceTagEnrichmentInsertRow;
 import com.soomgil.preference.infrastructure.persistence.row.PlaceTagEnrichmentTagInsertRow;
 import com.soomgil.preference.infrastructure.persistence.row.PreferenceTagLookupRow;
+import com.soomgil.preference.infrastructure.persistence.row.SelectablePreferenceTagRow;
 import java.util.List;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -15,6 +16,8 @@ import org.apache.ibatis.annotations.Param;
 public interface PreferencePlaceTagEnrichmentMapper {
 
 	List<PreferenceTagLookupRow> findTagsByCodes(@Param("codes") List<String> codes);
+
+	List<SelectablePreferenceTagRow> findSelectableTags();
 
 	void insertEnrichment(PlaceTagEnrichmentInsertRow row);
 

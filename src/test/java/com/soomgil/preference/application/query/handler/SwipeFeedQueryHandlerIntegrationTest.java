@@ -13,6 +13,7 @@ import com.soomgil.place.application.port.TourismPlaceFeedResult;
 import com.soomgil.preference.api.dto.SwipeFeedResponse;
 import com.soomgil.preference.api.dto.SwipeReaction;
 import com.soomgil.preference.application.query.dto.SwipeFeedQuery;
+import com.soomgil.preference.application.service.SwipeTagEnrichmentQueue;
 import java.util.UUID;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -42,6 +43,9 @@ class SwipeFeedQueryHandlerIntegrationTest {
 
 	@MockitoBean
 	private TourismPlaceFeedClient placeFeedClient;
+
+	@MockitoBean
+	private SwipeTagEnrichmentQueue swipeTagEnrichmentQueue;
 
 	@BeforeEach
 	void setUp() {

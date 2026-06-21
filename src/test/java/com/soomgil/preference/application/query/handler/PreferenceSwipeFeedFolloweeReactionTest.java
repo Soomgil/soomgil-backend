@@ -13,12 +13,16 @@ import com.soomgil.place.application.port.TourismPlaceFeedClient;
 import com.soomgil.place.application.port.TourismPlaceFeedItem;
 import com.soomgil.place.application.port.TourismPlaceFeedResult;
 import com.soomgil.preference.application.query.dto.SwipeFeedQuery;
+import com.soomgil.preference.application.service.SwipeTagPreparation;
+import com.soomgil.preference.application.service.SwipeTagPreparationService;
+import com.soomgil.preference.api.dto.TagPreparationStatus;
 import com.soomgil.preference.infrastructure.persistence.mapper.PreferenceSwipeFeedMapper;
 import com.soomgil.social.application.query.dto.FolloweePlaceReaction;
 import com.soomgil.social.application.query.handler.FindFolloweePlaceReactionsQueryHandler;
 import com.soomgil.user.api.dto.UserSummary;
 import java.net.URI;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
@@ -42,6 +46,7 @@ class PreferenceSwipeFeedFolloweeReactionTest {
 		TourismPlaceFeedClient placeClient = mock(TourismPlaceFeedClient.class);
 		FindFolloweePlaceReactionsQueryHandler reactionHandler =
 			mock(FindFolloweePlaceReactionsQueryHandler.class);
+		SwipeTagPreparationService tagPreparationService = mock(SwipeTagPreparationService.class);
 
 		when(currentUserProvider.getIfAvailable())
 			.thenReturn(() -> new CurrentUser(currentUserId, "min@example.com"));
@@ -59,6 +64,9 @@ class PreferenceSwipeFeedFolloweeReactionTest {
 			)), "next"));
 		when(feedMapper.findReactions(currentUserId.toString(), List.of("126508"))).thenReturn(List.of());
 		when(feedMapper.findTags(List.of("126508"))).thenReturn(List.of());
+		when(tagPreparationService.prepare(any())).thenReturn(Map.of(
+			"126508", new SwipeTagPreparation(List.of(), TagPreparationStatus.PENDING)
+		));
 		when(reactionHandler.handle(any()))
 			.thenReturn(List.of(new FolloweePlaceReaction(place, followee)));
 
@@ -66,7 +74,8 @@ class PreferenceSwipeFeedFolloweeReactionTest {
 			currentUserProvider,
 			placeClient,
 			feedMapper,
-			reactionHandler
+			reactionHandler,
+			tagPreparationService
 		);
 
 		var response = handler.handle(new SwipeFeedQuery(null, null, 20, true, null));

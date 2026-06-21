@@ -39,6 +39,7 @@ class KtoTourismPlaceClientTest {
 			"https://img.example/sub.jpg"
 		);
 		assertThat(enriched.category()).isEqualTo("관광지");
+		assertThat(enriched.sourceModifiedAt()).hasToString("2026-06-19T17:36:54+09:00");
 	}
 
 	@Test

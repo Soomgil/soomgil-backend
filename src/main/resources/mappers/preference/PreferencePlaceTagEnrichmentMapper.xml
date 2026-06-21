@@ -14,6 +14,21 @@
 		</constructor>
 	</resultMap>
 
+	<resultMap id="SelectablePreferenceTagRowMap" type="com.soomgil.preference.infrastructure.persistence.row.SelectablePreferenceTagRow">
+		<constructor>
+			<arg column="code" javaType="java.lang.String"/>
+			<arg column="display_name" javaType="java.lang.String"/>
+			<arg column="description" javaType="java.lang.String"/>
+		</constructor>
+	</resultMap>
+
+	<select id="findSelectableTags" resultMap="SelectablePreferenceTagRowMap">
+		SELECT code, display_name, description
+		FROM preference.preference_tags
+		WHERE is_active = true AND is_selectable = true AND tag_type = 'TAG'
+		ORDER BY sort_order, code
+	</select>
+
 	<select id="findTagsByCodes" resultMap="PreferenceTagLookupRowMap">
 		SELECT
 			CAST(tag.id AS text) AS id,

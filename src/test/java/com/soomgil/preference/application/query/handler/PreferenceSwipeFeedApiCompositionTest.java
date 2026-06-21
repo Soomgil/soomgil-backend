@@ -10,11 +10,14 @@ import com.soomgil.place.application.port.TourismPlaceFeedClient;
 import com.soomgil.place.application.port.TourismPlaceFeedItem;
 import com.soomgil.place.application.port.TourismPlaceFeedResult;
 import com.soomgil.preference.application.query.dto.SwipeFeedQuery;
+import com.soomgil.preference.application.service.SwipeTagPreparation;
+import com.soomgil.preference.application.service.SwipeTagPreparationService;
+import com.soomgil.preference.api.dto.TagPreparationStatus;
 import com.soomgil.preference.infrastructure.persistence.mapper.PreferenceSwipeFeedMapper;
 import com.soomgil.preference.infrastructure.persistence.row.SwipeFeedReactionRow;
-import com.soomgil.preference.infrastructure.persistence.row.SwipeFeedTagRow;
 import com.soomgil.social.application.query.handler.FindFolloweePlaceReactionsQueryHandler;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
@@ -29,6 +32,7 @@ class PreferenceSwipeFeedApiCompositionTest {
 		TourismPlaceFeedClient placeClient = mock(TourismPlaceFeedClient.class);
 		PreferenceSwipeFeedMapper mapper = mock(PreferenceSwipeFeedMapper.class);
 		FindFolloweePlaceReactionsQueryHandler followees = mock(FindFolloweePlaceReactionsQueryHandler.class);
+		SwipeTagPreparationService tagPreparationService = mock(SwipeTagPreparationService.class);
 
 		when(currentUserProvider.getIfAvailable())
 			.thenReturn(() -> new CurrentUser(userId, "min@example.com"));
@@ -42,15 +46,13 @@ class PreferenceSwipeFeedApiCompositionTest {
 		));
 		when(mapper.findReactions(userId.toString(), List.of("126508")))
 			.thenReturn(List.of(new SwipeFeedReactionRow("126508", "LIKE")));
-		when(mapper.findTags(List.of("126508")))
-			.thenReturn(List.of(
-				new SwipeFeedTagRow("126508", "바다·해안", 1),
-				new SwipeFeedTagRow("126508", "산책", 2)
-			));
+		when(tagPreparationService.prepare(org.mockito.ArgumentMatchers.any())).thenReturn(Map.of(
+			"126508", new SwipeTagPreparation(List.of("바다·해안", "산책"), TagPreparationStatus.READY)
+		));
 		when(followees.handle(org.mockito.ArgumentMatchers.any())).thenReturn(List.of());
 
 		var handler = new PreferenceSwipeFeedQueryHandler(
-			currentUserProvider, placeClient, mapper, followees
+			currentUserProvider, placeClient, mapper, followees, tagPreparationService
 		);
 		var response = handler.handle(new SwipeFeedQuery(null, null, 20, false, "seed"));
 

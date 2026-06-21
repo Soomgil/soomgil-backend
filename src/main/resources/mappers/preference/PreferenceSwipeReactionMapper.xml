@@ -33,6 +33,15 @@
 		</constructor>
 	</resultMap>
 
+	<resultMap id="SwipeReactionRefreshRowMap" type="com.soomgil.preference.infrastructure.persistence.row.SwipeReactionRefreshRow">
+		<constructor>
+			<arg column="id" javaType="java.lang.String"/>
+			<arg column="user_id" javaType="java.lang.String"/>
+			<arg column="reaction" javaType="java.lang.String"/>
+			<arg column="place_tag_enrichment_id" javaType="java.lang.String"/>
+		</constructor>
+	</resultMap>
+
 	<select id="findReaction" resultMap="UserPlaceReactionRowMap">
 		SELECT
 			CAST(id AS text) AS id,
@@ -74,6 +83,24 @@
 			last_reacted_at = now(),
 			place_tag_enrichment_id = CAST(#{placeTagEnrichmentId} AS uuid),
 			source_modified_at = #{sourceModifiedAt}
+		WHERE id = CAST(#{id} AS uuid)
+	</update>
+
+	<select id="findReactionsNeedingEnrichmentRefresh" resultMap="SwipeReactionRefreshRowMap">
+		SELECT CAST(id AS text) AS id,
+		       CAST(user_id AS text) AS user_id,
+		       reaction,
+		       CAST(place_tag_enrichment_id AS text) AS place_tag_enrichment_id
+		FROM preference.user_place_reactions
+		WHERE provider = #{provider}
+		  AND external_place_id = #{externalPlaceId}
+		  AND place_tag_enrichment_id IS DISTINCT FROM CAST(#{enrichmentId} AS uuid)
+	</select>
+
+	<update id="updateReactionEnrichment">
+		UPDATE preference.user_place_reactions
+		SET place_tag_enrichment_id = CAST(#{enrichmentId} AS uuid),
+		    source_modified_at = #{sourceModifiedAt}
 		WHERE id = CAST(#{id} AS uuid)
 	</update>
 
