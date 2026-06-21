@@ -16,6 +16,7 @@ import com.soomgil.community.api.dto.ModerationStatus;
 import com.soomgil.community.api.dto.PostVisibility;
 import com.soomgil.community.application.command.CreateCommunityPostCommand;
 import com.soomgil.community.application.service.CommunityPostAssembler;
+import com.soomgil.community.application.service.CommunityPostSnapshotCodec;
 import com.soomgil.community.application.service.ShareTokenService;
 import com.soomgil.community.application.service.TripSnapshotChecker;
 import com.soomgil.community.domain.model.CommunityException;
@@ -42,11 +43,12 @@ class CreateCommunityPostCommandHandlerTest {
 	private final PostMediaMapper postMediaMapper = mock(PostMediaMapper.class);
 	private final ShareTokenService shareTokenService = mock(ShareTokenService.class);
 	private final TripSnapshotChecker tripSnapshotChecker = mock(TripSnapshotChecker.class);
+	private final CommunityPostSnapshotCodec snapshotCodec = mock(CommunityPostSnapshotCodec.class);
 	private final CommunityPostAssembler assembler = mock(CommunityPostAssembler.class);
 
 	private final CreateCommunityPostCommandHandler handler = new CreateCommunityPostCommandHandler(
 		postMapper, hashtagMapper, postHashtagMapper, postMediaMapper,
-		shareTokenService, tripSnapshotChecker, assembler
+		shareTokenService, tripSnapshotChecker, snapshotCodec, assembler
 	);
 
 	@Test
@@ -56,8 +58,9 @@ class CreateCommunityPostCommandHandlerTest {
 		UUID tripId = UUID.randomUUID();
 		UUID postId = UUID.randomUUID();
 
-		when(tripSnapshotChecker.fetchSnapshot(eq(tripId), eq(1L), eq(publisherId)))
-			.thenReturn(new CommunityPostSnapshot(List.of(), List.of(), null));
+		CommunityPostSnapshot snapshot = new CommunityPostSnapshot(List.of(), List.of(), null);
+		when(tripSnapshotChecker.fetchSnapshot(eq(tripId), eq(1L), eq(publisherId))).thenReturn(snapshot);
+		when(snapshotCodec.encode(snapshot)).thenReturn("{\"days\":[]}");
 		when(postMapper.findById(any(UUID.class)))
 			.thenReturn(Optional.of(samplePost(postId, publisherId, PostVisibility.PUBLIC)));
 		when(assembler.toDetail(any(), eq(publisherId), isNull(), eq(true)))
@@ -73,7 +76,7 @@ class CreateCommunityPostCommandHandlerTest {
 		verify(postMapper).insert(
 			any(UUID.class), eq(tripId), eq(1L), eq(publisherId),
 			eq(PostVisibility.PUBLIC), eq("제주도 3박 4일"), eq("맛집 코스"), isNull(),
-			eq(1), isNull(), isNull(), isNull(), any(Instant.class)
+			eq(1), eq("{\"days\":[]}"), isNull(), isNull(), isNull(), any(Instant.class)
 		);
 	}
 
@@ -86,6 +89,7 @@ class CreateCommunityPostCommandHandlerTest {
 
 		when(tripSnapshotChecker.fetchSnapshot(eq(tripId), eq(1L), eq(publisherId)))
 			.thenReturn(new CommunityPostSnapshot(List.of(), List.of(), null));
+		when(snapshotCodec.encode(any())).thenReturn("{\"days\":[]}");
 		when(shareTokenService.issue())
 			.thenReturn(new ShareTokenService.IssuedShareToken("raw-token", "hashed-token"));
 		when(postMapper.findById(any(UUID.class)))
@@ -102,7 +106,7 @@ class CreateCommunityPostCommandHandlerTest {
 		verify(postMapper).insert(
 			any(UUID.class), eq(tripId), eq(1L), eq(publisherId),
 			eq(PostVisibility.UNLISTED), eq("비공개 여행"), isNull(), isNull(),
-			eq(1), eq("hashed-token"), any(Instant.class), any(Instant.class), any(Instant.class)
+			eq(1), eq("{\"days\":[]}"), eq("hashed-token"), any(Instant.class), any(Instant.class), any(Instant.class)
 		);
 	}
 
@@ -129,6 +133,7 @@ class CreateCommunityPostCommandHandlerTest {
 
 		when(tripSnapshotChecker.fetchSnapshot(any(), eq(1L), any()))
 			.thenReturn(new CommunityPostSnapshot(List.of(), List.of(), null));
+		when(snapshotCodec.encode(any())).thenReturn("{\"days\":[]}");
 		when(hashtagMapper.findByNormalizedName(eq("부산맛집")))
 			.thenReturn(Optional.of(new HashtagRecord(hashtagId, "부산맛집", "부산맛집", 0, Instant.now(), Instant.now())));
 		when(postMapper.findById(any(UUID.class)))

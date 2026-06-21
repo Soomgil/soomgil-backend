@@ -43,8 +43,33 @@ public record CommunityPostRecord(
 	Instant shareTokenRotatedAt,
 	ModerationStatus moderationStatus,
 	Instant publishedAt,
-	Instant deletedAt
+	Instant deletedAt,
+	String snapshotJson
 ) {
+	public CommunityPostRecord(
+		UUID id,
+		UUID sourceTripId,
+		long sourceTripVersion,
+		UUID publishedByUserId,
+		PostVisibility visibility,
+		String title,
+		String summary,
+		UUID coverMediaFileId,
+		int snapshotVersion,
+		String shareTokenHash,
+		Instant shareTokenCreatedAt,
+		Instant shareTokenRotatedAt,
+		ModerationStatus moderationStatus,
+		Instant publishedAt,
+		Instant deletedAt
+	) {
+		this(
+			id, sourceTripId, sourceTripVersion, publishedByUserId, visibility, title, summary,
+			coverMediaFileId, snapshotVersion, shareTokenHash, shareTokenCreatedAt, shareTokenRotatedAt,
+			moderationStatus, publishedAt, deletedAt,
+			"{\"days\":[],\"routes\":[],\"authorDisplay\":null}"
+		);
+	}
 
 	/**
 	 * 게시글이 삭제되었는지 확인한다.

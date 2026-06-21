@@ -34,7 +34,7 @@ public class CommunityPostAssembler {
 	private final FindDisplayNameQueryHandler displayNameQueryHandler;
 	private final PostHashtagMapper postHashtagMapper;
 	private final PostMediaMapper postMediaMapper;
-	private final TripSnapshotChecker tripSnapshotChecker;
+	private final CommunityPostSnapshotCodec snapshotCodec;
 	private final PostLikeMapper postLikeMapper;
 	private final CommunityCommentMapper communityCommentMapper;
 	private final MediaFileQueryService mediaFileQueryService;
@@ -43,7 +43,7 @@ public class CommunityPostAssembler {
 		FindDisplayNameQueryHandler displayNameQueryHandler,
 		PostHashtagMapper postHashtagMapper,
 		PostMediaMapper postMediaMapper,
-		TripSnapshotChecker tripSnapshotChecker,
+		CommunityPostSnapshotCodec snapshotCodec,
 		PostLikeMapper postLikeMapper,
 		CommunityCommentMapper communityCommentMapper,
 		MediaFileQueryService mediaFileQueryService
@@ -51,7 +51,7 @@ public class CommunityPostAssembler {
 		this.displayNameQueryHandler = displayNameQueryHandler;
 		this.postHashtagMapper = postHashtagMapper;
 		this.postMediaMapper = postMediaMapper;
-		this.tripSnapshotChecker = tripSnapshotChecker;
+		this.snapshotCodec = snapshotCodec;
 		this.postLikeMapper = postLikeMapper;
 		this.communityCommentMapper = communityCommentMapper;
 		this.mediaFileQueryService = mediaFileQueryService;
@@ -86,8 +86,7 @@ public class CommunityPostAssembler {
 			&& postLikeMapper.existsByPostIdAndUserId(post.id(), viewerUserId);
 
 		CommunityPostSnapshot snapshot = includeSnapshot
-			? tripSnapshotChecker.fetchSnapshot(
-				post.sourceTripId(), post.sourceTripVersion(), post.publishedByUserId())
+			? snapshotCodec.decode(post.snapshotJson())
 			: new CommunityPostSnapshot(List.of(), List.of(), null);
 
 		return new CommunityPostDetail(
