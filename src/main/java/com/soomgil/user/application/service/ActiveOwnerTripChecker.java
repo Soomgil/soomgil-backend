@@ -8,8 +8,7 @@ import java.util.UUID;
  * <p>계정 삭제({@code DELETE /me})는 MVP에서 OWNER 이관을 지원하지 않으므로,
  * 활성 OWNER 여행방이 있으면 삭제 예약을 차단한다({@code api_spec.md} 4.1.3 절).
  *
- * <p>trip 모듈(김지훈)이 구현되기 전까지는 {@code false}를 반환하는 기본 구현체
- * ({@code NoOpActiveOwnerTripChecker})를 사용한다. trip 모듈 완성 후 실제 구현체로 교체한다.
+	* <p>구현체는 trip 모듈의 조회 계약을 사용하며 user 모듈이 trip persistence를 직접 읽지 않는다.
  */
 public interface ActiveOwnerTripChecker {
 
