@@ -10,6 +10,7 @@ import com.soomgil.social.api.dto.FollowStatus;
 import com.soomgil.social.application.port.SocialFollowRepository;
 import com.soomgil.social.domain.model.SocialFollowRecord;
 import com.soomgil.social.domain.model.SocialFollowRequestRecord;
+import com.soomgil.social.domain.model.SocialFollowUserRecord;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -66,10 +67,36 @@ class SocialFollowServiceTest {
 		assertThat(result.page().totalElements()).isEqualTo(1);
 	}
 
+	@Test
+	void returnsPublicFollowerAndFollowingPages() {
+		repository.visibility = "PUBLIC";
+		repository.users = List.of(new SocialFollowUserRecord(TARGET, "Traveler", null));
+		repository.total = 1;
+
+		var followers = service.listFollowers(null, CURRENT, 0, 20);
+		var following = service.listFollowing(null, CURRENT, 0, 20);
+
+		assertThat(followers.items()).extracting("displayName").containsExactly("Traveler");
+		assertThat(following.items()).extracting("displayName").containsExactly("Traveler");
+		assertThat(followers.page().totalElements()).isEqualTo(1);
+	}
+
+	@Test
+	void hidesPrivateFollowListsFromOtherUsersButAllowsOwner() {
+		repository.visibility = "PRIVATE";
+
+		assertThatThrownBy(() -> service.listFollowers(CURRENT, TARGET, 0, 20))
+			.isInstanceOfSatisfying(BusinessException.class, exception ->
+				assertThat(exception.errorCode()).isEqualTo(ErrorCode.FORBIDDEN));
+
+		assertThat(service.listFollowers(TARGET, TARGET, 0, 20).items()).isEmpty();
+	}
+
 	private static final class FakeRepository implements SocialFollowRepository {
 		private String visibility;
 		private SocialFollowRecord follow;
 		private List<SocialFollowRequestRecord> requests = List.of();
+		private List<SocialFollowUserRecord> users = List.of();
 		private long total;
 
 		@Override
@@ -109,6 +136,26 @@ class SocialFollowServiceTest {
 
 		@Override
 		public long countPending(UUID followingId) {
+			return total;
+		}
+
+		@Override
+		public List<SocialFollowUserRecord> findFollowers(UUID userId, int offset, int size) {
+			return users;
+		}
+
+		@Override
+		public long countFollowers(UUID userId) {
+			return total;
+		}
+
+		@Override
+		public List<SocialFollowUserRecord> findFollowing(UUID userId, int offset, int size) {
+			return users;
+		}
+
+		@Override
+		public long countFollowing(UUID userId) {
 			return total;
 		}
 	}

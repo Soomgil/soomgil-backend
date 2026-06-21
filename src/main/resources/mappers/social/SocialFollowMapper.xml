@@ -21,6 +21,14 @@
     </constructor>
   </resultMap>
 
+  <resultMap id="userSummaryMap" type="com.soomgil.social.domain.model.SocialFollowUserRecord">
+    <constructor>
+      <arg column="user_id" javaType="java.util.UUID"/>
+      <arg column="display_name" javaType="java.lang.String"/>
+      <arg column="profile_image_url" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+
   <select id="findProfileVisibility" resultType="string">
     SELECT profile_visibility FROM auth.user_profiles WHERE user_id = #{userId}
   </select>
@@ -63,5 +71,35 @@
   <select id="countPending" resultType="long">
     SELECT COUNT(*) FROM social.user_follows
     WHERE following_user_id = #{followingId} AND status = 'PENDING' AND deleted_at IS NULL
+  </select>
+
+  <select id="findFollowers" resultMap="userSummaryMap">
+    SELECT profile.user_id, profile.display_name, profile.profile_image_url
+    FROM social.user_follows follow
+    JOIN auth.user_profiles profile ON profile.user_id = follow.follower_user_id
+    WHERE follow.following_user_id = #{userId}
+      AND follow.status = 'ACTIVE' AND follow.deleted_at IS NULL
+    ORDER BY follow.created_at DESC, follow.follower_user_id
+    LIMIT #{size} OFFSET #{offset}
+  </select>
+
+  <select id="countFollowers" resultType="long">
+    SELECT COUNT(*) FROM social.user_follows
+    WHERE following_user_id = #{userId} AND status = 'ACTIVE' AND deleted_at IS NULL
+  </select>
+
+  <select id="findFollowing" resultMap="userSummaryMap">
+    SELECT profile.user_id, profile.display_name, profile.profile_image_url
+    FROM social.user_follows follow
+    JOIN auth.user_profiles profile ON profile.user_id = follow.following_user_id
+    WHERE follow.follower_user_id = #{userId}
+      AND follow.status = 'ACTIVE' AND follow.deleted_at IS NULL
+    ORDER BY follow.created_at DESC, follow.following_user_id
+    LIMIT #{size} OFFSET #{offset}
+  </select>
+
+  <select id="countFollowing" resultType="long">
+    SELECT COUNT(*) FROM social.user_follows
+    WHERE follower_user_id = #{userId} AND status = 'ACTIVE' AND deleted_at IS NULL
   </select>
 </mapper>

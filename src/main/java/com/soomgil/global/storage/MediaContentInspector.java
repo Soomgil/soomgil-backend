@@ -8,7 +8,7 @@ import java.util.Arrays;
  *
  * <p>클라이언트가 지정한 {@code Content-Type}만 신뢰하지 않고 완료 등록 시 교차 검증하는 데 사용한다.
  */
-public final class MediaContentInspector {
+public class MediaContentInspector {
 
 	private static final byte[] PNG = new byte[] {(byte) 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a};
 

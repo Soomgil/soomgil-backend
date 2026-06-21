@@ -16,6 +16,9 @@ import com.soomgil.social.api.dto.Follow;
 import com.soomgil.social.api.dto.FollowStatus;
 import com.soomgil.social.api.dto.PagedFollowRequest;
 import com.soomgil.social.application.SocialFollowService;
+import com.soomgil.user.api.dto.PagedUserSummary;
+import com.soomgil.user.api.dto.UserSummary;
+import java.net.URI;
 import java.security.Principal;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -63,6 +66,24 @@ class SocialControllerTest {
 
 		verify(service).reject(CURRENT, TARGET);
 		verify(service).unfollow(CURRENT, TARGET);
+	}
+
+	@Test
+	void listsFollowersAndFollowingWithPagination() throws Exception {
+		PagedUserSummary page = new PagedUserSummary(
+			List.of(new UserSummary(TARGET, "Traveler", URI.create("https://example.com/profile.jpg"))),
+			new PageMeta(0, 20, 1L, 1, List.of())
+		);
+		when(service.listFollowers(CURRENT, TARGET, 0, 20)).thenReturn(page);
+		when(service.listFollowing(CURRENT, TARGET, 0, 20)).thenReturn(page);
+
+		mockMvc.perform(get("/api/v1/users/{userId}/followers", TARGET).principal(principal()))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.items[0].displayName").value("Traveler"))
+			.andExpect(jsonPath("$.page.totalElements").value(1));
+		mockMvc.perform(get("/api/v1/users/{userId}/following", TARGET).principal(principal()))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.items[0].id").value(TARGET.toString()));
 	}
 
 	private Principal principal() {

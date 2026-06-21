@@ -48,11 +48,24 @@ class SecurityConfigWebMvcTest {
 			.andExpect(status().isOk());
 	}
 
+	@Test
+	void allowsPublicFollowListsWithoutAuthentication() throws Exception {
+		mockMvc.perform(get("/api/v1/users/10000000-0000-0000-0000-000000000001/followers"))
+			.andExpect(status().isOk());
+		mockMvc.perform(get("/api/v1/users/10000000-0000-0000-0000-000000000001/following"))
+			.andExpect(status().isOk());
+	}
+
 	@RestController
 	static class AdminTestController {
 
 		@GetMapping("/api/v1/admin/test")
 		String adminOnly() {
+			return "ok";
+		}
+
+		@GetMapping({"/api/v1/users/{userId}/followers", "/api/v1/users/{userId}/following"})
+		String publicFollowLists() {
 			return "ok";
 		}
 	}

@@ -2,6 +2,7 @@ package com.soomgil.social.application.port;
 
 import com.soomgil.social.domain.model.SocialFollowRecord;
 import com.soomgil.social.domain.model.SocialFollowRequestRecord;
+import com.soomgil.social.domain.model.SocialFollowUserRecord;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -22,4 +23,12 @@ public interface SocialFollowRepository {
 	List<SocialFollowRequestRecord> findPending(UUID followingId, int offset, int size);
 
 	long countPending(UUID followingId);
+
+	List<SocialFollowUserRecord> findFollowers(UUID userId, int offset, int size);
+
+	long countFollowers(UUID userId);
+
+	List<SocialFollowUserRecord> findFollowing(UUID userId, int offset, int size);
+
+	long countFollowing(UUID userId);
 }
