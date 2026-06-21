@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.Test;
+import org.springframework.aop.framework.ProxyFactory;
 
 class MediaContentInspectorTest {
 
@@ -22,5 +23,16 @@ class MediaContentInspectorTest {
 	@Test
 	void returnsNullForUnknownContent() {
 		assertThat(inspector.detect("plain text".getBytes(StandardCharsets.UTF_8))).isNull();
+	}
+
+	@Test
+	void supportsClassBasedObservabilityProxy() {
+		ProxyFactory proxyFactory = new ProxyFactory(inspector);
+		proxyFactory.setProxyTargetClass(true);
+
+		MediaContentInspector proxy = (MediaContentInspector) proxyFactory.getProxy();
+
+		assertThat(proxy.detect(new byte[] {(byte) 0xff, (byte) 0xd8, (byte) 0xff}))
+			.isEqualTo("image/jpeg");
 	}
 }
