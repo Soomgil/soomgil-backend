@@ -65,8 +65,8 @@ public interface NoteMapper {
 		FROM planning.trip_notes
 		WHERE trip_id = #{tripId}
 		  AND scope_type = #{scopeType}
-		  AND (itinerary_day_id = #{itineraryDayId}
-		       OR (itinerary_day_id IS NULL AND #{itineraryDayId} IS NULL))
+		  AND itinerary_day_id IS NOT DISTINCT FROM
+		      CAST(#{itineraryDayId,jdbcType=OTHER} AS uuid)
 		  AND deleted_at IS NULL
 		""")
 	Optional<NoteRecord> findByTripScopeDay(

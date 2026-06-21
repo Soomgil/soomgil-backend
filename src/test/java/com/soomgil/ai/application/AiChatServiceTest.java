@@ -15,6 +15,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 class AiChatServiceTest {
@@ -22,10 +23,11 @@ class AiChatServiceTest {
 	private final TripAccessGuard accessGuard = mock(TripAccessGuard.class);
 	private final AiChatMapper mapper = mock(AiChatMapper.class);
 	private final AiGuideModel model = mock(AiGuideModel.class);
+	private final AiTripContextService contextService = mock(AiTripContextService.class);
 	private final FindDisplayNameQueryHandler displayNameHandler = mock(FindDisplayNameQueryHandler.class);
 	private final SimpMessagingTemplate messagingTemplate = mock(SimpMessagingTemplate.class);
 	private final AiChatService service = new AiChatService(
-		accessGuard, mapper, model, displayNameHandler, messagingTemplate
+		accessGuard, mapper, model, contextService, displayNameHandler, messagingTemplate
 	);
 
 	@Test
@@ -36,6 +38,8 @@ class AiChatServiceTest {
 		AiChatSessionRow session = new AiChatSessionRow(sessionId, tripId, "ACTIVE", null, null, Instant.now());
 		when(mapper.findSessionByTripId(tripId)).thenReturn(session);
 		when(mapper.findRecentMessages(sessionId, 20)).thenReturn(List.of());
+		AiTripContext tripContext = mock(AiTripContext.class);
+		when(contextService.load(tripId, userId)).thenReturn(tripContext);
 		when(model.reply(any())).thenReturn(new AiGuideReply("비 오는 날에는 박물관을 추천해요.", List.of()));
 		when(mapper.findMessageById(any())).thenAnswer(invocation -> new AiChatMessageRow(
 			invocation.getArgument(0), sessionId, null, "ASSISTANT",
@@ -55,5 +59,8 @@ class AiChatServiceTest {
 		verify(messagingTemplate).convertAndSend(
 			org.mockito.ArgumentMatchers.eq("/topic/trips/" + tripId + "/ai"), any(Object.class)
 		);
+		ArgumentCaptor<AiGuideRequest> requestCaptor = ArgumentCaptor.forClass(AiGuideRequest.class);
+		verify(model).reply(requestCaptor.capture());
+		assertThat(requestCaptor.getValue().tripContext()).isSameAs(tripContext);
 	}
 }

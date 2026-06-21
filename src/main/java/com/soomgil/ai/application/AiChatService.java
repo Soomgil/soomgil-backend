@@ -35,6 +35,7 @@ public class AiChatService {
 	private final TripAccessGuard accessGuard;
 	private final AiChatMapper mapper;
 	private final AiGuideModel model;
+	private final AiTripContextService contextService;
 	private final FindDisplayNameQueryHandler displayNameHandler;
 	private final SimpMessagingTemplate messagingTemplate;
 
@@ -42,12 +43,14 @@ public class AiChatService {
 		TripAccessGuard accessGuard,
 		AiChatMapper mapper,
 		AiGuideModel model,
+		AiTripContextService contextService,
 		FindDisplayNameQueryHandler displayNameHandler,
 		SimpMessagingTemplate messagingTemplate
 	) {
 		this.accessGuard = Objects.requireNonNull(accessGuard);
 		this.mapper = Objects.requireNonNull(mapper);
 		this.model = Objects.requireNonNull(model);
+		this.contextService = Objects.requireNonNull(contextService);
 		this.displayNameHandler = Objects.requireNonNull(displayNameHandler);
 		this.messagingTemplate = Objects.requireNonNull(messagingTemplate);
 	}
@@ -98,8 +101,10 @@ public class AiChatService {
 			.toList());
 		UUID requestMessageId = UUID.randomUUID();
 		mapper.insertMessage(requestMessageId, session.id(), userId, AiMessageRole.USER.name(), question, Instant.now());
+		AiTripContext tripContext = contextService.load(tripId, userId);
 		AiGuideReply reply = model.reply(new AiGuideRequest(
-			tripId, userId, session.id(), requestMessageId, session.summary(), recent, question, baseVersion, viewport
+			tripId, userId, session.id(), requestMessageId, session.summary(), recent,
+			question, baseVersion, viewport, tripContext
 		));
 		String answer = reply.content();
 		if (answer == null || answer.isBlank()) {
