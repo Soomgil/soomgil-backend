@@ -23,6 +23,15 @@ public interface TripCommandRepository {
 	 */
 	void saveCreatedTrip(Trip trip, TripMember initialMember, List<String> legalRegionCodes);
 
+	default void saveCreatedRetrip(
+		Trip trip,
+		TripMember initialMember,
+		UUID sourcePostId,
+		int snapshotVersion
+	) {
+		throw new UnsupportedOperationException("Retrip persistence is not implemented.");
+	}
+
 	/**
 	 * 여행방 초대를 저장한다.
 	 *

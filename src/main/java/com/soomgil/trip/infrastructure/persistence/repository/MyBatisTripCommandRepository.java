@@ -64,6 +64,23 @@ public class MyBatisTripCommandRepository implements TripCommandRepository {
 	}
 
 	@Override
+	public void saveCreatedRetrip(
+		Trip trip,
+		TripMember initialMember,
+		UUID sourcePostId,
+		int snapshotVersion
+	) {
+		mapper.insertTrip(new TripRow(
+			trip.id(), trip.ownerUserId(), trip.title(), trip.displayDestination(), trip.status().name(),
+			trip.itineraryVersion(), sourcePostId, snapshotVersion, trip.createdAt(), trip.createdAt(), null
+		));
+		mapper.insertTripMember(new TripMemberRow(
+			initialMember.id(), initialMember.tripId(), initialMember.userId(), initialMember.role().name(),
+			initialMember.status().name(), initialMember.joinedAt(), null, null
+		));
+	}
+
+	@Override
 	public void saveTripInvite(TripInvite invite) {
 		mapper.insertTripInvite(new TripInviteRow(
 			invite.id(),
