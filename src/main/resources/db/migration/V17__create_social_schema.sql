@@ -12,6 +12,8 @@ CREATE TABLE social.user_follows (
     created_at        timestamptz NOT NULL DEFAULT now(),
     updated_at        timestamptz NOT NULL DEFAULT now(),
     deleted_at        timestamptz,
+    CONSTRAINT user_follows_no_self_check CHECK (follower_user_id <> following_user_id),
+    CONSTRAINT user_follows_status_check CHECK (status IN ('PENDING', 'ACTIVE', 'DELETED')),
     PRIMARY KEY (follower_user_id, following_user_id)
 );
 

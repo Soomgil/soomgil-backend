@@ -22,7 +22,7 @@ import com.soomgil.user.application.command.UpdateMeCommand;
 import com.soomgil.user.domain.model.UserProfileRecord;
 import com.soomgil.user.infrastructure.persistence.UserMeMapper;
 import com.soomgil.user.infrastructure.persistence.UserMeSettingsMapper;
-import com.soomgil.media.infrastructure.persistence.MediaFileMapper;
+import com.soomgil.media.infrastructure.persistence.MediaFileLookupMapper;
 import com.soomgil.media.infrastructure.persistence.MediaFileRecord;
 import java.time.Instant;
 import java.util.Optional;
@@ -39,7 +39,7 @@ class UpdateMeCommandHandlerTest {
 	private final UserMeSettingsMapper settingsMapper = mock(UserMeSettingsMapper.class);
 	private final UserMapper authUserMapper = mock(UserMapper.class);
 	private final EmailAddressMapper emailAddressMapper = mock(EmailAddressMapper.class);
-	private final MediaFileMapper mediaFileMapper = mock(MediaFileMapper.class);
+	private final MediaFileLookupMapper mediaFileMapper = mock(MediaFileLookupMapper.class);
 	private final UpdateMeCommandHandler handler = new UpdateMeCommandHandler(
 		userMeMapper, settingsMapper, authUserMapper, emailAddressMapper, mediaFileMapper
 	);

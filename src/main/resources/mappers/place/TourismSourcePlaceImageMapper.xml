@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+	PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+	"https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.soomgil.place.infrastructure.persistence.mapper.TourismSourcePlaceImageMapper">
+
+	<resultMap id="PlaceImageRowMap" type="com.soomgil.place.infrastructure.persistence.row.TourismSourcePlaceImageRow">
+		<constructor>
+			<arg column="image_type" javaType="java.lang.String"/>
+			<arg column="public_url" javaType="java.lang.String"/>
+			<arg column="source_type" javaType="java.lang.String"/>
+			<arg column="display_order" javaType="java.lang.Integer"/>
+			<arg column="width" javaType="java.lang.Integer"/>
+			<arg column="height" javaType="java.lang.Integer"/>
+		</constructor>
+	</resultMap>
+
+	<select id="findNormalImages" resultMap="PlaceImageRowMap">
+		SELECT
+			'GENERAL' AS image_type,
+			ai.public_url,
+			ai.source_type,
+			ai.display_order,
+			ai.width,
+			ai.height
+		FROM tourism_source.attractions a
+		JOIN tourism_source.attraction_images ai ON ai.attraction_no = a.no
+		WHERE CAST(a.content_id AS text) = #{contentId}
+			AND ai.is_active = true
+			AND nullif(ai.public_url, '') IS NOT NULL
+		ORDER BY ai.display_order ASC, ai.created_at ASC, ai.id ASC
+		LIMIT 4
+	</select>
+
+	<select id="findAwardImage" resultMap="PlaceImageRowMap">
+		WITH target_attraction AS (
+			SELECT no, area_code, si_gun_gu_code
+			FROM tourism_source.attractions
+			WHERE CAST(content_id AS text) = #{contentId}
+			LIMIT 1
+		),
+		award_candidates AS (
+			SELECT
+				'AWARD' AS image_type,
+				p.public_url,
+				'CONTEST_AWARD' AS source_type,
+				5 AS display_order,
+				p.width,
+				p.height,
+				1 AS match_priority,
+				p.award_year,
+				p.award_rank,
+				p.created_at
+			FROM target_attraction t
+			JOIN tourism_source.contest_award_photo_matches m ON m.attraction_no = t.no
+			JOIN tourism_source.contest_award_photos p ON p.id = m.photo_id
+			WHERE m.match_scope = 'ATTRACTION'
+				AND m.match_status = 'SELECTED'
+				AND m.is_selected = true
+				AND p.upload_status = 'UPLOADED'
+				AND p.rights_status = 'APPROVED'
+				AND nullif(p.object_key, '') IS NOT NULL
+				AND nullif(p.public_url, '') IS NOT NULL
+			UNION ALL
+			SELECT
+				'AWARD' AS image_type,
+				p.public_url,
+				'CONTEST_AWARD' AS source_type,
+				5 AS display_order,
+				p.width,
+				p.height,
+				2 AS match_priority,
+				p.award_year,
+				p.award_rank,
+				p.created_at
+			FROM target_attraction t
+			JOIN tourism_source.contest_award_photo_matches m ON m.sido_code = t.area_code
+				AND (m.gugun_code IS NULL OR m.gugun_code = t.si_gun_gu_code)
+			JOIN tourism_source.contest_award_photos p ON p.id = m.photo_id
+			WHERE m.match_scope = 'REGION'
+				AND m.match_status = 'SELECTED'
+				AND m.is_selected = true
+				AND p.upload_status = 'UPLOADED'
+				AND p.rights_status = 'APPROVED'
+				AND nullif(p.object_key, '') IS NOT NULL
+				AND nullif(p.public_url, '') IS NOT NULL
+		)
+		SELECT
+			image_type,
+			public_url,
+			source_type,
+			display_order,
+			width,
+			height
+		FROM award_candidates
+		ORDER BY match_priority ASC, award_year DESC, award_rank ASC, created_at DESC
+		LIMIT 1
+	</select>
+</mapper>

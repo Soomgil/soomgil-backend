@@ -6,6 +6,7 @@ import java.net.URI;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
+/** 검증을 마친 media file의 공개 가능한 metadata 응답. */
 public record MediaFile(
 	@NotNull
 	UUID id,

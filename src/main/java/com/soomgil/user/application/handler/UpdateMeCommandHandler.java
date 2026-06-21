@@ -18,7 +18,7 @@ import com.soomgil.user.domain.model.UserSettingsRecord;
 import com.soomgil.user.domain.policy.UserProfilePolicy;
 import com.soomgil.user.infrastructure.persistence.UserMeMapper;
 import com.soomgil.user.infrastructure.persistence.UserMeSettingsMapper;
-import com.soomgil.media.infrastructure.persistence.MediaFileMapper;
+import com.soomgil.media.infrastructure.persistence.MediaFileLookupMapper;
 import com.soomgil.media.infrastructure.persistence.MediaFileRecord;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -50,14 +50,14 @@ public class UpdateMeCommandHandler implements CommandHandler<UpdateMeCommand, U
 	private final UserMeSettingsMapper userSettingsMapper;
 	private final UserMapper userMapper;
 	private final EmailAddressMapper emailAddressMapper;
-	private final MediaFileMapper mediaFileMapper;
+	private final MediaFileLookupMapper mediaFileMapper;
 
 	public UpdateMeCommandHandler(
 		UserMeMapper userMeMapper,
 		UserMeSettingsMapper userSettingsMapper,
 		UserMapper userMapper,
 		EmailAddressMapper emailAddressMapper,
-		MediaFileMapper mediaFileMapper
+		MediaFileLookupMapper mediaFileMapper
 	) {
 		this.userMeMapper = userMeMapper;
 		this.userSettingsMapper = userSettingsMapper;

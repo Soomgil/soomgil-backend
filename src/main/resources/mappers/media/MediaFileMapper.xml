@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.soomgil.media.infrastructure.persistence.mapper.MediaFileMapper">
+  <insert id="insert">
+    INSERT INTO media.media_files (
+      id, owner_user_id, storage_provider, bucket, object_key, public_url, mime_type, byte_size,
+      width, height, linked_resource_type, linked_resource_id, status, created_at, deleted_at, purge_after_at
+    ) VALUES (
+      #{id}, #{ownerUserId}, #{storageProvider}, #{bucket}, #{objectKey}, #{publicUrl}, #{mimeType}, #{byteSize},
+      #{width}, #{height}, #{linkedResourceType}, #{linkedResourceId}, #{status}, #{createdAt}, #{deletedAt}, #{purgeAfterAt}
+    )
+  </insert>
+
+  <select id="findById" resultType="com.soomgil.media.infrastructure.persistence.row.MediaFileRow">
+    SELECT id, owner_user_id, storage_provider, bucket, object_key, public_url, mime_type, byte_size,
+           width, height, linked_resource_type, linked_resource_id, status, created_at, deleted_at, purge_after_at
+    FROM media.media_files
+    WHERE id = #{mediaFileId}
+  </select>
+
+  <update id="markDeleted">
+    UPDATE media.media_files
+    SET status = 'DELETED', deleted_at = #{deletedAt}, purge_after_at = #{purgeAfter}
+    WHERE id = #{mediaFileId} AND status = 'ACTIVE'
+  </update>
+
+  <select id="countAccessibleTripRecord" resultType="long">
+    SELECT COUNT(*)
+    FROM record.trip_record_entries record_entry
+    JOIN trip.trips trip_row ON trip_row.id = record_entry.trip_id AND trip_row.status = 'ACTIVE'
+    LEFT JOIN trip.trip_members member
+      ON member.trip_id = trip_row.id AND member.user_id = #{userId} AND member.status = 'ACTIVE'
+    WHERE record_entry.id = #{recordId}
+      AND record_entry.status = 'ACTIVE'
+      AND (trip_row.owner_user_id = #{userId} OR member.id IS NOT NULL)
+  </select>
+</mapper>

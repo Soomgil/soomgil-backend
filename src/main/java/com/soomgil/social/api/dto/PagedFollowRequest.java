@@ -5,6 +5,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import java.util.List;
 
+/** PENDING follow 요청의 0 기반 page 응답. */
 public record PagedFollowRequest(
 	@Valid
 	@NotNull

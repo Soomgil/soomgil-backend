@@ -60,6 +60,9 @@ mybatis:
     map-underscore-to-camel-case: true
 
 soomgil:
+  kto:
+    base-url: ${KTO_API_BASE_URL:https://apis.data.go.kr/B551011/KorService2}
+    api-key: ${KTO_API_KEY:}
   mapbox:
     base-url: ${MAPBOX_BASE_URL:https://api.mapbox.com}
     access-token: ${MAPBOX_ACCESS_TOKEN:}
@@ -90,3 +93,24 @@ soomgil:
       bucket: ${S3_BUCKET:soomgil-local}
       access-key: ${S3_ACCESS_KEY:soomgil}
       secret-key: ${S3_SECRET_KEY:change-me-change-me}
+      public-base-url: ${S3_PUBLIC_BASE_URL:}
+  preference:
+    statistics:
+      alpha: ${PREFERENCE_STATISTICS_ALPHA:100}
+    tag-selection:
+      minimum-confidence: ${PREFERENCE_TAG_MIN_CONFIDENCE:0.55}
+      maximum-confirmed-tags: ${PREFERENCE_TAG_MAX_CONFIRMED:10}
+    recommendation:
+      matched-member-lift-threshold: ${PREFERENCE_MATCHED_MEMBER_LIFT:0.15}
+    synthetic-persona:
+      required-count: ${PREFERENCE_SYNTHETIC_PERSONA_COUNT:50}
+      maximum-noise-rate: ${PREFERENCE_SYNTHETIC_MAX_NOISE_RATE:0.05}
+      hard-preference-strength: ${PREFERENCE_SYNTHETIC_HARD_STRENGTH:1.50}
+      soft-preference-strength: ${PREFERENCE_SYNTHETIC_SOFT_STRENGTH:0.60}
+      super-like-threshold: ${PREFERENCE_SYNTHETIC_SUPER_LIKE_THRESHOLD:1.20}
+      like-threshold: ${PREFERENCE_SYNTHETIC_LIKE_THRESHOLD:0.35}
+      nope-threshold: ${PREFERENCE_SYNTHETIC_NOPE_THRESHOLD:-0.35}
+      minimum-core-tag-reaction-count: ${PREFERENCE_SYNTHETIC_MIN_CORE_TAG_REACTIONS:50}
+    real-user:
+      minimum-total-reaction-count: ${PREFERENCE_REAL_MIN_TOTAL_REACTIONS:10000}
+      minimum-core-tag-reaction-count: ${PREFERENCE_REAL_MIN_CORE_TAG_REACTIONS:100}

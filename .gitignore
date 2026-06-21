@@ -154,6 +154,7 @@ surefire-reports/
 failsafe-reports/
 
 # Local environment
+.venv/
 .env
 .env.*
 !.env.example
@@ -205,3 +206,9 @@ compose.override.yaml
 src/main/resources/*
 src/main/resources/application.yml
 src/main/resources/application-prod.yml
+!src/main/resources/db/
+!src/main/resources/db/**
+!src/main/resources/mappers/
+!src/main/resources/mappers/**
+!src/main/resources/tourism-source/
+!src/main/resources/tourism-source/**

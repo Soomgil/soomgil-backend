@@ -1,7 +1,7 @@
 package com.soomgil.media.application;
 
 import com.soomgil.media.api.dto.MediaFile;
-import com.soomgil.media.infrastructure.persistence.MediaFileMapper;
+import com.soomgil.media.infrastructure.persistence.MediaFileLookupMapper;
 import com.soomgil.media.infrastructure.persistence.MediaFileRecord;
 import java.net.URI;
 import java.time.OffsetDateTime;
@@ -20,9 +20,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class MediaFileQueryService {
 
-	private final MediaFileMapper mediaFileMapper;
+	private final MediaFileLookupMapper mediaFileMapper;
 
-	public MediaFileQueryService(MediaFileMapper mediaFileMapper) {
+	public MediaFileQueryService(MediaFileLookupMapper mediaFileMapper) {
 		this.mediaFileMapper = Objects.requireNonNull(mediaFileMapper, "mediaFileMapper must not be null");
 	}
 

@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.soomgil.social.infrastructure.persistence.mapper.SocialFollowMapper">
+  <resultMap id="followMap" type="com.soomgil.social.domain.model.SocialFollowRecord">
+    <constructor>
+      <arg column="follower_user_id" javaType="java.util.UUID"/>
+      <arg column="following_user_id" javaType="java.util.UUID"/>
+      <arg column="status" javaType="java.lang.String"/>
+      <arg column="created_at" javaType="java.time.Instant"/>
+      <arg column="updated_at" javaType="java.time.Instant"/>
+      <arg column="deleted_at" javaType="java.time.Instant"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="requestMap" type="com.soomgil.social.domain.model.SocialFollowRequestRecord">
+    <constructor>
+      <arg column="follower_user_id" javaType="java.util.UUID"/>
+      <arg column="display_name" javaType="java.lang.String"/>
+      <arg column="profile_image_url" javaType="java.lang.String"/>
+      <arg column="created_at" javaType="java.time.Instant"/>
+    </constructor>
+  </resultMap>
+
+  <select id="findProfileVisibility" resultType="string">
+    SELECT profile_visibility FROM auth.user_profiles WHERE user_id = #{userId}
+  </select>
+
+  <insert id="upsert">
+    INSERT INTO social.user_follows (follower_user_id, following_user_id, status, created_at, updated_at, deleted_at)
+    VALUES (#{followerId}, #{followingId}, #{status}, #{now}, #{now}, NULL)
+    ON CONFLICT (follower_user_id, following_user_id) DO UPDATE
+    SET status = EXCLUDED.status, updated_at = EXCLUDED.updated_at, deleted_at = NULL
+  </insert>
+
+  <select id="find" resultMap="followMap">
+    SELECT follower_user_id, following_user_id, status, created_at, updated_at, deleted_at
+    FROM social.user_follows
+    WHERE follower_user_id = #{followerId} AND following_user_id = #{followingId}
+  </select>
+
+  <update id="activatePending">
+    UPDATE social.user_follows SET status = 'ACTIVE', updated_at = #{now}, deleted_at = NULL
+    WHERE follower_user_id = #{followerId} AND following_user_id = #{followingId}
+      AND status = 'PENDING' AND deleted_at IS NULL
+  </update>
+
+  <update id="delete">
+    UPDATE social.user_follows SET status = 'DELETED', updated_at = #{now}, deleted_at = #{now}
+    WHERE follower_user_id = #{followerId} AND following_user_id = #{followingId}
+      AND status != 'DELETED' AND deleted_at IS NULL
+      <if test="requiredStatus != null">AND status = #{requiredStatus}</if>
+  </update>
+
+  <select id="findPending" resultMap="requestMap">
+    SELECT follow.follower_user_id, profile.display_name, profile.profile_image_url, follow.created_at
+    FROM social.user_follows follow
+    JOIN auth.user_profiles profile ON profile.user_id = follow.follower_user_id
+    WHERE follow.following_user_id = #{followingId} AND follow.status = 'PENDING' AND follow.deleted_at IS NULL
+    ORDER BY follow.created_at DESC, follow.follower_user_id
+    LIMIT #{size} OFFSET #{offset}
+  </select>
+
+  <select id="countPending" resultType="long">
+    SELECT COUNT(*) FROM social.user_follows
+    WHERE following_user_id = #{followingId} AND status = 'PENDING' AND deleted_at IS NULL
+  </select>
+</mapper>

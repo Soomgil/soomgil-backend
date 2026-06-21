@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+	PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+	"https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.soomgil.tourismsource.matching.infrastructure.TourismSourceContestAwardPhotoMatchingMapper">
+
+	<resultMap id="PhotoRowMap" type="com.soomgil.tourismsource.matching.infrastructure.TourismSourceContestAwardPhotoRow">
+		<constructor>
+			<arg column="title" javaType="java.lang.String"/>
+			<arg column="original_file_name" javaType="java.lang.String"/>
+			<arg column="extracted_region_text" javaType="java.lang.String"/>
+		</constructor>
+	</resultMap>
+
+	<resultMap id="RegionAliasRowMap" type="com.soomgil.tourismsource.matching.infrastructure.TourismSourceRegionAliasRow">
+		<constructor>
+			<arg column="normalized_alias" javaType="java.lang.String"/>
+			<arg column="sido_code" javaType="java.lang.Integer"/>
+			<arg column="gugun_code" javaType="java.lang.Integer"/>
+		</constructor>
+	</resultMap>
+
+	<resultMap id="AttractionMatchRowMap" type="com.soomgil.tourismsource.matching.infrastructure.TourismSourceAttractionMatchRow">
+		<constructor>
+			<arg column="no" javaType="java.lang.Integer"/>
+			<arg column="title" javaType="java.lang.String"/>
+		</constructor>
+	</resultMap>
+
+	<select id="findPhoto" resultMap="PhotoRowMap">
+		SELECT
+			title,
+			original_file_name,
+			extracted_region_text
+		FROM tourism_source.contest_award_photos
+		WHERE id = CAST(#{photoId} AS uuid)
+	</select>
+
+	<select id="findActiveRegionAliases" resultMap="RegionAliasRowMap">
+		SELECT
+			normalized_alias,
+			sido_code,
+			gugun_code
+		FROM tourism_source.region_aliases
+		WHERE is_active = true
+		ORDER BY length(normalized_alias) DESC, normalized_alias ASC
+	</select>
+
+	<select id="findAttractions" resultMap="AttractionMatchRowMap">
+		SELECT
+			no,
+			title
+		FROM tourism_source.attractions
+		WHERE title IS NOT NULL
+		ORDER BY length(title) DESC, no ASC
+	</select>
+
+	<select id="existsSelectedMatch" resultType="boolean">
+		SELECT EXISTS (
+			SELECT 1
+			FROM tourism_source.contest_award_photo_matches
+			WHERE photo_id = CAST(#{photoId} AS uuid)
+				AND match_status = 'SELECTED'
+				AND is_selected = true
+		)
+	</select>
+
+	<delete id="deleteGeneratedMatches">
+		DELETE FROM tourism_source.contest_award_photo_matches
+		WHERE photo_id = CAST(#{photoId} AS uuid)
+			AND is_selected = false
+			AND match_method IN ('FILE_NAME_REGION', 'TITLE_TEXT', 'IMPORT_METADATA')
+	</delete>
+
+	<insert id="insertMatch" parameterType="com.soomgil.tourismsource.matching.infrastructure.TourismSourceContestAwardPhotoMatchInsertRow">
+		INSERT INTO tourism_source.contest_award_photo_matches (
+			id,
+			photo_id,
+			attraction_no,
+			sido_code,
+			gugun_code,
+			match_scope,
+			match_status,
+			match_method,
+			confidence,
+			is_selected,
+			rationale
+		)
+		VALUES (
+			CAST(#{id} AS uuid),
+			CAST(#{photoId} AS uuid),
+			#{attractionNo},
+			#{sidoCode},
+			#{gugunCode},
+			#{matchScope},
+			#{matchStatus},
+			#{matchMethod},
+			#{confidence},
+			#{selected},
+			#{rationale}
+		)
+	</insert>
+</mapper>

@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+	PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+	"https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.soomgil.place.infrastructure.persistence.mapper.TourismSourcePlaceSearchMapper">
+
+	<resultMap id="PlaceSearchRowMap" type="com.soomgil.place.infrastructure.persistence.row.TourismSourcePlaceSearchRow">
+		<constructor>
+			<arg column="content_id" javaType="java.lang.Integer"/>
+			<arg column="title" javaType="java.lang.String"/>
+			<arg column="address" javaType="java.lang.String"/>
+			<arg column="latitude" javaType="java.lang.Double"/>
+			<arg column="longitude" javaType="java.lang.Double"/>
+			<arg column="thumbnail_url" javaType="java.lang.String"/>
+			<arg column="category" javaType="java.lang.String"/>
+		</constructor>
+	</resultMap>
+
+	<sql id="SearchWhere">
+		<where>
+			<if test="q != null and q != ''">
+				AND (
+					lower(a.title) LIKE concat('%', lower(#{q}), '%')
+					OR lower(coalesce(a.addr1, '')) LIKE concat('%', lower(#{q}), '%')
+					OR lower(coalesce(a.addr2, '')) LIKE concat('%', lower(#{q}), '%')
+				)
+			</if>
+			<if test="bboxMinLng != null and bboxMinLat != null and bboxMaxLng != null and bboxMaxLat != null">
+				AND a.longitude BETWEEN #{bboxMinLng} AND #{bboxMaxLng}
+				AND a.latitude BETWEEN #{bboxMinLat} AND #{bboxMaxLat}
+			</if>
+			<if test="legalRegionCode != null and legalRegionCode != ''">
+				AND (
+					CAST(a.area_code AS text) = #{legalRegionCode}
+					OR CAST((a.area_code * 1000 + coalesce(a.si_gun_gu_code, 0)) AS text) = #{legalRegionCode}
+				)
+			</if>
+			<if test="category != null and category != ''">
+				AND (
+					CAST(a.content_type_id AS text) = #{category}
+					OR upper(ct.content_type_name) = upper(#{category})
+				)
+			</if>
+		</where>
+	</sql>
+
+	<select id="count" parameterType="com.soomgil.place.application.query.dto.PlaceSearchCriteria" resultType="long">
+		SELECT count(*)
+		FROM tourism_source.attractions a
+		LEFT JOIN tourism_source.contenttypes ct ON ct.content_type_id = a.content_type_id
+		<include refid="SearchWhere"/>
+	</select>
+
+	<select id="search" parameterType="com.soomgil.place.application.query.dto.PlaceSearchCriteria" resultMap="PlaceSearchRowMap">
+		SELECT
+			a.content_id,
+			a.title,
+			NULLIF(concat_ws(' ', a.addr1, a.addr2), '') AS address,
+			a.latitude,
+			a.longitude,
+			coalesce(image.public_url, a.first_image1, a.first_image2) AS thumbnail_url,
+			coalesce(ct.content_type_name, 'UNKNOWN') AS category
+		FROM tourism_source.attractions a
+		LEFT JOIN tourism_source.contenttypes ct ON ct.content_type_id = a.content_type_id
+		LEFT JOIN LATERAL (
+			SELECT ai.public_url
+			FROM tourism_source.attraction_images ai
+			WHERE ai.attraction_no = a.no
+				AND ai.is_active = true
+			ORDER BY ai.display_order ASC, ai.created_at ASC
+			LIMIT 1
+		) image ON true
+		<include refid="SearchWhere"/>
+		ORDER BY a.source_modified_at DESC NULLS LAST, a.imported_at DESC, a.no DESC
+		LIMIT #{size}
+		OFFSET (#{page} * #{size})
+	</select>
+
+	<select id="findViewportCandidates" parameterType="com.soomgil.place.application.query.dto.PlaceViewportCandidateCriteria" resultMap="PlaceSearchRowMap">
+		SELECT
+			a.content_id,
+			a.title,
+			NULLIF(concat_ws(' ', a.addr1, a.addr2), '') AS address,
+			a.latitude,
+			a.longitude,
+			coalesce(image.public_url, a.first_image1, a.first_image2) AS thumbnail_url,
+			coalesce(ct.content_type_name, 'UNKNOWN') AS category
+		FROM tourism_source.attractions a
+		LEFT JOIN tourism_source.contenttypes ct ON ct.content_type_id = a.content_type_id
+		LEFT JOIN LATERAL (
+			SELECT ai.public_url
+			FROM tourism_source.attraction_images ai
+			WHERE ai.attraction_no = a.no
+				AND ai.is_active = true
+			ORDER BY ai.display_order ASC, ai.created_at ASC
+			LIMIT 1
+		) image ON true
+		WHERE a.longitude BETWEEN #{bboxMinLng} AND #{bboxMaxLng}
+			AND a.latitude BETWEEN #{bboxMinLat} AND #{bboxMaxLat}
+			<if test="category != null and category != ''">
+				AND (
+					CAST(a.content_type_id AS text) = #{category}
+					OR upper(ct.content_type_name) = upper(#{category})
+				)
+			</if>
+		ORDER BY a.source_modified_at DESC NULLS LAST, a.imported_at DESC, a.no DESC
+		LIMIT #{limit}
+	</select>
+</mapper>

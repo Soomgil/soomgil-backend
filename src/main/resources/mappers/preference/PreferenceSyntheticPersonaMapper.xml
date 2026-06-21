@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+	PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+	"https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.soomgil.preference.infrastructure.persistence.mapper.PreferenceSyntheticPersonaMapper">
+
+	<resultMap id="SyntheticPlaceTagSourceRowMap"
+		type="com.soomgil.preference.infrastructure.persistence.row.SyntheticPlaceTagSourceRow">
+		<constructor>
+			<arg column="enrichment_id" javaType="java.lang.String"/>
+			<arg column="provider" javaType="java.lang.String"/>
+			<arg column="external_place_id" javaType="java.lang.String"/>
+			<arg column="tag_code" javaType="java.lang.String"/>
+			<arg column="confidence" javaType="java.math.BigDecimal"/>
+			<arg column="weight" javaType="java.math.BigDecimal"/>
+		</constructor>
+	</resultMap>
+
+	<insert id="upsertPersonas">
+		INSERT INTO preference.synthetic_personas (
+			id,
+			persona_key,
+			display_name,
+			description,
+			generator_version,
+			seed,
+			noise_rate,
+			is_active
+		)
+		VALUES
+		<foreach collection="rows" item="row" separator=",">
+			(
+				CAST(#{row.id} AS uuid),
+				#{row.personaKey},
+				#{row.displayName},
+				#{row.description},
+				#{row.generatorVersion},
+				#{row.seed},
+				#{row.noiseRate},
+				true
+			)
+		</foreach>
+		ON CONFLICT (generator_version, persona_key)
+		DO UPDATE SET
+			display_name = excluded.display_name,
+			description = excluded.description,
+			seed = excluded.seed,
+			noise_rate = excluded.noise_rate,
+			is_active = true,
+			updated_at = now()
+	</insert>
+
+	<delete id="deleteTagPreferences">
+		DELETE FROM preference.synthetic_persona_tag_preferences preference
+		USING preference.synthetic_personas persona
+		WHERE preference.persona_id = persona.id
+			AND persona.generator_version = #{generatorVersion}
+	</delete>
+
+	<insert id="insertTagPreferences">
+		INSERT INTO preference.synthetic_persona_tag_preferences (
+			persona_id,
+			tag_id,
+			preference_type,
+			preference_strength
+		)
+		SELECT
+			CAST(source.persona_id AS uuid),
+			tag.id,
+			source.preference_type,
+			CAST(source.preference_strength AS numeric)
+		FROM (
+			VALUES
+			<foreach collection="rows" item="row" separator=",">
+				(
+					#{row.personaId},
+					#{row.tagCode},
+					#{row.preferenceType},
+					#{row.preferenceStrength}
+				)
+			</foreach>
+		) AS source(persona_id, tag_code, preference_type, preference_strength)
+		JOIN preference.preference_tags tag
+			ON tag.code = source.tag_code
+			AND tag.is_active = true
+	</insert>
+
+	<select id="findPlaceTagSources" resultMap="SyntheticPlaceTagSourceRowMap">
+		WITH ranked_enrichments AS (
+			SELECT
+				enrichment.id,
+				enrichment.provider,
+				enrichment.external_place_id,
+				row_number() OVER (
+					PARTITION BY enrichment.provider, enrichment.external_place_id
+					ORDER BY
+						enrichment.enriched_at DESC NULLS LAST,
+						enrichment.updated_at DESC,
+						enrichment.id
+				) AS version_rank
+			FROM preference.place_tag_enrichments enrichment
+			WHERE enrichment.status = 'SUCCEEDED'
+		),
+		selected_enrichments AS (
+			SELECT id, provider, external_place_id
+			FROM ranked_enrichments
+			WHERE version_rank = 1
+			ORDER BY provider, external_place_id
+			LIMIT #{limit}
+		)
+		SELECT
+			CAST(enrichment.id AS text) AS enrichment_id,
+			enrichment.provider,
+			enrichment.external_place_id,
+			tag.code AS tag_code,
+			place_tag.confidence,
+			place_tag.weight
+		FROM selected_enrichments enrichment
+		JOIN preference.place_tag_enrichment_tags place_tag
+			ON place_tag.enrichment_id = enrichment.id
+		JOIN preference.preference_tags tag
+			ON tag.id = place_tag.tag_id
+			AND tag.is_active = true
+		ORDER BY
+			enrichment.provider,
+			enrichment.external_place_id,
+			place_tag.rank_order,
+			tag.code
+	</select>
+
+	<insert id="upsertEvents">
+		INSERT INTO preference.synthetic_swipe_events (
+			persona_id,
+			provider,
+			external_place_id,
+			reaction,
+			place_tag_enrichment_id,
+			generator_version,
+			seed,
+			persona_place_score
+		)
+		VALUES
+		<foreach collection="rows" item="row" separator=",">
+			(
+				CAST(#{row.personaId} AS uuid),
+				#{row.provider},
+				#{row.externalPlaceId},
+				#{row.reaction},
+				CAST(#{row.enrichmentId} AS uuid),
+				#{row.generatorVersion},
+				#{row.seed},
+				#{row.personaPlaceScore}
+			)
+		</foreach>
+		ON CONFLICT (persona_id, provider, external_place_id, generator_version, seed)
+		DO UPDATE SET
+			reaction = excluded.reaction,
+			place_tag_enrichment_id = excluded.place_tag_enrichment_id,
+			persona_place_score = excluded.persona_place_score,
+			generated_at = now()
+	</insert>
+</mapper>

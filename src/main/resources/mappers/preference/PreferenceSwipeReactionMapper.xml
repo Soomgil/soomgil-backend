@@ -1,0 +1,219 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+	PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+	"https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.soomgil.preference.infrastructure.persistence.mapper.PreferenceSwipeReactionMapper">
+
+	<resultMap id="UserPlaceReactionRowMap" type="com.soomgil.preference.infrastructure.persistence.row.UserPlaceReactionRow">
+		<constructor>
+			<arg column="id" javaType="java.lang.String"/>
+			<arg column="reaction" javaType="java.lang.String"/>
+			<arg column="place_tag_enrichment_id" javaType="java.lang.String"/>
+		</constructor>
+	</resultMap>
+
+	<resultMap id="PlaceTagEvidenceSourceRowMap"
+		type="com.soomgil.preference.infrastructure.persistence.row.PlaceTagEvidenceSourceRow">
+		<constructor>
+			<arg column="enrichment_id" javaType="java.lang.String"/>
+			<arg column="tag_id" javaType="java.lang.String"/>
+			<arg column="confidence" javaType="java.math.BigDecimal"/>
+			<arg column="weight" javaType="java.math.BigDecimal"/>
+		</constructor>
+	</resultMap>
+
+	<resultMap id="UserTagPreferenceScoreSourceRowMap"
+		type="com.soomgil.preference.infrastructure.persistence.row.UserTagPreferenceScoreSourceRow">
+		<constructor>
+			<arg column="tag_id" javaType="java.lang.String"/>
+			<arg column="positive_evidence" javaType="java.math.BigDecimal"/>
+			<arg column="negative_evidence" javaType="java.math.BigDecimal"/>
+			<arg column="smoothed_positive_rate" javaType="java.math.BigDecimal"/>
+			<arg column="preference_discrimination" javaType="java.math.BigDecimal"/>
+		</constructor>
+	</resultMap>
+
+	<select id="findReaction" resultMap="UserPlaceReactionRowMap">
+		SELECT
+			CAST(id AS text) AS id,
+			reaction,
+			CAST(place_tag_enrichment_id AS text) AS place_tag_enrichment_id
+		FROM preference.user_place_reactions
+		WHERE user_id = CAST(#{userId} AS uuid)
+			AND provider = #{provider}
+			AND external_place_id = #{externalPlaceId}
+	</select>
+
+	<insert id="insertReaction" parameterType="com.soomgil.preference.infrastructure.persistence.row.UserPlaceReactionInsertRow">
+		INSERT INTO preference.user_place_reactions (
+			id,
+			user_id,
+			provider,
+			external_place_id,
+			reaction,
+			reaction_count,
+			place_tag_enrichment_id,
+			source_modified_at
+		)
+		VALUES (
+			CAST(#{id} AS uuid),
+			CAST(#{userId} AS uuid),
+			#{provider},
+			#{externalPlaceId},
+			#{reaction},
+			1,
+			CAST(#{placeTagEnrichmentId} AS uuid),
+			#{sourceModifiedAt}
+		)
+	</insert>
+
+	<update id="updateReaction" parameterType="com.soomgil.preference.infrastructure.persistence.row.UserPlaceReactionUpdateRow">
+		UPDATE preference.user_place_reactions
+		SET reaction = #{reaction},
+			reaction_count = reaction_count + 1,
+			last_reacted_at = now(),
+			place_tag_enrichment_id = CAST(#{placeTagEnrichmentId} AS uuid),
+			source_modified_at = #{sourceModifiedAt}
+		WHERE id = CAST(#{id} AS uuid)
+	</update>
+
+	<insert id="insertEvent" parameterType="com.soomgil.preference.infrastructure.persistence.row.UserSwipeEventInsertRow">
+		INSERT INTO preference.user_swipe_events (
+			user_id,
+			provider,
+			external_place_id,
+			reaction,
+			previous_reaction,
+			place_tag_enrichment_id,
+			source_modified_at
+		)
+		VALUES (
+			CAST(#{userId} AS uuid),
+			#{provider},
+			#{externalPlaceId},
+			#{reaction},
+			#{previousReaction},
+			CAST(#{placeTagEnrichmentId} AS uuid),
+			#{sourceModifiedAt}
+		)
+	</insert>
+
+	<select id="findLatestConfirmedTags" resultMap="PlaceTagEvidenceSourceRowMap">
+		WITH latest_enrichment AS (
+			SELECT id
+			FROM preference.place_tag_enrichments
+			WHERE provider = #{provider}
+				AND external_place_id = #{externalPlaceId}
+				AND status = 'SUCCEEDED'
+			ORDER BY enriched_at DESC NULLS LAST, created_at DESC, id
+			LIMIT 1
+		)
+		SELECT
+			CAST(tag.enrichment_id AS text) AS enrichment_id,
+			CAST(tag.tag_id AS text) AS tag_id,
+			tag.confidence,
+			tag.weight
+		FROM preference.place_tag_enrichment_tags tag
+		JOIN latest_enrichment latest ON latest.id = tag.enrichment_id
+		ORDER BY tag.rank_order, tag.tag_id
+	</select>
+
+	<select id="findConfirmedTagsByEnrichment" resultMap="PlaceTagEvidenceSourceRowMap">
+		SELECT
+			CAST(tag.enrichment_id AS text) AS enrichment_id,
+			CAST(tag.tag_id AS text) AS tag_id,
+			tag.confidence,
+			tag.weight
+		FROM preference.place_tag_enrichment_tags tag
+		WHERE tag.enrichment_id = CAST(#{enrichmentId} AS uuid)
+		ORDER BY tag.rank_order, tag.tag_id
+	</select>
+
+	<update id="removeUserTagEvidence"
+		parameterType="com.soomgil.preference.infrastructure.persistence.row.UserTagEvidenceAdjustmentRow">
+		UPDATE preference.user_preference_tag_weights
+		SET positive_evidence = CASE
+				WHEN #{reaction} IN ('LIKE', 'SUPER_LIKE')
+					THEN greatest(0, positive_evidence - #{evidence})
+				ELSE positive_evidence
+			END,
+			negative_evidence = CASE
+				WHEN #{reaction} = 'NOPE'
+					THEN greatest(0, negative_evidence - #{evidence})
+				ELSE negative_evidence
+			END,
+			like_count = CASE WHEN #{reaction} = 'LIKE' THEN greatest(0, like_count - 1) ELSE like_count END,
+			super_like_count = CASE
+				WHEN #{reaction} = 'SUPER_LIKE' THEN greatest(0, super_like_count - 1)
+				ELSE super_like_count
+			END,
+			nope_count = CASE WHEN #{reaction} = 'NOPE' THEN greatest(0, nope_count - 1) ELSE nope_count END,
+			updated_at = now()
+		WHERE user_id = CAST(#{userId} AS uuid)
+			AND tag_id = CAST(#{tagId} AS uuid)
+	</update>
+
+	<insert id="addUserTagEvidence"
+		parameterType="com.soomgil.preference.infrastructure.persistence.row.UserTagEvidenceAdjustmentRow">
+		INSERT INTO preference.user_preference_tag_weights (
+			user_id,
+			tag_id,
+			positive_evidence,
+			negative_evidence,
+			preference_score,
+			like_count,
+			super_like_count,
+			nope_count,
+			calculation_version
+		)
+		VALUES (
+			CAST(#{userId} AS uuid),
+			CAST(#{tagId} AS uuid),
+			CASE WHEN #{reaction} IN ('LIKE', 'SUPER_LIKE') THEN #{evidence} ELSE 0 END,
+			CASE WHEN #{reaction} = 'NOPE' THEN #{evidence} ELSE 0 END,
+			0.5,
+			CASE WHEN #{reaction} = 'LIKE' THEN 1 ELSE 0 END,
+			CASE WHEN #{reaction} = 'SUPER_LIKE' THEN 1 ELSE 0 END,
+			CASE WHEN #{reaction} = 'NOPE' THEN 1 ELSE 0 END,
+			'preference-evidence-v1'
+		)
+		ON CONFLICT (user_id, tag_id)
+		DO UPDATE SET
+			positive_evidence = preference.user_preference_tag_weights.positive_evidence
+				+ excluded.positive_evidence,
+			negative_evidence = preference.user_preference_tag_weights.negative_evidence
+				+ excluded.negative_evidence,
+			like_count = preference.user_preference_tag_weights.like_count + excluded.like_count,
+			super_like_count = preference.user_preference_tag_weights.super_like_count + excluded.super_like_count,
+			nope_count = preference.user_preference_tag_weights.nope_count + excluded.nope_count,
+			updated_at = now()
+	</insert>
+
+	<select id="findUserTagPreferenceScoreSource" resultMap="UserTagPreferenceScoreSourceRowMap">
+		SELECT
+			CAST(projection.tag_id AS text) AS tag_id,
+			projection.positive_evidence,
+			projection.negative_evidence,
+			coalesce(statistic.smoothed_positive_rate, 0.5) AS smoothed_positive_rate,
+			coalesce(statistic.preference_discrimination, 0.5) AS preference_discrimination
+		FROM preference.user_preference_tag_weights projection
+		LEFT JOIN preference.tag_statistic_runs serving_run
+			ON serving_run.is_serving = true
+			AND serving_run.status = 'SUCCEEDED'
+		LEFT JOIN preference.tag_statistics statistic
+			ON statistic.run_id = serving_run.id
+			AND statistic.tag_id = projection.tag_id
+		WHERE projection.user_id = CAST(#{userId} AS uuid)
+			AND projection.tag_id = CAST(#{tagId} AS uuid)
+	</select>
+
+	<update id="updateUserTagPreferenceScore"
+		parameterType="com.soomgil.preference.infrastructure.persistence.row.UserTagPreferenceScoreUpdateRow">
+		UPDATE preference.user_preference_tag_weights
+		SET preference_score = #{preferenceScore},
+			calculation_version = #{calculationVersion},
+			updated_at = now()
+		WHERE user_id = CAST(#{userId} AS uuid)
+			AND tag_id = CAST(#{tagId} AS uuid)
+	</update>
+</mapper>

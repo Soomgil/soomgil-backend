@@ -1,0 +1,53 @@
+{
+  "manifestVersion": "tourism-source-import-manifest-v1",
+  "sourceProvider": "KTO",
+  "sourceSnapshot": "kto-ssafy-v1",
+  "generatedAt": "2026-06-19T00:00:00Z",
+  "datasets": [
+    {
+      "dataset": "sidos",
+      "targetTable": "tourism_source.sidos",
+      "sourceLocation": "external://kto-ssafy-v1/sidos.csv",
+      "format": "CSV",
+      "checksumSha256": null,
+      "loadOrder": 10,
+      "required": true
+    },
+    {
+      "dataset": "guguns",
+      "targetTable": "tourism_source.guguns",
+      "sourceLocation": "external://kto-ssafy-v1/guguns.csv",
+      "format": "CSV",
+      "checksumSha256": null,
+      "loadOrder": 20,
+      "required": true
+    },
+    {
+      "dataset": "contenttypes",
+      "targetTable": "tourism_source.contenttypes",
+      "sourceLocation": "external://kto-ssafy-v1/contenttypes.csv",
+      "format": "CSV",
+      "checksumSha256": null,
+      "loadOrder": 30,
+      "required": true
+    },
+    {
+      "dataset": "attractions",
+      "targetTable": "tourism_source.attractions",
+      "sourceLocation": "external://kto-ssafy-v1/attractions.csv",
+      "format": "CSV",
+      "checksumSha256": null,
+      "loadOrder": 40,
+      "required": true
+    },
+    {
+      "dataset": "attraction_images",
+      "targetTable": "tourism_source.attraction_images",
+      "sourceLocation": "external://kto-ssafy-v1/attraction_images.csv",
+      "format": "CSV",
+      "checksumSha256": null,
+      "loadOrder": 50,
+      "required": false
+    }
+  ]
+}

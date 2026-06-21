@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+	PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+	"https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.soomgil.preference.infrastructure.persistence.mapper.PreferenceSwipeFeedMapper">
+
+	<resultMap id="SwipeFeedReactionRowMap" type="com.soomgil.preference.infrastructure.persistence.row.SwipeFeedReactionRow">
+		<constructor>
+			<arg column="external_place_id" javaType="java.lang.String"/>
+			<arg column="my_reaction" javaType="java.lang.String"/>
+		</constructor>
+	</resultMap>
+
+	<resultMap id="SwipeFeedTagRowMap" type="com.soomgil.preference.infrastructure.persistence.row.SwipeFeedTagRow">
+		<constructor>
+			<arg column="external_place_id" javaType="java.lang.String"/>
+			<arg column="display_name" javaType="java.lang.String"/>
+			<arg column="rank_order" javaType="java.lang.Integer"/>
+		</constructor>
+	</resultMap>
+
+	<select id="findReactions" resultMap="SwipeFeedReactionRowMap">
+		SELECT
+			external_place_id,
+			reaction AS my_reaction
+		FROM preference.user_place_reactions
+		WHERE user_id = CAST(#{userId} AS uuid)
+			AND provider = 'KTO'
+			AND external_place_id IN
+			<foreach collection="externalPlaceIds" item="placeId" open="(" separator="," close=")">
+				#{placeId}
+			</foreach>
+	</select>
+
+	<select id="findTags" resultMap="SwipeFeedTagRowMap">
+		WITH latest_enrichment AS (
+			SELECT DISTINCT ON (external_place_id)
+				id,
+				external_place_id
+			FROM preference.place_tag_enrichments
+			WHERE provider = 'KTO'
+				AND status = 'SUCCEEDED'
+				AND external_place_id IN
+				<foreach collection="externalPlaceIds" item="placeId" open="(" separator="," close=")">
+					#{placeId}
+				</foreach>
+			ORDER BY external_place_id, enriched_at DESC, updated_at DESC
+		)
+		SELECT
+			latest.external_place_id,
+			tag.display_name,
+			selected.rank_order
+		FROM latest_enrichment latest
+		JOIN preference.place_tag_enrichment_tags selected ON selected.enrichment_id = latest.id
+		JOIN preference.preference_tags tag ON tag.id = selected.tag_id
+		ORDER BY latest.external_place_id, selected.rank_order
+	</select>
+</mapper>

@@ -1,0 +1,108 @@
+package com.soomgil.place.infrastructure.persistence.repository;
+
+import com.soomgil.common.api.dto.PageMeta;
+import com.soomgil.place.api.dto.PlaceProvider;
+import com.soomgil.place.api.dto.PlaceSourceStatus;
+import com.soomgil.place.application.query.dto.PlaceSearchCriteria;
+import com.soomgil.place.application.query.dto.PlaceSearchItem;
+import com.soomgil.place.application.query.dto.PlaceSearchResult;
+import com.soomgil.place.application.query.dto.PlaceViewportCandidate;
+import com.soomgil.place.application.query.dto.PlaceViewportCandidateCriteria;
+import com.soomgil.place.infrastructure.persistence.mapper.TourismSourcePlaceSearchMapper;
+import com.soomgil.place.infrastructure.persistence.row.TourismSourcePlaceSearchRow;
+import java.net.URI;
+import java.util.List;
+import org.springframework.stereotype.Repository;
+
+/**
+ * 관광 원천 저장소에서 장소 검색 결과를 조회하는 repository.
+ */
+@Repository
+public class TourismSourcePlaceSearchRepository {
+
+	private final TourismSourcePlaceSearchMapper mapper;
+
+	public TourismSourcePlaceSearchRepository(TourismSourcePlaceSearchMapper mapper) {
+		this.mapper = mapper;
+	}
+
+	/**
+	 * 검색 조건에 맞는 관광 원천 장소 목록을 조회한다.
+	 *
+	 * @param criteria 검색 조건
+	 * @return 검색 결과와 page metadata
+	 */
+	public PlaceSearchResult search(PlaceSearchCriteria criteria) {
+		long totalElements = mapper.count(criteria);
+		List<PlaceSearchItem> items = mapper.search(criteria)
+			.stream()
+			.map(this::toItem)
+			.toList();
+
+		return new PlaceSearchResult(items, new PageMeta(
+			criteria.page(),
+			criteria.size(),
+			totalElements,
+			totalPages(totalElements, criteria.size()),
+			List.of()
+			));
+	}
+
+	/**
+	 * 지도 viewport 안의 관광 원천 장소 후보를 조회한다.
+	 *
+	 * @param criteria viewport 후보 조회 조건
+	 * @return 후보 목록
+	 */
+	public List<PlaceViewportCandidate> findViewportCandidates(PlaceViewportCandidateCriteria criteria) {
+		if (!criteria.hasValidBounds()) {
+			return List.of();
+		}
+
+		return mapper.findViewportCandidates(criteria)
+			.stream()
+			.map(this::toViewportCandidate)
+			.toList();
+	}
+
+	private PlaceSearchItem toItem(TourismSourcePlaceSearchRow row) {
+		return new PlaceSearchItem(
+			String.valueOf(row.contentId()),
+			row.title(),
+			row.address(),
+			row.latitude(),
+			row.longitude(),
+			toUri(row.thumbnailUrl()),
+			row.category(),
+			PlaceSourceStatus.AVAILABLE
+		);
+	}
+
+	private PlaceViewportCandidate toViewportCandidate(TourismSourcePlaceSearchRow row) {
+		return new PlaceViewportCandidate(
+			PlaceProvider.KTO,
+			String.valueOf(row.contentId()),
+			row.title(),
+			row.address(),
+			row.latitude(),
+			row.longitude(),
+			toUri(row.thumbnailUrl()),
+			row.category(),
+			PlaceSourceStatus.AVAILABLE
+		);
+	}
+
+	private URI toUri(String value) {
+		if (value == null || value.isBlank()) {
+			return null;
+		}
+		return URI.create(value);
+	}
+
+	private int totalPages(long totalElements, int size) {
+		if (totalElements == 0) {
+			return 0;
+		}
+		return (int) Math.ceil((double) totalElements / size);
+	}
+}
