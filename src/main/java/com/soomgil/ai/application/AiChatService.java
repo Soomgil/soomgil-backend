@@ -96,10 +96,12 @@ public class AiChatService {
 		List<AiGuideRequest.AiGuideTurn> recent = new ArrayList<>(mapper.findRecentMessages(session.id(), 20).stream()
 			.map(row -> new AiGuideRequest.AiGuideTurn(row.role(), row.content()))
 			.toList());
-		mapper.insertMessage(UUID.randomUUID(), session.id(), userId, AiMessageRole.USER.name(), question, Instant.now());
-		String answer = model.reply(new AiGuideRequest(
-			tripId, userId, session.summary(), recent, question, baseVersion, viewport
+		UUID requestMessageId = UUID.randomUUID();
+		mapper.insertMessage(requestMessageId, session.id(), userId, AiMessageRole.USER.name(), question, Instant.now());
+		AiGuideReply reply = model.reply(new AiGuideRequest(
+			tripId, userId, session.id(), requestMessageId, session.summary(), recent, question, baseVersion, viewport
 		));
+		String answer = reply.content();
 		if (answer == null || answer.isBlank()) {
 			throw new BusinessException(ErrorCode.AI_PROVIDER_UNAVAILABLE, "AI provider returned an empty response.");
 		}
@@ -108,7 +110,19 @@ public class AiChatService {
 			assistantMessageId, session.id(), null, AiMessageRole.ASSISTANT.name(), answer.trim(), Instant.now()
 		);
 		AiChatMessage assistant = toDto(mapper.findMessageById(assistantMessageId));
-		AiMessageResponse response = new AiMessageResponse(assistant, List.of(), baseVersion, false, false);
+		for (var toolCall : reply.toolCalls()) {
+			mapper.linkToolCallToResultMessage(toolCall.id(), assistantMessageId);
+		}
+		Long resultingVersion = reply.toolCalls().stream()
+			.map(call -> call.versionAfter())
+			.filter(Objects::nonNull)
+			.max(Long::compareTo)
+			.orElse(baseVersion);
+		boolean undoAvailable = reply.toolCalls().stream()
+			.anyMatch(call -> Boolean.TRUE.equals(call.undoRedoAvailable()));
+		AiMessageResponse response = new AiMessageResponse(
+			assistant, reply.toolCalls(), resultingVersion, undoAvailable, false
+		);
 		messagingTemplate.convertAndSend("/topic/trips/" + tripId + "/ai", response);
 		return response;
 	}

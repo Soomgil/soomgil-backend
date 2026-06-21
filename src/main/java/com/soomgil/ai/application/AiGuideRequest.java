@@ -7,6 +7,8 @@ import java.util.UUID;
 public record AiGuideRequest(
 	UUID tripId,
 	UUID requesterUserId,
+	UUID sessionId,
+	UUID requestMessageId,
 	String sessionSummary,
 	List<AiGuideTurn> recentMessages,
 	String question,

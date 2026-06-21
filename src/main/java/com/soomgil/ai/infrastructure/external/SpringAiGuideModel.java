@@ -1,7 +1,9 @@
 package com.soomgil.ai.infrastructure.external;
 
 import com.soomgil.ai.application.AiGuideModel;
+import com.soomgil.ai.application.AiGuideReply;
 import com.soomgil.ai.application.AiGuideRequest;
+import com.soomgil.ai.application.AiTripToolsFactory;
 import java.util.ArrayList;
 import java.util.Collections;
 import org.springframework.ai.chat.client.ChatClient;
@@ -21,13 +23,15 @@ public class SpringAiGuideModel implements AiGuideModel {
 		""";
 
 	private final ChatClient chatClient;
+	private final AiTripToolsFactory toolsFactory;
 
-	public SpringAiGuideModel(ChatModel chatModel) {
+	public SpringAiGuideModel(ChatModel chatModel, AiTripToolsFactory toolsFactory) {
 		this.chatClient = ChatClient.create(chatModel);
+		this.toolsFactory = toolsFactory;
 	}
 
 	@Override
-	public String reply(AiGuideRequest request) {
+	public AiGuideReply reply(AiGuideRequest request) {
 		StringBuilder context = new StringBuilder();
 		if (request.sessionSummary() != null && !request.sessionSummary().isBlank()) {
 			context.append("이전 대화 요약: ").append(request.sessionSummary()).append('\n');
@@ -38,6 +42,13 @@ public class SpringAiGuideModel implements AiGuideModel {
 			context.append(turn.role()).append(": ").append(turn.content()).append('\n');
 		}
 		context.append("USER: ").append(request.question());
-		return chatClient.prompt().system(SYSTEM_PROMPT).user(context.toString()).call().content();
+		var tools = toolsFactory.create(request);
+		String content = chatClient.prompt()
+			.system(SYSTEM_PROMPT)
+			.user(context.toString())
+			.tools(tools)
+			.call()
+			.content();
+		return new AiGuideReply(content, tools.executedCalls());
 	}
 }

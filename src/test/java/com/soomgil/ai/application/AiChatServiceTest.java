@@ -36,7 +36,7 @@ class AiChatServiceTest {
 		AiChatSessionRow session = new AiChatSessionRow(sessionId, tripId, "ACTIVE", null, null, Instant.now());
 		when(mapper.findSessionByTripId(tripId)).thenReturn(session);
 		when(mapper.findRecentMessages(sessionId, 20)).thenReturn(List.of());
-		when(model.reply(any())).thenReturn("비 오는 날에는 박물관을 추천해요.");
+		when(model.reply(any())).thenReturn(new AiGuideReply("비 오는 날에는 박물관을 추천해요.", List.of()));
 		when(mapper.findMessageById(any())).thenAnswer(invocation -> new AiChatMessageRow(
 			invocation.getArgument(0), sessionId, null, "ASSISTANT",
 			"비 오는 날에는 박물관을 추천해요.", null, Instant.now(), null, null
