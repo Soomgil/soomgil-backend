@@ -4,8 +4,6 @@ import jakarta.validation.constraints.NotNull;
 
 public record UpdateChecklistMemberStatusRequest(
 	@NotNull
-	Long baseVersion,
-	@NotNull
 	Boolean isCompleted
 ) {
 }

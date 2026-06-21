@@ -28,6 +28,12 @@ class SecurityConfigWebMvcTest {
 	@Autowired
 	private MockMvc mockMvc;
 
+	@org.springframework.boot.test.mock.mockito.MockBean
+	private org.springframework.security.oauth2.jwt.JwtDecoder jwtDecoder;
+
+	@org.springframework.boot.test.mock.mockito.MockBean
+	private com.soomgil.global.security.JwtToCurrentUserAuthenticationConverter jwtAuthenticationConverter;
+
 	@Test
 	@WithMockUser(roles = "USER")
 	void rejectsAdminEndpointForRegularUser() throws Exception {

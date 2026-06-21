@@ -100,6 +100,7 @@ atlassian-ide-plugin.xml
 .settings/
 .springBeans
 .sts4-cache/
+.metadata/
 
 # Logs and runtime data
 logs/
@@ -200,3 +201,7 @@ compose.override.yaml
 *.p12
 *.jks
 *.keystore
+
+src/main/resources/*
+src/main/resources/application.yml
+src/main/resources/application-prod.yml

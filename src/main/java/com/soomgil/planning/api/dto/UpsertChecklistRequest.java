@@ -5,8 +5,6 @@ import java.util.UUID;
 
 public record UpsertChecklistRequest(
 	@NotNull
-	Long baseVersion,
-	@NotNull
 	PlanningScopeType scopeType,
 	UUID itineraryDayId,
 	String title
