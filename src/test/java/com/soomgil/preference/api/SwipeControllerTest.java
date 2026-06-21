@@ -18,6 +18,7 @@ import com.soomgil.place.api.dto.PlaceSummary;
 import com.soomgil.preference.api.dto.PagedSavedPlace;
 import com.soomgil.preference.api.dto.SavedPlace;
 import com.soomgil.preference.api.dto.SwipeFeedItem;
+import com.soomgil.preference.api.dto.SwipeFeedPlace;
 import com.soomgil.preference.api.dto.SwipeFeedResponse;
 import com.soomgil.preference.api.dto.SwipeReaction;
 import com.soomgil.preference.api.dto.SwipeReactionRequest;
@@ -162,6 +163,23 @@ class SwipeControllerTest {
 		);
 	}
 
+	private static SwipeFeedPlace swipePlace() {
+		return new SwipeFeedPlace(
+			PlaceProvider.KTO,
+			"126508",
+			"Haeundae Beach",
+			"Busan Haeundae-gu",
+			35.1587,
+			129.1604,
+			"https://cdn.soomgil.example.com/places/126508.jpg",
+			"관광지",
+			PlaceSourceStatus.AVAILABLE,
+			"Beach",
+			List.of("https://cdn.soomgil.example.com/places/126508.jpg"),
+			List.of("바다·해안")
+		);
+	}
+
 	private static final class RecordingSwipeFeedQueryHandler implements SwipeFeedQueryHandler {
 
 		private SwipeFeedQuery lastQuery;
@@ -169,7 +187,7 @@ class SwipeControllerTest {
 		@Override
 		public SwipeFeedResponse handle(SwipeFeedQuery query) {
 			lastQuery = query;
-			return new SwipeFeedResponse(List.of(new SwipeFeedItem(place(), SwipeReaction.LIKE, List.of())), null);
+			return new SwipeFeedResponse(List.of(new SwipeFeedItem(swipePlace(), SwipeReaction.LIKE, List.of())), null);
 		}
 	}
 

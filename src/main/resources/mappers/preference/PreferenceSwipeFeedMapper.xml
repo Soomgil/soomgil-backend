@@ -4,61 +4,55 @@
 	"https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.soomgil.preference.infrastructure.persistence.mapper.PreferenceSwipeFeedMapper">
 
-	<resultMap id="SwipeFeedPlaceRowMap" type="com.soomgil.preference.infrastructure.persistence.row.SwipeFeedPlaceRow">
+	<resultMap id="SwipeFeedReactionRowMap" type="com.soomgil.preference.infrastructure.persistence.row.SwipeFeedReactionRow">
 		<constructor>
-			<arg column="content_id" javaType="java.lang.Integer"/>
-			<arg column="title" javaType="java.lang.String"/>
-			<arg column="address" javaType="java.lang.String"/>
-			<arg column="latitude" javaType="java.lang.Double"/>
-			<arg column="longitude" javaType="java.lang.Double"/>
-			<arg column="thumbnail_url" javaType="java.lang.String"/>
-			<arg column="category" javaType="java.lang.String"/>
+			<arg column="external_place_id" javaType="java.lang.String"/>
 			<arg column="my_reaction" javaType="java.lang.String"/>
 		</constructor>
 	</resultMap>
 
-	<select id="findFeed" resultMap="SwipeFeedPlaceRowMap">
+	<resultMap id="SwipeFeedTagRowMap" type="com.soomgil.preference.infrastructure.persistence.row.SwipeFeedTagRow">
+		<constructor>
+			<arg column="external_place_id" javaType="java.lang.String"/>
+			<arg column="display_name" javaType="java.lang.String"/>
+			<arg column="rank_order" javaType="java.lang.Integer"/>
+		</constructor>
+	</resultMap>
+
+	<select id="findReactions" resultMap="SwipeFeedReactionRowMap">
 		SELECT
-			a.content_id,
-			a.title,
-			NULLIF(concat_ws(' ', a.addr1, a.addr2), '') AS address,
-			a.latitude,
-			a.longitude,
-			coalesce(image.public_url, a.first_image1, a.first_image2) AS thumbnail_url,
-			coalesce(ct.content_type_name, 'UNKNOWN') AS category,
-			upr.reaction AS my_reaction
-		FROM tourism_source.attractions a
-		LEFT JOIN tourism_source.contenttypes ct ON ct.content_type_id = a.content_type_id
-		LEFT JOIN LATERAL (
-			SELECT ai.public_url
-			FROM tourism_source.attraction_images ai
-			WHERE ai.attraction_no = a.no
-				AND ai.is_active = true
-			ORDER BY ai.display_order ASC, ai.created_at ASC
-			LIMIT 1
-		) image ON true
-		LEFT JOIN preference.user_place_reactions upr
-			ON upr.user_id = CAST(#{userId} AS uuid)
-			AND upr.provider = 'KTO'
-			AND upr.external_place_id = CAST(a.content_id AS text)
-		<where>
-			<if test="legalRegionCode != null and legalRegionCode != ''">
-				AND (
-					CAST(a.area_code AS text) = #{legalRegionCode}
-					OR CAST((a.area_code * 1000 + coalesce(a.si_gun_gu_code, 0)) AS text) = #{legalRegionCode}
-				)
-			</if>
-			<if test="category != null and category != ''">
-				AND (
-					CAST(a.content_type_id AS text) = #{category}
-					OR upper(ct.content_type_name) = upper(#{category})
-				)
-			</if>
-			<if test="excludeRecent">
-				AND upr.id IS NULL
-			</if>
-		</where>
-		ORDER BY a.source_modified_at DESC NULLS LAST, a.imported_at DESC, a.no DESC
-		LIMIT #{limit}
+			external_place_id,
+			reaction AS my_reaction
+		FROM preference.user_place_reactions
+		WHERE user_id = CAST(#{userId} AS uuid)
+			AND provider = 'KTO'
+			AND external_place_id IN
+			<foreach collection="externalPlaceIds" item="placeId" open="(" separator="," close=")">
+				#{placeId}
+			</foreach>
+	</select>
+
+	<select id="findTags" resultMap="SwipeFeedTagRowMap">
+		WITH latest_enrichment AS (
+			SELECT DISTINCT ON (external_place_id)
+				id,
+				external_place_id
+			FROM preference.place_tag_enrichments
+			WHERE provider = 'KTO'
+				AND status = 'SUCCEEDED'
+				AND external_place_id IN
+				<foreach collection="externalPlaceIds" item="placeId" open="(" separator="," close=")">
+					#{placeId}
+				</foreach>
+			ORDER BY external_place_id, enriched_at DESC, updated_at DESC
+		)
+		SELECT
+			latest.external_place_id,
+			tag.display_name,
+			selected.rank_order
+		FROM latest_enrichment latest
+		JOIN preference.place_tag_enrichment_tags selected ON selected.enrichment_id = latest.id
+		JOIN preference.preference_tags tag ON tag.id = selected.tag_id
+		ORDER BY latest.external_place_id, selected.rank_order
 	</select>
 </mapper>

@@ -49,6 +49,9 @@ mybatis:
     map-underscore-to-camel-case: true
 
 soomgil:
+  kto:
+    base-url: ${KTO_API_BASE_URL:https://apis.data.go.kr/B551011/KorService2}
+    api-key: ${KTO_API_KEY:}
   mapbox:
     base-url: ${MAPBOX_BASE_URL:https://api.mapbox.com}
     access-token: ${MAPBOX_ACCESS_TOKEN:}

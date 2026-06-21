@@ -9,9 +9,11 @@ import com.soomgil.global.security.CurrentUser;
 import com.soomgil.global.security.CurrentUserProvider;
 import com.soomgil.place.api.dto.PlaceProvider;
 import com.soomgil.place.api.dto.PlaceRef;
+import com.soomgil.place.application.port.TourismPlaceFeedClient;
+import com.soomgil.place.application.port.TourismPlaceFeedItem;
+import com.soomgil.place.application.port.TourismPlaceFeedResult;
 import com.soomgil.preference.application.query.dto.SwipeFeedQuery;
 import com.soomgil.preference.infrastructure.persistence.mapper.PreferenceSwipeFeedMapper;
-import com.soomgil.preference.infrastructure.persistence.row.SwipeFeedPlaceRow;
 import com.soomgil.social.application.query.dto.FolloweePlaceReaction;
 import com.soomgil.social.application.query.handler.FindFolloweePlaceReactionsQueryHandler;
 import com.soomgil.user.api.dto.UserSummary;
@@ -37,27 +39,32 @@ class PreferenceSwipeFeedFolloweeReactionTest {
 		@SuppressWarnings("unchecked")
 		ObjectProvider<CurrentUserProvider> currentUserProvider = mock(ObjectProvider.class);
 		PreferenceSwipeFeedMapper feedMapper = mock(PreferenceSwipeFeedMapper.class);
+		TourismPlaceFeedClient placeClient = mock(TourismPlaceFeedClient.class);
 		FindFolloweePlaceReactionsQueryHandler reactionHandler =
 			mock(FindFolloweePlaceReactionsQueryHandler.class);
 
 		when(currentUserProvider.getIfAvailable())
 			.thenReturn(() -> new CurrentUser(currentUserId, "min@example.com"));
-		when(feedMapper.findFeed(currentUserId.toString(), null, null, 20, true))
-			.thenReturn(List.of(new SwipeFeedPlaceRow(
-				126508,
+		when(placeClient.fetch(any())).thenReturn(new TourismPlaceFeedResult(
+			List.of(new TourismPlaceFeedItem(
+				"126508",
 				"Haeundae Beach",
 				"Busan Haeundae-gu",
 				35.1587,
 				129.1604,
 				"https://cdn.soomgil.example.com/places/126508.jpg",
-				"ATTRACTION",
-				null
-			)));
+				"관광지",
+				"Beach",
+				List.of("https://cdn.soomgil.example.com/places/126508.jpg")
+			)), "next"));
+		when(feedMapper.findReactions(currentUserId.toString(), List.of("126508"))).thenReturn(List.of());
+		when(feedMapper.findTags(List.of("126508"))).thenReturn(List.of());
 		when(reactionHandler.handle(any()))
 			.thenReturn(List.of(new FolloweePlaceReaction(place, followee)));
 
 		var handler = new PreferenceSwipeFeedQueryHandler(
 			currentUserProvider,
+			placeClient,
 			feedMapper,
 			reactionHandler
 		);

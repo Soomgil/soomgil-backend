@@ -1,14 +1,20 @@
 package com.soomgil.preference.application.query.handler;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
 
 import com.soomgil.TestcontainersConfiguration;
 import com.soomgil.global.security.CurrentUser;
 import com.soomgil.global.security.CurrentUserProvider;
+import com.soomgil.place.application.port.TourismPlaceFeedClient;
+import com.soomgil.place.application.port.TourismPlaceFeedItem;
+import com.soomgil.place.application.port.TourismPlaceFeedResult;
 import com.soomgil.preference.api.dto.SwipeFeedResponse;
 import com.soomgil.preference.api.dto.SwipeReaction;
 import com.soomgil.preference.application.query.dto.SwipeFeedQuery;
 import java.util.UUID;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,6 +23,7 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 @Import({
 	TestcontainersConfiguration.class,
@@ -33,6 +40,9 @@ class SwipeFeedQueryHandlerIntegrationTest {
 	@Autowired
 	private JdbcTemplate jdbcTemplate;
 
+	@MockitoBean
+	private TourismPlaceFeedClient placeFeedClient;
+
 	@BeforeEach
 	void setUp() {
 		createExternalContractFixtures();
@@ -41,43 +51,10 @@ class SwipeFeedQueryHandlerIntegrationTest {
 		jdbcTemplate.update("DELETE FROM preference.user_place_reactions");
 		jdbcTemplate.update("DELETE FROM social.user_follows");
 		jdbcTemplate.update("DELETE FROM auth.user_profiles");
-		jdbcTemplate.update("DELETE FROM tourism_source.attraction_images");
-		jdbcTemplate.update("DELETE FROM tourism_source.attractions");
-		jdbcTemplate.update("DELETE FROM tourism_source.contenttypes");
-		jdbcTemplate.update("""
-			INSERT INTO tourism_source.contenttypes (content_type_id, content_type_name)
-			VALUES (12, 'ATTRACTION')
-			""");
-		jdbcTemplate.update("""
-			INSERT INTO tourism_source.attractions (
-				no,
-				content_id,
-				title,
-				content_type_id,
-				area_code,
-				si_gun_gu_code,
-				latitude,
-				longitude,
-				addr1,
-				source_modified_at,
-				imported_at
-			)
-			VALUES
-				(1, 126508, 'Haeundae Beach', 12, 26, 2, 35.1587, 129.1604, 'Busan Haeundae-gu', '2026-06-02T00:00:00Z', '2026-06-02T00:00:00Z'),
-				(2, 999999, 'Seoul Forest', 12, 11, 0, 37.5444, 127.0374, 'Seoul Seongdong-gu', '2026-06-01T00:00:00Z', '2026-06-01T00:00:00Z')
-			""");
-		jdbcTemplate.update("""
-			INSERT INTO tourism_source.attraction_images (
-				id,
-				attraction_no,
-				source_type,
-				public_url,
-				display_order
-			)
-			VALUES
-				('00000000-0000-0000-0000-000000000902', 1, 'THUMBNAIL', 'https://cdn.soomgil.example.com/places/126508.jpg', 1),
-				('00000000-0000-0000-0000-000000000903', 2, 'THUMBNAIL', 'https://cdn.soomgil.example.com/places/999999.jpg', 1)
-			""");
+		when(placeFeedClient.fetch(any())).thenReturn(new TourismPlaceFeedResult(List.of(
+			place("126508", "Haeundae Beach"),
+			place("999999", "Seoul Forest")
+		), "next-seed"));
 		jdbcTemplate.update("""
 			INSERT INTO preference.user_place_reactions (
 				id,
@@ -89,6 +66,13 @@ class SwipeFeedQueryHandlerIntegrationTest {
 			VALUES ('00000000-0000-0000-0000-000000000904', ?, 'KTO', '126508', 'LIKE')
 			""",
 			USER_ID
+		);
+	}
+
+	private TourismPlaceFeedItem place(String id, String name) {
+		String image = "https://cdn.soomgil.example.com/places/" + id + ".jpg";
+		return new TourismPlaceFeedItem(
+			id, name, "Korea", 37.0, 127.0, image, "관광지", "description", List.of(image)
 		);
 	}
 
