@@ -25,7 +25,6 @@ public enum ErrorCode {
 	CANNOT_FOLLOW_SELF(HttpStatus.UNPROCESSABLE_ENTITY, "CANNOT_FOLLOW_SELF", "Users cannot follow themselves."),
 	FOLLOW_NOT_FOUND(HttpStatus.NOT_FOUND, "FOLLOW_NOT_FOUND", "Follow was not found."),
 	FOLLOW_REQUEST_NOT_FOUND(HttpStatus.NOT_FOUND, "FOLLOW_REQUEST_NOT_FOUND", "Follow request was not found."),
-	NOT_IMPLEMENTED(HttpStatus.NOT_IMPLEMENTED, "NOT_IMPLEMENTED", "Endpoint is not implemented yet."),
 	INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR", "Unexpected server error."),
 	INVALID_CREDENTIALS(HttpStatus.UNAUTHORIZED, "INVALID_CREDENTIALS", "Email or password is incorrect."),
 	EMAIL_ALREADY_USED(HttpStatus.CONFLICT, "EMAIL_ALREADY_USED", "Email is already registered."),

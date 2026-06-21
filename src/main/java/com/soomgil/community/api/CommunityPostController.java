@@ -60,7 +60,7 @@ import org.springframework.web.bind.annotation.RestController;
  *
  * <p>Phase 1: 게시글 CRUD + 공개 feed + 공유 토큰 rotate.
  * Phase 2: 좋아요, 댓글 CRUD.
- * Retrip은 trip 모듈 구축 후 구현한다.
+ * Retrip은 저장된 게시글 snapshot을 독립된 새 여행방으로 복제한다.
  */
 @Validated
 @RestController

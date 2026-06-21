@@ -5,9 +5,7 @@ import java.util.UUID;
 /**
  * planning mutation/query 전 사용자가 해당 여행방의 active member인지 검증한다.
  *
- * <p>여행방(trip) 모듈은 아직 구현되지 않았으므로, 기본 구현체
- * {@link NoOpTripMemberAccessChecker}는 어떤 검증도 수행하지 않는다.
- * trip 모듈 완성 후 실제 구현체로 교체한다.
+ * <p>구현체는 trip 모듈의 접근 guard를 통해 active member 여부를 검증한다.
  */
 public interface TripMemberAccessChecker {
 
