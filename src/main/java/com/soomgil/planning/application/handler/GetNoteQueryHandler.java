@@ -12,6 +12,7 @@ import com.soomgil.planning.domain.policy.PlanningPolicy;
 import com.soomgil.planning.infrastructure.persistence.mapper.NoteMapper;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import java.util.Optional;
 
 /**
  * {@link GetNoteQuery}를 처리한다.
@@ -40,12 +41,18 @@ public class GetNoteQueryHandler implements QueryHandler<GetNoteQuery, Note> {
 
 	@Override
 	public Note handle(GetNoteQuery query) {
+		return findOptional(query)
+			.orElseThrow(() -> new PlanningException(ErrorCode.PLANNING_NOTE_NOT_FOUND));
+	}
+
+	/**
+	 * 메모가 선택 정보인 내부 조회에서 예외로 트랜잭션을 rollback-only 처리하지 않도록 한다.
+	 */
+	public Optional<Note> findOptional(GetNoteQuery query) {
 		accessChecker.requireMember(query.tripId(), query.viewerUserId());
 		PlanningPolicy.validateScopeDay(query.scopeType(), query.itineraryDayId());
 
-		NoteRecord record = noteMapper.findByTripScopeDay(
-				query.tripId(), query.scopeType(), query.itineraryDayId())
-			.orElseThrow(() -> new PlanningException(ErrorCode.PLANNING_NOTE_NOT_FOUND));
-		return assembler.toNoteDto(record);
+		return noteMapper.findByTripScopeDay(query.tripId(), query.scopeType(), query.itineraryDayId())
+			.map(assembler::toNoteDto);
 	}
 }

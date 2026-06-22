@@ -58,7 +58,8 @@ class UpdateMeCommandHandlerTest {
 
 		when(userMeMapper.findFull(userId)).thenReturn(Optional.of(current));
 		MediaFileRecord mediaFile = new MediaFileRecord(
-			mediaFileId, userId, "LOCAL", "default-bucket", "filename.jpg", "http://localhost:8080/uploads/filename.jpg",
+			mediaFileId, userId, "S3_COMPATIBLE", "default-bucket",
+			"media/" + userId + "/profile-image/" + mediaFileId + ".jpg", null,
 			"image/jpeg", 1024L, null, null, null, null, "ACTIVE", Instant.now()
 		);
 		when(mediaFileMapper.findById(mediaFileId)).thenReturn(Optional.of(mediaFile));
@@ -73,6 +74,9 @@ class UpdateMeCommandHandlerTest {
 
 		assertThat(result.profile().displayName()).isEqualTo("민지");
 		assertThat(result.profile().profileMediaFileId()).isEqualTo(mediaFileId);
+		assertThat(result.profile().profileImageUrl()).hasToString(
+			"/api/v1/media/files/" + mediaFileId + "/content"
+		);
 		assertThat(result.profile().bio()).isEqualTo("old bio");
 		assertThat(result.profile().profileVisibility()).isEqualTo(UserProfileVisibility.PRIVATE);
 		assertThat(result.primaryEmail()).isEqualTo("minji@example.com");

@@ -89,7 +89,12 @@ public class UpdateMeCommandHandler implements CommandHandler<UpdateMeCommand, U
 				MediaFileRecord mediaFile = mediaFileMapper.findById(command.profileMediaFileId())
 					.orElseThrow(() -> new UserException(ErrorCode.PROFILE_NOT_FOUND,
 						"Media file not found: " + command.profileMediaFileId()));
-				profileImageUrl = mediaFile.publicUrl();
+				String expectedPrefix = "media/" + command.userId() + "/profile-image/";
+				if (!command.userId().equals(mediaFile.ownerUserId())
+					|| !mediaFile.objectKey().startsWith(expectedPrefix)) {
+					throw new UserException(ErrorCode.FORBIDDEN, "Profile image must be owned by the current user.");
+				}
+				profileImageUrl = "/api/v1/media/files/" + mediaFile.id() + "/content";
 			}
 		}
 

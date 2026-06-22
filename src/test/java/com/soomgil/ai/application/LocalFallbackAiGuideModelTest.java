@@ -1,0 +1,59 @@
+package com.soomgil.ai.application;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.soomgil.ai.api.dto.AiToolCall;
+import java.util.List;
+import java.util.UUID;
+import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+
+class LocalFallbackAiGuideModelTest {
+
+	private final AiTripToolsFactory toolsFactory = mock(AiTripToolsFactory.class);
+	private final LocalFallbackAiGuideModel model = new LocalFallbackAiGuideModel(toolsFactory, new ObjectMapper());
+
+	@Test
+	void alwaysAnswersGreetingWithoutExternalProvider() {
+		AiGuideRequest request = request("ㅎㅇ", null);
+
+		AiIntentDecision decision = model.classify(request);
+		AiGuideReply reply = model.replyWithoutTools(request, decision);
+
+		assertThat(decision.intent()).isEqualTo(AiIntent.GENERAL_CHAT);
+		assertThat(reply.content()).contains("안녕하세요");
+		assertThat(reply.toolCalls()).isEmpty();
+	}
+
+	@Test
+	void executesOnlyTheNoteToolForAnExplicitNoteRequest() {
+		AiNoteTools noteTools = mock(AiNoteTools.class);
+		AiToolCall call = mock(AiToolCall.class);
+		when(toolsFactory.create(any(), org.mockito.ArgumentMatchers.eq(AiIntent.WRITE_NOTE)))
+			.thenReturn(List.of(noteTools));
+		when(noteTools.executedCalls()).thenReturn(List.of(call));
+		AiGuideRequest request = request("전체 메모에 렌터카 예약 확인이라고 써줘", mock(AiTripContext.class));
+
+		AiGuideReply reply = model.replyWithWriteTools(
+			request, new AiIntentDecision(AiIntent.WRITE_NOTE, 1.0, "test", null)
+		);
+
+		ArgumentCaptor<AiNoteTools.ScopedTextInput> input = ArgumentCaptor.forClass(AiNoteTools.ScopedTextInput.class);
+		verify(noteTools).upsertNote(input.capture());
+		assertThat(input.getValue().scope()).isEqualTo("TRIP");
+		assertThat(input.getValue().text()).isEqualTo("렌터카 예약 확인");
+		assertThat(reply.toolCalls()).containsExactly(call);
+	}
+
+	private AiGuideRequest request(String question, AiTripContext context) {
+		return new AiGuideRequest(
+			UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), null,
+			List.of(), question, 1L, null, context
+		);
+	}
+}

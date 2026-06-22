@@ -1,6 +1,9 @@
 package com.soomgil.trip.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+
+import com.soomgil.auth.application.handler.FindDisplayNameQueryHandler;
 
 import com.soomgil.common.time.TimeProvider;
 import com.soomgil.trip.api.dto.CreateTripRequest;
@@ -78,7 +81,8 @@ class TripControllerTest {
 			new ListMyTripsHandler(queryRepository),
 			new FindTripDetailHandler(accessGuard, queryRepository),
 			new ListTripMembersHandler(accessGuard, queryRepository),
-			new ListTripInvitesHandler(accessGuard, queryRepository)
+			new ListTripInvitesHandler(accessGuard, queryRepository),
+			mock(FindDisplayNameQueryHandler.class)
 		);
 	}
 

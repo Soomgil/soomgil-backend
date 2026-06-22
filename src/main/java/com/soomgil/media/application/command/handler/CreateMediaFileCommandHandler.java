@@ -17,6 +17,7 @@ import com.soomgil.media.domain.policy.MediaObjectKeyPolicy;
 import com.soomgil.media.domain.policy.MediaUploadPolicy;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.net.URI;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Supplier;
@@ -80,9 +81,11 @@ public class CreateMediaFileCommandHandler implements CommandHandler<CreateMedia
 		}
 
 		OffsetDateTime createdAt = OffsetDateTime.ofInstant(timeProvider.now(), ZoneOffset.UTC);
+		UUID mediaFileId = idGenerator.get();
 		MediaFileMetadata mediaFile = new MediaFileMetadata(
-			idGenerator.get(), command.userId(), "S3_COMPATIBLE", object.metadata().bucket(), key,
-			purpose.publicServingAllowed() ? object.metadata().publicUrl() : null,
+			mediaFileId, command.userId(), "S3_COMPATIBLE", object.metadata().bucket(), key,
+			purpose.publicServingAllowed()
+				? URI.create("/api/v1/media/files/" + mediaFileId + "/content") : null,
 			object.detectedContentType(), object.metadata().sizeBytes(), object.width(), object.height(),
 			command.linkedResourceType(), command.linkedResourceId(), "ACTIVE", createdAt, null, null
 		);

@@ -127,10 +127,17 @@ out/
 
 # Gradle
 .gradle/
+**/.gradle/
 **/build/
 !src/**/build/
 gradle-app.setting
 .gradletasknamecache
+
+# Gradle dependency/cache directories
+caches/
+**/caches/
+backend/caches/
+backend/.gradle/
 
 # Maven
 target/

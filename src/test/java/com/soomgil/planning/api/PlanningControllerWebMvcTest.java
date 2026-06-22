@@ -115,7 +115,7 @@ class PlanningControllerWebMvcTest {
 		UUID tripId = UUID.randomUUID();
 		UUID noteId = UUID.randomUUID();
 		Note stub = new Note(noteId, tripId, PlanningScopeType.TRIP, null, "본문", null);
-		when(getNoteQueryHandler.handle(any())).thenReturn(stub);
+		when(getNoteQueryHandler.findOptional(any())).thenReturn(java.util.Optional.of(stub));
 
 		mockMvc.perform(get("/api/v1/trips/{tripId}/planning/notes", tripId)
 				.param("scopeType", "TRIP")
@@ -123,6 +123,18 @@ class PlanningControllerWebMvcTest {
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.id").value(noteId.toString()))
 			.andExpect(jsonPath("$.content").value("본문"));
+	}
+
+	@Test
+	@DisplayName("GET /planning/notes - 메모가 없으면 204")
+	void getNoteReturns204WhenMissing() throws Exception {
+		UUID tripId = UUID.randomUUID();
+		when(getNoteQueryHandler.findOptional(any())).thenReturn(java.util.Optional.empty());
+
+		mockMvc.perform(get("/api/v1/trips/{tripId}/planning/notes", tripId)
+				.param("scopeType", "TRIP")
+				.with(asUser()))
+			.andExpect(status().isNoContent());
 	}
 
 	@Test

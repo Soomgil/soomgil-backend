@@ -13,6 +13,8 @@ import com.soomgil.global.error.BusinessException;
 import java.time.Instant;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class AiToolAuditService {
@@ -31,6 +33,7 @@ public class AiToolAuditService {
 		this.sessionIdProvider = sessionIdProvider;
 	}
 
+	@Transactional(propagation = Propagation.REQUIRES_NEW)
 	public UUID start(AiGuideRequest request, String toolName, AiToolExecutionPolicy policy, Object arguments, Long versionBefore) {
 		UUID id = UUID.randomUUID();
 		mapper.insertToolCall(
@@ -40,6 +43,7 @@ public class AiToolAuditService {
 		return id;
 	}
 
+	@Transactional(propagation = Propagation.REQUIRES_NEW)
 	public AiToolCall succeed(
 		UUID id, String toolName, AiToolExecutionPolicy policy, Object result,
 		Long versionBefore, Long versionAfter, boolean undoAvailable
@@ -51,6 +55,7 @@ public class AiToolAuditService {
 		);
 	}
 
+	@Transactional(propagation = Propagation.REQUIRES_NEW)
 	public void fail(UUID id, RuntimeException exception) {
 		String code = exception instanceof BusinessException business
 			? business.errorCode().code() : "AI_TOOL_EXECUTION_FAILED";
