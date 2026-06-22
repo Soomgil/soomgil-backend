@@ -79,7 +79,7 @@ soomgil:
     base-url: ${MAPBOX_API_BASE_URL:https://api.mapbox.com}
     access-token: ${MAPBOX_ACCESS_TOKEN:}
   cors:
-    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://127.0.0.1:5173}
   mail:
     verification-base-url: ${MAIL_VERIFICATION_BASE_URL:http://localhost:5173/auth/verify-email}
     reset-base-url: ${MAIL_RESET_BASE_URL:http://localhost:5173/auth/reset-password}

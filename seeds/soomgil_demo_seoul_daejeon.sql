@@ -90,14 +90,17 @@ SELECT md5('demo-user:' || n)::uuid, 'ko', 'Asia/Seoul', n % 3 = 0,
 FROM generate_series(1, 20) n
 ON CONFLICT (user_id) DO NOTHING;
 
--- Shared local credential for visual/demo accounts only. Authentication is not the purpose of this dataset.
+-- Shared local credential for visual/demo accounts only: Soomgil123!
 INSERT INTO auth.user_password_credentials
   (user_id, password_hash, password_algorithm, password_changed_at, created_at, updated_at)
 SELECT md5('demo-user:' || n)::uuid,
-       '$2b$10$LcCmC64iYPhk8JYniS.Bt.9FFjERfngVrWMmes0gElUhLZGOVPk7q',
+       '$2a$10$4zIe8rBz3.2nGyj4JC/8uug1K82T9xDq74iVLGlgN1b5hzz5YEpCe',
        'bcrypt', now() - interval '90 days', now() - interval '90 days', now()
 FROM generate_series(1, 20) n
-ON CONFLICT (user_id) DO NOTHING;
+ON CONFLICT (user_id) DO UPDATE SET
+  password_hash = EXCLUDED.password_hash,
+  password_algorithm = EXCLUDED.password_algorithm,
+  updated_at = EXCLUDED.updated_at;
 
 INSERT INTO auth.user_policy_acceptances
   (id, user_id, policy_document_id, acceptance_method, accepted_at, created_at)
