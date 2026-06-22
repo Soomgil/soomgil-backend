@@ -76,7 +76,7 @@ soomgil:
     base-url: ${KTO_API_BASE_URL:https://apis.data.go.kr/B551011/KorService2}
     api-key: ${KTO_API_KEY:}
   mapbox:
-    base-url: ${MAPBOX_BASE_URL:https://api.mapbox.com}
+    base-url: ${MAPBOX_API_BASE_URL:https://api.mapbox.com}
     access-token: ${MAPBOX_ACCESS_TOKEN:}
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
