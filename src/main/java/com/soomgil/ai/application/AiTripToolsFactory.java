@@ -1,6 +1,5 @@
 package com.soomgil.ai.application;
 
-import com.soomgil.itinerary.application.command.handler.UpdateItineraryItemHandler;
 import com.soomgil.itinerary.application.query.handler.FindItineraryHandler;
 import com.soomgil.place.application.query.handler.PlaceSearchQueryHandler;
 import com.soomgil.planning.application.handler.CreateChecklistItemCommandHandler;
@@ -20,7 +19,6 @@ public class AiTripToolsFactory {
 	private final UpsertChecklistCommandHandler checklistHandler;
 	private final CreateChecklistItemCommandHandler checklistItemHandler;
 	private final AiItineraryToolService itineraryToolService;
-	private final UpdateItineraryItemHandler updateItemHandler;
 	private final AiToolAuditService auditService;
 
 	public AiTripToolsFactory(
@@ -31,7 +29,6 @@ public class AiTripToolsFactory {
 		UpsertChecklistCommandHandler checklistHandler,
 		CreateChecklistItemCommandHandler checklistItemHandler,
 		AiItineraryToolService itineraryToolService,
-		UpdateItineraryItemHandler updateItemHandler,
 		AiToolAuditService auditService
 	) {
 		this.itineraryHandler = itineraryHandler;
@@ -41,7 +38,6 @@ public class AiTripToolsFactory {
 		this.checklistHandler = checklistHandler;
 		this.checklistItemHandler = checklistItemHandler;
 		this.itineraryToolService = itineraryToolService;
-		this.updateItemHandler = updateItemHandler;
 		this.auditService = auditService;
 	}
 
@@ -59,8 +55,11 @@ public class AiTripToolsFactory {
 			case ADD_PLACE_TO_ITINERARY -> List.of(new AiAddPlaceTools(
 				request, auditService, itineraryToolService
 			));
+			case DELETE_ITINERARY_ITEM -> List.of(new AiDeleteItineraryItemTools(
+				request, auditService, itineraryToolService
+			));
 			case MOVE_ITINERARY_ITEM -> List.of(new AiMoveItineraryItemTools(
-				request, auditService, updateItemHandler
+				request, auditService, itineraryToolService
 			));
 			case SUMMARIZE_ITINERARY -> List.of(new AiSummarizeItineraryTools(
 				request, auditService, itineraryHandler

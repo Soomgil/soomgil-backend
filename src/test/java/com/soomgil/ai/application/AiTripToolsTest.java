@@ -5,7 +5,6 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.soomgil.itinerary.application.command.handler.UpdateItineraryItemHandler;
 import com.soomgil.itinerary.application.query.dto.FindItineraryQuery;
 import com.soomgil.itinerary.application.query.dto.ItineraryView;
 import com.soomgil.itinerary.application.query.handler.FindItineraryHandler;
@@ -84,6 +83,10 @@ class AiTripToolsTest {
 			.containsExactly("upsertNote");
 		assertThat(toolNames(factory.create(request, AiIntent.ADD_PLACE_TO_ITINERARY)))
 			.containsExactly("addPlaceToItinerary");
+		assertThat(toolNames(factory.create(request, AiIntent.DELETE_ITINERARY_ITEM)))
+			.containsExactly("deleteItineraryItem");
+		assertThat(toolNames(factory.create(request, AiIntent.MOVE_ITINERARY_ITEM)))
+			.containsExactly("moveItineraryItem");
 		assertThat(toolNames(factory.create(request, AiIntent.GENERAL_CHAT))).isEmpty();
 		assertThat(toolNames(factory.create(request, AiIntent.HELP))).isEmpty();
 		assertThat(toolNames(factory.create(request, AiIntent.AMBIGUOUS))).isEmpty();
@@ -102,7 +105,7 @@ class AiTripToolsTest {
 			mock(FindItineraryHandler.class), mock(PlaceSearchQueryHandler.class),
 			mock(ListPlaceRecommendationsQueryHandler.class), mock(UpsertNoteCommandHandler.class),
 			mock(UpsertChecklistCommandHandler.class), mock(CreateChecklistItemCommandHandler.class),
-			mock(AiItineraryToolService.class), mock(UpdateItineraryItemHandler.class), audit()
+			mock(AiItineraryToolService.class), audit()
 		);
 	}
 

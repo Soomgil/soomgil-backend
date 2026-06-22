@@ -105,20 +105,25 @@ public class AiChatService {
 			tripId, userId, session.id(), requestMessageId, session.summary(), recent,
 			question, baseVersion, viewport, null
 		);
-		AiIntentDecision decision = applySafetyPolicy(question, model.classify(classificationRequest));
+		AiIntentDecision decision = validDecision(model.classify(classificationRequest));
 		AiGuideRequest replyRequest = decision.intent().usesReadTools() || decision.intent().usesWriteTools()
 			? withTripContext(classificationRequest, contextService.load(tripId, userId))
 			: classificationRequest;
 		AiGuideReply reply = switch (decision.intent()) {
 			case READ_ITINERARY, SEARCH_PLACES, RECOMMEND_PLACES, SUMMARIZE_ITINERARY ->
 				model.replyWithReadTools(replyRequest, decision);
-			case WRITE_NOTE, WRITE_CHECKLIST, ADD_PLACE_TO_ITINERARY, MOVE_ITINERARY_ITEM,
+			case WRITE_NOTE, WRITE_CHECKLIST, ADD_PLACE_TO_ITINERARY, DELETE_ITINERARY_ITEM,
+					MOVE_ITINERARY_ITEM,
 					FILTER_PLACES_BY_CONDITION, GENERATE_CHECKLIST_FROM_ITINERARY, OPTIMIZE_ROUTE ->
 				model.replyWithWriteTools(replyRequest, decision);
 			case GENERAL_CHAT, HELP, AMBIGUOUS, UNSUPPORTED ->
 				model.replyWithoutTools(replyRequest, decision);
 		};
-		String answer = reply.content();
+		String answer = AiPlainTextFormatter.format(reply.content());
+		if (decision.intent() == AiIntent.UNSUPPORTED
+			&& !answer.contains(AiPlainTextFormatter.UNSUPPORTED_NOTICE)) {
+			answer = answer + " " + AiPlainTextFormatter.UNSUPPORTED_NOTICE;
+		}
 		if (answer == null || answer.isBlank()) {
 			throw new BusinessException(ErrorCode.AI_PROVIDER_UNAVAILABLE, "AI provider returned an empty response.");
 		}
@@ -152,6 +157,15 @@ public class AiChatService {
 		);
 	}
 
+	private AiIntentDecision validDecision(AiIntentDecision classified) {
+		if (classified != null) return classified;
+		return new AiIntentDecision(
+			AiIntent.AMBIGUOUS, 0.0, "분류 결과가 없습니다.",
+			"어떤 여행 정보를 확인하거나 변경하고 싶은지 조금 더 구체적으로 알려주시겠어요?"
+		);
+	}
+
+	@SuppressWarnings("unused")
 	private AiIntentDecision applySafetyPolicy(String question, AiIntentDecision classified) {
 		AiIntentDecision decision = classified == null
 			? new AiIntentDecision(AiIntent.AMBIGUOUS, 0.0, "분류 결과가 없습니다.", null)

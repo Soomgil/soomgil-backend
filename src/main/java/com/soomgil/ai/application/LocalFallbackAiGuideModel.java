@@ -49,6 +49,9 @@ public class LocalFallbackAiGuideModel implements AiGuideModel {
 			+ ".*장애인.*이용.*불가.*|.*유모차.*진입.*불가.*")) {
 			intent = AiIntent.FILTER_PLACES_BY_CONDITION;
 		}
+		else if (q.matches(".*(삭제|지워|제거|빼줘|빼기|없애).*")) {
+			intent = AiIntent.DELETE_ITINERARY_ITEM;
+		}
 		else if (q.matches(".*(요약|정리|분석|리뷰|코스.*봐줘|코스.*리뷰|한눈에.*보)|"
 			+ ".*(여행일정|여행.*일정|전체.*일정|일정.*전체).*(어때|어떨까|봐줘|알려)")) {
 			intent = AiIntent.SUMMARIZE_ITINERARY;
@@ -76,7 +79,7 @@ public class LocalFallbackAiGuideModel implements AiGuideModel {
 			intent = AiIntent.READ_ITINERARY;
 		}
 		else {
-			intent = AiIntent.GENERAL_CHAT;
+			intent = AiIntent.UNSUPPORTED;
 		}
 		return new AiIntentDecision(intent, 1.0, "로컬 안전 분류", null);
 	}
@@ -90,7 +93,8 @@ public class LocalFallbackAiGuideModel implements AiGuideModel {
 			case AMBIGUOUS -> decision.clarificationQuestion() == null
 				? "어떤 여행 정보를 확인하거나 변경하고 싶은지 조금 더 구체적으로 알려주시겠어요?"
 				: decision.clarificationQuestion();
-			case UNSUPPORTED -> "그 작업은 안전상 직접 처리할 수 없어요. 일정 조회나 메모·체크리스트처럼 여행방 안에서 되돌릴 수 있는 작업은 도와드릴게요.";
+			case UNSUPPORTED -> "요청하신 내용에 대해 일반적인 안내는 드릴 수 있지만 "
+				+ AiPlainTextFormatter.UNSUPPORTED_NOTICE;
 			default -> greeting(request.question())
 				? "안녕하세요! 여행 일정부터 장소 추천, 준비물 정리까지 무엇이든 편하게 말씀해주세요."
 				: "말씀하신 내용을 확인했어요. 여행 일정이나 장소, 메모, 체크리스트와 관련해 원하는 내용을 구체적으로 알려주시면 바로 도와드릴게요.";
@@ -137,6 +141,7 @@ public class LocalFallbackAiGuideModel implements AiGuideModel {
 			return switch (decision.intent()) {
 				case WRITE_NOTE -> writeNote(request, (AiNoteTools) executable);
 				case WRITE_CHECKLIST -> writeChecklist(request, (AiChecklistTools) executable);
+				case DELETE_ITINERARY_ITEM -> deleteItem(request, (AiDeleteItineraryItemTools) executable);
 				case MOVE_ITINERARY_ITEM -> moveItem(request, (AiMoveItineraryItemTools) executable);
 				case ADD_PLACE_TO_ITINERARY -> new AiGuideReply(
 					"정확한 장소 정보가 필요해요. 먼저 장소를 검색하거나 추천받은 뒤 추가할 장소와 일차를 지정해주세요.",
@@ -216,9 +221,26 @@ public class LocalFallbackAiGuideModel implements AiGuideModel {
 			);
 		}
 		tools.moveItineraryItem(new AiMoveItineraryItemTools.MoveItemInput(
-			request.baseVersion(), item.id(), targetDayId, null
+			request.baseVersion(), item.id(), item.placeName(), targetDayId, null, null
 		));
 		return new AiGuideReply(item.placeName() + "을(를) 요청한 일차로 옮겼어요.", tools.executedCalls());
+	}
+
+	private AiGuideReply deleteItem(AiGuideRequest request, AiDeleteItineraryItemTools tools) {
+		if (request.tripContext() == null) return new AiGuideReply("삭제할 일정 정보를 확인하지 못했어요.", List.of());
+		String normalizedQuestion = normalize(request.question());
+		AiTripContext.ItemSummary item = request.tripContext().days().stream()
+			.flatMap(day -> day.items().stream())
+			.filter(candidate -> candidate.placeName() != null
+				&& normalizedQuestion.contains(normalize(candidate.placeName())))
+			.findFirst().orElse(null);
+		if (item == null) {
+			return new AiGuideReply("일정에서 삭제할 장소 이름을 정확히 알려주세요.", List.of());
+		}
+		tools.deleteItineraryItem(new AiDeleteItineraryItemTools.DeleteItemInput(
+			request.baseVersion(), item.id(), item.placeName()
+		));
+		return new AiGuideReply(item.placeName() + "을(를) 일정에서 삭제했어요.", tools.executedCalls());
 	}
 
 	private UUID dayId(AiGuideRequest request) {

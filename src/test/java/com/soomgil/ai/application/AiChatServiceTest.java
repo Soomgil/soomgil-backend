@@ -78,7 +78,7 @@ class AiChatServiceTest {
 	@Test
 	void greetingNeverExposesTools() {
 		stubAssistant("안녕하세요! 여행 계획을 함께 정리해드릴게요.");
-		when(model.classify(any())).thenReturn(decision(AiIntent.WRITE_NOTE));
+		when(model.classify(any())).thenReturn(decision(AiIntent.GENERAL_CHAT));
 		when(model.replyWithoutTools(any(), any())).thenReturn(
 			new AiGuideReply("안녕하세요! 여행 계획을 함께 정리해드릴게요.", List.of())
 		);
@@ -97,7 +97,7 @@ class AiChatServiceTest {
 	@Test
 	void shorthandGreetingNeverLoadsTripContextOrExposesTools() {
 		stubAssistant("안녕하세요!");
-		when(model.classify(any())).thenReturn(decision(AiIntent.WRITE_NOTE));
+		when(model.classify(any())).thenReturn(decision(AiIntent.GENERAL_CHAT));
 		when(model.replyWithoutTools(any(), any())).thenReturn(new AiGuideReply("안녕하세요!", List.of()));
 
 		var response = service.createMessage(tripId, userId, "ㅎㅇ", null);
@@ -114,7 +114,7 @@ class AiChatServiceTest {
 	@Test
 	void helpQuestionNeverExposesTools() {
 		stubAssistant("일정 조회와 장소 추천 등을 도와드릴 수 있어요.");
-		when(model.classify(any())).thenReturn(decision(AiIntent.ADD_PLACE_TO_ITINERARY));
+		when(model.classify(any())).thenReturn(decision(AiIntent.HELP));
 		when(model.replyWithoutTools(any(), any())).thenReturn(
 			new AiGuideReply("일정 조회와 장소 추천 등을 도와드릴 수 있어요.", List.of())
 		);
