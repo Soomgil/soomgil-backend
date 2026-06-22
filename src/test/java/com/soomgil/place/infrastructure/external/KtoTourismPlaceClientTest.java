@@ -34,12 +34,23 @@ class KtoTourismPlaceClientTest {
 		assertThat(enriched.externalPlaceId()).isEqualTo("126508");
 		assertThat(enriched.name()).isEqualTo("해운대해수욕장");
 		assertThat(enriched.description()).isEqualTo("넓은 백사장이 있는 해수욕장");
-		assertThat(enriched.photos()).containsExactly(
-			"https://img.example/main.jpg",
-			"https://img.example/sub.jpg"
-		);
+		assertThat(enriched.photos()).containsExactly("https://img.example/main.jpg");
 		assertThat(enriched.category()).isEqualTo("관광지");
 		assertThat(enriched.sourceModifiedAt()).hasToString("2026-06-19T17:36:54+09:00");
+	}
+
+	@Test
+	void usesKtoThumbnailOnlyWhenTheOriginalImageIsMissing() throws Exception {
+		var listBody = objectMapper.readTree("""
+			{"response":{"header":{"resultCode":"0000"},"body":{"items":{"item":[{
+			  "contentid":"126508","title":"해운대해수욕장","contenttypeid":"12",
+			  "firstimage2":"https://img.example/thumbnail.jpg"
+			}]}}}}
+			""");
+
+		var places = KtoTourismPlaceClient.parseList(listBody);
+
+		assertThat(places.getFirst().photos()).containsExactly("https://img.example/thumbnail.jpg");
 	}
 
 	@Test

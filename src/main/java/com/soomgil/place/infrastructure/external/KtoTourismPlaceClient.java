@@ -131,7 +131,7 @@ public class KtoTourismPlaceClient implements TourismPlaceFeedClient {
 			if (contentId == null || title == null) {
 				continue;
 			}
-			List<String> photos = distinctUrls(text(item, "firstimage"), text(item, "firstimage2"));
+			List<String> photos = distinctUrls(preferredImage(item));
 			String contentType = text(item, "contenttypeid");
 			result.add(new TourismPlaceFeedItem(
 				contentId,
@@ -156,11 +156,8 @@ public class KtoTourismPlaceClient implements TourismPlaceFeedClient {
 			return place;
 		}
 		JsonNode detail = items.get(0);
-		List<String> photos = distinctUrls(
-			place.photos().toArray(String[]::new),
-			text(detail, "firstimage"),
-			text(detail, "firstimage2")
-		);
+		String detailImage = preferredImage(detail);
+		List<String> photos = detailImage == null ? place.photos() : List.of(detailImage);
 		return new TourismPlaceFeedItem(
 			place.externalPlaceId(),
 			place.name(),
@@ -233,6 +230,11 @@ public class KtoTourismPlaceClient implements TourismPlaceFeedClient {
 		return value == null ? null : Double.valueOf(value);
 	}
 
+	private static String preferredImage(JsonNode item) {
+		String original = text(item, "firstimage");
+		return original == null ? text(item, "firstimage2") : original;
+	}
+
 	private static List<String> distinctUrls(String... values) {
 		LinkedHashSet<String> urls = new LinkedHashSet<>();
 		for (String value : values) {
@@ -243,9 +245,4 @@ public class KtoTourismPlaceClient implements TourismPlaceFeedClient {
 		return List.copyOf(urls);
 	}
 
-	private static List<String> distinctUrls(String[] existing, String... values) {
-		List<String> all = new ArrayList<>(java.util.Arrays.asList(existing));
-		all.addAll(java.util.Arrays.asList(values));
-		return distinctUrls(all.toArray(String[]::new));
-	}
 }
