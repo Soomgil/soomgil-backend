@@ -3,6 +3,7 @@ package com.soomgil.media.infrastructure.persistence.mapper;
 import com.soomgil.media.infrastructure.persistence.row.MediaFileRow;
 import java.time.Instant;
 import java.util.UUID;
+import java.util.List;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -18,4 +19,10 @@ public interface MediaFileMapper {
 		@Param("purgeAfter") Instant purgeAfter);
 
 	long countAccessibleTripRecord(@Param("userId") UUID userId, @Param("recordId") UUID recordId);
+
+	List<MediaFileRow> findDueForPurge(@Param("now") Instant now, @Param("limit") int limit);
+
+	int markPurged(@Param("mediaFileId") UUID mediaFileId, @Param("purgedAt") Instant purgedAt);
+
+	int claimUnlinkedForPurge(@Param("mediaFileId") UUID mediaFileId, @Param("now") Instant now);
 }

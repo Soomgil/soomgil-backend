@@ -83,7 +83,7 @@ public class MediaController extends ApiControllerSupport {
 
 	private MediaFile toResponse(MediaFileMetadata value) {
 		return new MediaFile(
-			value.id(), value.publicUrl(), value.mimeType(), value.byteSize(), value.width(), value.height(),
+			value.id(), value.publicUrl(), null, null, value.mimeType(), value.byteSize(), value.width(), value.height(),
 			value.status(), value.createdAt()
 		);
 	}

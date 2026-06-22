@@ -15,6 +15,7 @@ import software.amazon.awssdk.core.ResponseBytes;
 import software.amazon.awssdk.core.exception.SdkException;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
@@ -22,6 +23,8 @@ import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.S3Exception;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
+import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
+import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PresignedPutObjectRequest;
 
@@ -71,6 +74,22 @@ public class S3ObjectStorageGateway implements ObjectStorageGateway {
 	}
 
 	@Override
+	public PresignedStorageRead presignRead(StorageReadRequest request) {
+		GetObjectRequest get = GetObjectRequest.builder()
+			.bucket(properties.bucket())
+			.key(request.objectKey().value())
+			.build();
+		PresignedGetObjectRequest signed = presigner.presignGetObject(GetObjectPresignRequest.builder()
+			.signatureDuration(request.validity())
+			.getObjectRequest(get)
+			.build());
+		return new PresignedStorageRead(
+			URI.create(signed.url().toString()),
+			OffsetDateTime.now(ZoneOffset.UTC).plus(request.validity())
+		);
+	}
+
+	@Override
 	public StoredObject inspect(StorageObjectKey objectKey) {
 		try {
 			HeadObjectResponse head = client.headObject(HeadObjectRequest.builder()
@@ -108,6 +127,19 @@ public class S3ObjectStorageGateway implements ObjectStorageGateway {
 		}
 		catch (Exception exception) {
 			throw new IllegalStateException("Stored media content could not be inspected.", exception);
+		}
+	}
+
+	@Override
+	public void delete(StorageObjectKey objectKey) {
+		try {
+			client.deleteObject(DeleteObjectRequest.builder()
+				.bucket(properties.bucket())
+				.key(objectKey.value())
+				.build());
+		}
+		catch (SdkException exception) {
+			throw new IllegalStateException("Object storage deletion failed.", exception);
 		}
 	}
 

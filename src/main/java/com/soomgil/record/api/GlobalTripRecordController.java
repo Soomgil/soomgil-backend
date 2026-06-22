@@ -5,13 +5,20 @@ import com.soomgil.common.id.Ids;
 import com.soomgil.global.error.BusinessException;
 import com.soomgil.global.error.ErrorCode;
 import com.soomgil.record.api.dto.PagedTripRecordPhoto;
+import com.soomgil.record.api.dto.TripRecordPhotoSummaryRequest;
+import com.soomgil.record.api.dto.TripRecordPhotoSummaryResponse;
+import com.soomgil.record.api.dto.TripRecordPhotoReadUrl;
 import com.soomgil.record.application.handler.TripRecordService;
+import jakarta.validation.Valid;
 import java.security.Principal;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -38,6 +45,22 @@ public class GlobalTripRecordController extends ApiControllerSupport {
 		Principal principal
 	) {
 		return tripRecordService.listPhotos(currentUserId(principal), page, size, sort);
+	}
+
+	@GetMapping("/photos/{mediaFileId}/read-url")
+	public TripRecordPhotoReadUrl refreshRecordPhotoReadUrl(
+		@PathVariable UUID mediaFileId,
+		Principal principal
+	) {
+		return tripRecordService.refreshPhotoReadUrl(currentUserId(principal), mediaFileId);
+	}
+
+	@PostMapping("/photo-summaries")
+	public TripRecordPhotoSummaryResponse summarizeRecordPhotos(
+		@Valid @RequestBody TripRecordPhotoSummaryRequest request,
+		Principal principal
+	) {
+		return tripRecordService.summarizePhotos(currentUserId(principal), request.tripIds());
 	}
 
 	private UUID currentUserId(Principal principal) {

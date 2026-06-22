@@ -5,6 +5,10 @@ import com.soomgil.common.id.Ids;
 import com.soomgil.common.time.TimeProvider;
 import com.soomgil.global.error.BusinessException;
 import com.soomgil.global.error.ErrorCode;
+import com.soomgil.global.storage.ObjectStorageGateway;
+import com.soomgil.global.storage.PresignedStorageRead;
+import com.soomgil.global.storage.StorageObjectKey;
+import com.soomgil.global.storage.StorageReadRequest;
 import com.soomgil.media.api.dto.MediaFile;
 import com.soomgil.record.api.dto.CreateTripRecordRequest;
 import com.soomgil.record.api.dto.PagedTripRecordEntry;
@@ -12,10 +16,14 @@ import com.soomgil.record.api.dto.PagedTripRecordPhoto;
 import com.soomgil.record.api.dto.RecordVisibility;
 import com.soomgil.record.api.dto.TripRecordEntry;
 import com.soomgil.record.api.dto.TripRecordPhoto;
+import com.soomgil.record.api.dto.TripRecordPhotoReadUrl;
+import com.soomgil.record.api.dto.TripRecordPhotoSummary;
+import com.soomgil.record.api.dto.TripRecordPhotoSummaryResponse;
 import com.soomgil.record.api.dto.UpdateTripRecordRequest;
 import com.soomgil.record.application.port.ItineraryReferenceRepository;
 import com.soomgil.record.application.port.RecordMediaAccessRepository;
 import com.soomgil.record.application.port.TripRecordCommandRepository;
+import com.soomgil.record.application.port.TripRecordCreateRequestReadModel;
 import com.soomgil.record.application.port.TripRecordEntryCreate;
 import com.soomgil.record.application.port.TripRecordEntryReadModel;
 import com.soomgil.record.application.port.TripRecordEntryUpdate;
@@ -23,15 +31,26 @@ import com.soomgil.record.application.port.TripRecordMediaReadModel;
 import com.soomgil.record.application.port.TripRecordPage;
 import com.soomgil.record.application.port.TripRecordPhotoPage;
 import com.soomgil.record.application.port.TripRecordPhotoReadModel;
+import com.soomgil.record.application.port.TripRecordPhotoSummaryReadModel;
+import com.soomgil.record.application.port.TripRecordPhotoUrlReadModel;
 import com.soomgil.record.application.port.TripRecordQueryRepository;
 import com.soomgil.trip.application.query.handler.TripAccessGuard;
 import com.soomgil.user.api.dto.UserSummary;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.LinkedHashSet;
+import java.util.HexFormat;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -43,11 +62,13 @@ public class TripRecordService {
 
 	private static final int DEFAULT_SIZE = 20;
 	private static final int MAX_SIZE = 100;
+	private static final Duration RECORD_MEDIA_READ_VALIDITY = Duration.ofMinutes(30);
 
 	private final TripRecordCommandRepository commandRepository;
 	private final TripRecordQueryRepository queryRepository;
 	private final ItineraryReferenceRepository itineraryReferenceRepository;
 	private final RecordMediaAccessRepository mediaAccessRepository;
+	private final ObjectStorageGateway objectStorageGateway;
 	private final TripAccessGuard tripAccessGuard;
 	private final TimeProvider timeProvider;
 
@@ -56,6 +77,7 @@ public class TripRecordService {
 		TripRecordQueryRepository queryRepository,
 		ItineraryReferenceRepository itineraryReferenceRepository,
 		RecordMediaAccessRepository mediaAccessRepository,
+		ObjectStorageGateway objectStorageGateway,
 		TripAccessGuard tripAccessGuard,
 		TimeProvider timeProvider
 	) {
@@ -66,6 +88,7 @@ public class TripRecordService {
 			"itineraryReferenceRepository must not be null"
 		);
 		this.mediaAccessRepository = Objects.requireNonNull(mediaAccessRepository, "mediaAccessRepository must not be null");
+		this.objectStorageGateway = Objects.requireNonNull(objectStorageGateway, "objectStorageGateway must not be null");
 		this.tripAccessGuard = Objects.requireNonNull(tripAccessGuard, "tripAccessGuard must not be null");
 		this.timeProvider = Objects.requireNonNull(timeProvider, "timeProvider must not be null");
 	}
@@ -84,9 +107,28 @@ public class TripRecordService {
 
 	@Transactional
 	public TripRecordEntry createRecord(UUID tripId, UUID userId, CreateTripRecordRequest request) {
+		return createRecord(tripId, userId, request, null);
+	}
+
+	@Transactional
+	public TripRecordEntry createRecord(
+		UUID tripId, UUID userId, CreateTripRecordRequest request, String idempotencyKey
+	) {
 		tripAccessGuard.requireActiveMember(tripId, userId);
 		validate(request.title(), request.lat(), request.lng());
 		validateItineraryReferences(tripId, request.itineraryDayId(), request.itineraryItemId());
+		String normalizedKey = normalizeIdempotencyKey(idempotencyKey);
+		String requestHash = requestHash(request);
+		if (normalizedKey != null) {
+			commandRepository.lockCreateRequest(userId, tripId, normalizedKey);
+			TripRecordCreateRequestReadModel existing = commandRepository.findCreateRequest(userId, tripId, normalizedKey);
+			if (existing != null) {
+				if (!existing.requestHash().equals(requestHash)) {
+					throw new BusinessException(ErrorCode.CONFLICT, "Idempotency key was reused with another request.");
+				}
+				return getRecord(tripId, userId, existing.recordId());
+			}
+		}
 		UUID recordId = Ids.newUuid();
 		OffsetDateTime now = now();
 		commandRepository.insertEntry(new TripRecordEntryCreate(
@@ -105,7 +147,36 @@ public class TripRecordService {
 			now
 		));
 		replaceMedia(recordId, userId, request.mediaFileIds(), now);
+		if (normalizedKey != null) {
+			commandRepository.insertCreateRequest(userId, tripId, normalizedKey, requestHash, recordId, now);
+		}
 		return getRecord(tripId, userId, recordId);
+	}
+
+	private String normalizeIdempotencyKey(String value) {
+		if (value == null || value.isBlank()) return null;
+		String normalized = value.trim();
+		if (normalized.length() < 8 || normalized.length() > 128) {
+			throw new BusinessException(ErrorCode.VALIDATION_FAILED, "Idempotency-Key must contain 8 to 128 characters.");
+		}
+		return normalized;
+	}
+
+	private String requestHash(CreateTripRecordRequest request) {
+		String canonical = String.join("\u001f",
+			Objects.toString(request.itineraryDayId(), ""), Objects.toString(request.itineraryItemId(), ""),
+			Objects.toString(request.title(), ""), Objects.toString(request.caption(), ""),
+			Objects.toString(request.locationName(), ""), Objects.toString(request.lat(), ""),
+			Objects.toString(request.lng(), ""), Objects.toString(request.takenAt(), ""),
+			Objects.toString(request.mediaFileIds(), "")
+		);
+		try {
+			return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+				.digest(canonical.getBytes(StandardCharsets.UTF_8)));
+		}
+		catch (NoSuchAlgorithmException exception) {
+			throw new IllegalStateException("SHA-256 is unavailable.", exception);
+		}
 	}
 
 	@Transactional(readOnly = true)
@@ -183,6 +254,57 @@ public class TripRecordService {
 		);
 	}
 
+	/**
+	 * 요청한 여행들의 사진 개수와 대표 사진을 한 번의 repository 조회로 반환한다.
+	 *
+	 * <p>요청은 1개 이상 100개 이하의 여행 ID만 허용하며, 중복 ID는 최초 순서를 유지해 제거한다.
+	 * 현재 사용자가 접근할 수 없는 여행이 하나라도 포함되면 전체 요청을 {@code FORBIDDEN}으로 거부한다.
+	 */
+	@Transactional(readOnly = true)
+	public TripRecordPhotoSummaryResponse summarizePhotos(UUID userId, List<UUID> tripIds) {
+		if (tripIds == null || tripIds.isEmpty() || tripIds.size() > MAX_SIZE || tripIds.stream().anyMatch(Objects::isNull)) {
+			throw new BusinessException(ErrorCode.VALIDATION_FAILED, "Between 1 and 100 trip IDs are required.");
+		}
+		List<UUID> requestedIds = List.copyOf(new LinkedHashSet<>(tripIds));
+		List<TripRecordPhotoSummaryReadModel> summaries = queryRepository.findPhotoSummariesByUser(userId, requestedIds);
+		Map<UUID, TripRecordPhotoSummaryReadModel> summariesByTripId = summaries.stream()
+			.collect(Collectors.toMap(TripRecordPhotoSummaryReadModel::tripId, Function.identity()));
+		if (summariesByTripId.size() != requestedIds.size()) {
+			throw new BusinessException(ErrorCode.FORBIDDEN, "Trip member access is required for every requested trip.");
+		}
+		return new TripRecordPhotoSummaryResponse(requestedIds.stream()
+			.map(tripId -> {
+				TripRecordPhotoSummaryReadModel summary = summariesByTripId.get(tripId);
+				ResolvedMediaUrl cover = resolveMediaUrl(summary.coverPublicUrl(), summary.coverObjectKey());
+				URI coverUrl = cover == null ? null : cover.url();
+				return new TripRecordPhotoSummary(
+					tripId,
+					summary.photoCount(),
+					summary.coverMediaFileId(),
+					coverUrl,
+					cover == null ? null : cover.expiresAt()
+				);
+			})
+			.toList());
+	}
+
+	/**
+	 * 현재 사용자가 접근 가능한 여행 기록 사진의 읽기 URL을 다시 발급한다.
+	 */
+	@Transactional(readOnly = true)
+	public TripRecordPhotoReadUrl refreshPhotoReadUrl(UUID userId, UUID mediaFileId) {
+		TripRecordPhotoUrlReadModel photo = queryRepository.findAccessiblePhotoUrl(userId, mediaFileId)
+			.orElseThrow(() -> new BusinessException(
+				ErrorCode.RESOURCE_NOT_FOUND,
+				"Accessible trip record photo was not found."
+			));
+		ResolvedMediaUrl resolved = resolveMediaUrl(photo.publicUrl(), photo.objectKey());
+		if (resolved == null) {
+			throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "Trip record photo URL was not found.");
+		}
+		return new TripRecordPhotoReadUrl(photo.mediaFileId(), resolved.url(), resolved.expiresAt());
+	}
+
 	private TripRecordEntryReadModel findEntry(UUID tripId, UUID recordId) {
 		return queryRepository.findEntry(tripId, recordId)
 			.orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "Trip record was not found."));
@@ -237,9 +359,12 @@ public class TripRecordService {
 	}
 
 	private MediaFile toMediaFile(TripRecordMediaReadModel media) {
+		ResolvedMediaUrl resolved = resolveMediaUrl(media.publicUrl(), media.objectKey());
 		return new MediaFile(
 			media.mediaFileId(),
-			media.publicUrl(),
+			publicUrl(media.publicUrl()),
+			servingUrl(media.publicUrl(), resolved),
+			servingUrlExpiresAt(media.publicUrl(), resolved),
 			media.mimeType(),
 			media.byteSize(),
 			media.width(),
@@ -250,9 +375,12 @@ public class TripRecordService {
 	}
 
 	private MediaFile toMediaFile(TripRecordPhotoReadModel photo) {
+		ResolvedMediaUrl resolved = resolveMediaUrl(photo.publicUrl(), photo.objectKey());
 		return new MediaFile(
 			photo.mediaFileId(),
-			photo.publicUrl(),
+			publicUrl(photo.publicUrl()),
+			servingUrl(photo.publicUrl(), resolved),
+			servingUrlExpiresAt(photo.publicUrl(), resolved),
 			photo.mimeType(),
 			photo.byteSize(),
 			photo.width(),
@@ -260,6 +388,35 @@ public class TripRecordService {
 			photo.mediaStatus(),
 			photo.mediaCreatedAt()
 		);
+	}
+
+	private ResolvedMediaUrl resolveMediaUrl(String publicUrl, String objectKey) {
+		if (publicUrl != null) {
+			return new ResolvedMediaUrl(URI.create(publicUrl), null);
+		}
+		if (objectKey == null) {
+			return null;
+		}
+		PresignedStorageRead read = objectStorageGateway.presignRead(new StorageReadRequest(
+			new StorageObjectKey(objectKey),
+			RECORD_MEDIA_READ_VALIDITY
+		));
+		return new ResolvedMediaUrl(read.readUrl(), read.expiresAt());
+	}
+
+	private URI publicUrl(String value) {
+		return value == null ? null : URI.create(value);
+	}
+
+	private URI servingUrl(String publicUrl, ResolvedMediaUrl resolved) {
+		return publicUrl == null && resolved != null ? resolved.url() : null;
+	}
+
+	private OffsetDateTime servingUrlExpiresAt(String publicUrl, ResolvedMediaUrl resolved) {
+		return publicUrl == null && resolved != null ? resolved.expiresAt() : null;
+	}
+
+	private record ResolvedMediaUrl(URI url, OffsetDateTime expiresAt) {
 	}
 
 	private UserSummary userSummary(UUID userId) {

@@ -112,6 +112,7 @@ public class CommunityPostController extends ApiControllerSupport {
 	@GetMapping
 	public PagedCommunityPostSummary listPosts(
 		@AuthenticationPrincipal CurrentUser currentUser,
+		@RequestParam(required = false) UUID authorId,
 		@RequestParam(required = false) String query,
 		@RequestParam(required = false) String hashtag,
 		@RequestParam(required = false) PostVisibility visibility,
@@ -121,7 +122,7 @@ public class CommunityPostController extends ApiControllerSupport {
 	) {
 		UUID viewerUserId = currentUser != null ? currentUser.userId() : null;
 		return listCommunityPostsQueryHandler.handle(
-			new ListCommunityPostsQuery(null, visibility, page, size, viewerUserId)
+			new ListCommunityPostsQuery(authorId, visibility, page, size, viewerUserId)
 		);
 	}
 

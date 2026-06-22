@@ -3,6 +3,7 @@ package com.soomgil.record.infrastructure.persistence.repository;
 import com.soomgil.record.application.port.TripRecordCommandRepository;
 import com.soomgil.record.application.port.TripRecordEntryCreate;
 import com.soomgil.record.application.port.TripRecordEntryUpdate;
+import com.soomgil.record.application.port.TripRecordCreateRequestReadModel;
 import com.soomgil.record.infrastructure.persistence.mapper.TripRecordCommandMapper;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -47,5 +48,22 @@ public class MyBatisTripRecordCommandRepository implements TripRecordCommandRepo
 		for (int index = 0; index < mediaFileIds.size(); index++) {
 			mapper.insertMediaLink(recordId, mediaFileIds.get(index), index, createdAt);
 		}
+	}
+
+	@Override
+	public void lockCreateRequest(UUID userId, UUID tripId, String idempotencyKey) {
+		mapper.lockCreateRequest(userId + ":" + tripId + ":" + idempotencyKey);
+	}
+
+	@Override
+	public TripRecordCreateRequestReadModel findCreateRequest(UUID userId, UUID tripId, String idempotencyKey) {
+		return mapper.findCreateRequest(userId, tripId, idempotencyKey);
+	}
+
+	@Override
+	public void insertCreateRequest(
+		UUID userId, UUID tripId, String idempotencyKey, String requestHash, UUID recordId, OffsetDateTime createdAt
+	) {
+		mapper.insertCreateRequest(userId, tripId, idempotencyKey, requestHash, recordId, createdAt);
 	}
 }

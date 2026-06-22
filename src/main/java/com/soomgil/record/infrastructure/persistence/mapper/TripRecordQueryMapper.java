@@ -3,6 +3,8 @@ package com.soomgil.record.infrastructure.persistence.mapper;
 import com.soomgil.record.application.port.TripRecordEntryReadModel;
 import com.soomgil.record.application.port.TripRecordMediaReadModel;
 import com.soomgil.record.application.port.TripRecordPhotoReadModel;
+import com.soomgil.record.application.port.TripRecordPhotoSummaryReadModel;
+import com.soomgil.record.application.port.TripRecordPhotoUrlReadModel;
 import java.util.List;
 import java.util.UUID;
 import org.apache.ibatis.annotations.Mapper;
@@ -33,4 +35,14 @@ public interface TripRecordQueryMapper {
 	);
 
 	long countPhotosByUser(@Param("userId") UUID userId);
+
+	TripRecordPhotoUrlReadModel findAccessiblePhotoUrl(
+		@Param("userId") UUID userId,
+		@Param("mediaFileId") UUID mediaFileId
+	);
+
+	List<TripRecordPhotoSummaryReadModel> findPhotoSummariesByUser(
+		@Param("userId") UUID userId,
+		@Param("tripIds") List<UUID> tripIds
+	);
 }

@@ -6,16 +6,22 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.times;
 
 import com.soomgil.global.error.BusinessException;
 import com.soomgil.global.error.ErrorCode;
+import com.soomgil.global.storage.ObjectStorageGateway;
+import com.soomgil.global.storage.PresignedStorageRead;
+import com.soomgil.global.storage.StorageReadRequest;
 import com.soomgil.record.api.dto.CreateTripRecordRequest;
 import com.soomgil.record.api.dto.PagedTripRecordEntry;
 import com.soomgil.record.api.dto.PagedTripRecordPhoto;
+import com.soomgil.record.api.dto.TripRecordPhotoSummaryResponse;
 import com.soomgil.record.api.dto.UpdateTripRecordRequest;
 import com.soomgil.record.application.port.ItineraryReferenceRepository;
 import com.soomgil.record.application.port.RecordMediaAccessRepository;
 import com.soomgil.record.application.port.TripRecordCommandRepository;
+import com.soomgil.record.application.port.TripRecordCreateRequestReadModel;
 import com.soomgil.record.application.port.TripRecordEntryCreate;
 import com.soomgil.record.application.port.TripRecordEntryReadModel;
 import com.soomgil.record.application.port.TripRecordEntryUpdate;
@@ -23,6 +29,8 @@ import com.soomgil.record.application.port.TripRecordMediaReadModel;
 import com.soomgil.record.application.port.TripRecordPage;
 import com.soomgil.record.application.port.TripRecordPhotoPage;
 import com.soomgil.record.application.port.TripRecordPhotoReadModel;
+import com.soomgil.record.application.port.TripRecordPhotoSummaryReadModel;
+import com.soomgil.record.application.port.TripRecordPhotoUrlReadModel;
 import com.soomgil.record.application.port.TripRecordQueryRepository;
 import com.soomgil.trip.application.port.TripAccessSnapshot;
 import com.soomgil.trip.application.port.TripQueryRepository;
@@ -30,6 +38,7 @@ import com.soomgil.trip.application.query.handler.TripAccessGuard;
 import com.soomgil.trip.domain.model.TripMemberStatus;
 import com.soomgil.trip.domain.model.TripStatus;
 import java.net.URI;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -41,6 +50,7 @@ import org.mockito.ArgumentCaptor;
 class TripRecordServiceTest {
 
 	private static final UUID TRIP_ID = UUID.fromString("10000000-0000-0000-0000-000000000001");
+	private static final UUID OTHER_TRIP_ID = UUID.fromString("10000000-0000-0000-0000-000000000002");
 	private static final UUID USER_ID = UUID.fromString("20000000-0000-0000-0000-000000000001");
 	private static final UUID OTHER_USER_ID = UUID.fromString("20000000-0000-0000-0000-000000000002");
 	private static final UUID RECORD_ID = UUID.fromString("30000000-0000-0000-0000-000000000001");
@@ -50,11 +60,13 @@ class TripRecordServiceTest {
 	private final TripRecordQueryRepository queryRepository = mock(TripRecordQueryRepository.class);
 	private final ItineraryReferenceRepository itineraryReferenceRepository = mock(ItineraryReferenceRepository.class);
 	private final RecordMediaAccessRepository mediaAccessRepository = mock(RecordMediaAccessRepository.class);
+	private final ObjectStorageGateway objectStorageGateway = mock(ObjectStorageGateway.class);
 	private final TripRecordService service = new TripRecordService(
 		commandRepository,
 		queryRepository,
 		itineraryReferenceRepository,
 		mediaAccessRepository,
+		objectStorageGateway,
 		new TripAccessGuard(tripRepository()),
 		() -> Instant.parse("2026-06-18T00:00:00Z")
 	);
@@ -121,6 +133,117 @@ class TripRecordServiceTest {
 		assertThat(result.items()).hasSize(1);
 		assertThat(result.items().getFirst().tripId()).isEqualTo(TRIP_ID);
 		assertThat(result.page().totalElements()).isEqualTo(1);
+	}
+
+	@Test
+	void returnsTheExistingRecordForTheSameIdempotencyRequest() {
+		when(queryRepository.findEntry(any(), any())).thenReturn(Optional.of(entry(USER_ID)));
+		when(queryRepository.findMedia(any())).thenReturn(List.of(media()));
+		when(mediaAccessRepository.areLinkable(any(), org.mockito.ArgumentMatchers.eq(USER_ID), any())).thenReturn(true);
+		CreateTripRecordRequest request = new CreateTripRecordRequest(
+			null, null, "제목", null, null, null, null, null, List.of(MEDIA_ID)
+		);
+
+		service.createRecord(TRIP_ID, USER_ID, request, "record-request-1");
+		ArgumentCaptor<String> hash = ArgumentCaptor.forClass(String.class);
+		verify(commandRepository).insertCreateRequest(
+			org.mockito.ArgumentMatchers.eq(USER_ID), org.mockito.ArgumentMatchers.eq(TRIP_ID),
+			org.mockito.ArgumentMatchers.eq("record-request-1"), hash.capture(), any(), any()
+		);
+		when(commandRepository.findCreateRequest(USER_ID, TRIP_ID, "record-request-1"))
+			.thenReturn(new TripRecordCreateRequestReadModel(hash.getValue(), RECORD_ID));
+
+		service.createRecord(TRIP_ID, USER_ID, request, "record-request-1");
+
+		verify(commandRepository, times(1)).insertEntry(any(TripRecordEntryCreate.class));
+		verify(commandRepository, times(2)).lockCreateRequest(USER_ID, TRIP_ID, "record-request-1");
+	}
+
+	@Test
+	void createsThirtyMinuteServingUrlForPrivateRecordPhoto() {
+		OffsetDateTime expiresAt = OffsetDateTime.parse("2026-06-18T00:30:00Z");
+		when(queryRepository.findPhotosByUser(USER_ID, 0, 20))
+			.thenReturn(new TripRecordPhotoPage(List.of(privatePhoto()), 1));
+		when(objectStorageGateway.presignRead(any(StorageReadRequest.class))).thenReturn(new PresignedStorageRead(
+			URI.create("https://storage.example.com/private-photo?X-Amz-Signature=signed"),
+			expiresAt
+		));
+
+		PagedTripRecordPhoto result = service.listPhotos(USER_ID, 0, 20, List.of());
+
+		assertThat(result.items().getFirst().media().publicUrl()).isNull();
+		assertThat(result.items().getFirst().media().servingUrl())
+			.hasToString("https://storage.example.com/private-photo?X-Amz-Signature=signed");
+		assertThat(result.items().getFirst().media().servingUrlExpiresAt()).isEqualTo(expiresAt);
+		ArgumentCaptor<StorageReadRequest> request = ArgumentCaptor.forClass(StorageReadRequest.class);
+		verify(objectStorageGateway).presignRead(request.capture());
+		assertThat(request.getValue().objectKey().value()).isEqualTo("media/user/trip-record/a.jpg");
+		assertThat(request.getValue().validity()).isEqualTo(Duration.ofMinutes(30));
+	}
+
+	@Test
+	void summarizesPhotosForTripsInOneRepositoryCall() {
+		when(objectStorageGateway.presignRead(any(StorageReadRequest.class))).thenReturn(new PresignedStorageRead(
+			URI.create("https://storage.example.com/cover?X-Amz-Signature=signed"),
+			OffsetDateTime.parse("2026-06-18T00:30:00Z")
+		));
+		when(queryRepository.findPhotoSummariesByUser(USER_ID, List.of(TRIP_ID, OTHER_TRIP_ID)))
+			.thenReturn(List.of(
+				new TripRecordPhotoSummaryReadModel(OTHER_TRIP_ID, 0, null, null, null),
+				new TripRecordPhotoSummaryReadModel(TRIP_ID, 3, MEDIA_ID, "media/user/trip-record/cover.jpg", null)
+			));
+
+		TripRecordPhotoSummaryResponse result = service.summarizePhotos(
+			USER_ID,
+			List.of(TRIP_ID, OTHER_TRIP_ID, TRIP_ID)
+		);
+
+		assertThat(result.items()).extracting(item -> item.tripId()).containsExactly(TRIP_ID, OTHER_TRIP_ID);
+		assertThat(result.items().getFirst().photoCount()).isEqualTo(3);
+		assertThat(result.items().getFirst().coverUrl())
+			.isEqualTo(URI.create("https://storage.example.com/cover?X-Amz-Signature=signed"));
+		assertThat(result.items().getFirst().coverMediaFileId()).isEqualTo(MEDIA_ID);
+		assertThat(result.items().getFirst().coverUrlExpiresAt())
+			.isEqualTo(OffsetDateTime.parse("2026-06-18T00:30:00Z"));
+		verify(queryRepository).findPhotoSummariesByUser(USER_ID, List.of(TRIP_ID, OTHER_TRIP_ID));
+	}
+
+	@Test
+	void rejectsPhotoSummaryWhenAnyRequestedTripIsNotAccessible() {
+		when(queryRepository.findPhotoSummariesByUser(USER_ID, List.of(TRIP_ID, OTHER_TRIP_ID)))
+			.thenReturn(List.of(new TripRecordPhotoSummaryReadModel(TRIP_ID, 0, null, null, null)));
+
+		assertThatThrownBy(() -> service.summarizePhotos(USER_ID, List.of(TRIP_ID, OTHER_TRIP_ID)))
+			.isInstanceOfSatisfying(BusinessException.class, exception ->
+				assertThat(exception.errorCode()).isEqualTo(ErrorCode.FORBIDDEN)
+			);
+	}
+
+	@Test
+	void refreshesReadUrlOnlyForAnAccessibleRecordPhoto() {
+		OffsetDateTime expiresAt = OffsetDateTime.parse("2026-06-18T00:30:00Z");
+		when(queryRepository.findAccessiblePhotoUrl(USER_ID, MEDIA_ID)).thenReturn(Optional.of(
+			new TripRecordPhotoUrlReadModel(MEDIA_ID, "media/user/trip-record/a.jpg", null)
+		));
+		when(objectStorageGateway.presignRead(any(StorageReadRequest.class))).thenReturn(new PresignedStorageRead(
+			URI.create("https://storage.example.com/refreshed?X-Amz-Signature=signed"), expiresAt
+		));
+
+		var result = service.refreshPhotoReadUrl(USER_ID, MEDIA_ID);
+
+		assertThat(result.mediaFileId()).isEqualTo(MEDIA_ID);
+		assertThat(result.url()).hasToString("https://storage.example.com/refreshed?X-Amz-Signature=signed");
+		assertThat(result.expiresAt()).isEqualTo(expiresAt);
+	}
+
+	@Test
+	void hidesAnInaccessibleRecordPhotoAsNotFound() {
+		when(queryRepository.findAccessiblePhotoUrl(USER_ID, MEDIA_ID)).thenReturn(Optional.empty());
+
+		assertThatThrownBy(() -> service.refreshPhotoReadUrl(USER_ID, MEDIA_ID))
+			.isInstanceOfSatisfying(BusinessException.class, exception ->
+				assertThat(exception.errorCode()).isEqualTo(ErrorCode.RESOURCE_NOT_FOUND)
+			);
 	}
 
 	@Test
@@ -217,7 +340,8 @@ class TripRecordServiceTest {
 		return new TripRecordMediaReadModel(
 			RECORD_ID,
 			MEDIA_ID,
-			URI.create("https://example.com/a.jpg"),
+			"media/user/trip-record/a.jpg",
+			"https://example.com/a.jpg",
 			"image/jpeg",
 			100L,
 			100,
@@ -237,7 +361,30 @@ class TripRecordServiceTest {
 			null,
 			USER_ID,
 			MEDIA_ID,
-			URI.create("https://example.com/a.jpg"),
+			"media/user/trip-record/a.jpg",
+			"https://example.com/a.jpg",
+			"image/jpeg",
+			100L,
+			100,
+			100,
+			"ACTIVE",
+			OffsetDateTime.parse("2026-06-18T00:00:00Z"),
+			OffsetDateTime.parse("2026-06-18T10:00:00Z"),
+			OffsetDateTime.parse("2026-06-18T00:00:00Z")
+		);
+	}
+
+	private TripRecordPhotoReadModel privatePhoto() {
+		return new TripRecordPhotoReadModel(
+			TRIP_ID,
+			"부산 여행",
+			RECORD_ID,
+			null,
+			null,
+			USER_ID,
+			MEDIA_ID,
+			"media/user/trip-record/a.jpg",
+			null,
 			"image/jpeg",
 			100L,
 			100,
