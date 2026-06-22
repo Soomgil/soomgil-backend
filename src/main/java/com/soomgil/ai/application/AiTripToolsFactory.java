@@ -8,6 +8,7 @@ import com.soomgil.planning.application.handler.UpsertChecklistCommandHandler;
 import com.soomgil.planning.application.handler.UpsertNoteCommandHandler;
 import com.soomgil.preference.application.query.handler.ListPlaceRecommendationsQueryHandler;
 import org.springframework.stereotype.Component;
+import java.util.List;
 
 @Component
 public class AiTripToolsFactory {
@@ -44,11 +45,24 @@ public class AiTripToolsFactory {
 		this.auditService = auditService;
 	}
 
-	public AiTripTools create(AiGuideRequest request) {
-		return new AiTripTools(
-			request.tripId(), request.requesterUserId(), itineraryHandler, placeSearchHandler,
-			recommendationHandler, noteHandler, checklistHandler, checklistItemHandler,
-			itineraryToolService, updateItemHandler, request, auditService
-		);
+	public List<AiExecutableTools> create(AiGuideRequest request, AiIntent intent) {
+		return switch (intent) {
+			case READ_ITINERARY -> List.of(new AiItineraryReadTools(request, auditService, itineraryHandler));
+			case SEARCH_PLACES -> List.of(new AiPlaceSearchTools(request, auditService, placeSearchHandler));
+			case RECOMMEND_PLACES -> List.of(new AiPlaceRecommendationTools(
+				request, auditService, recommendationHandler
+			));
+			case WRITE_NOTE -> List.of(new AiNoteTools(request, auditService, noteHandler));
+			case WRITE_CHECKLIST -> List.of(new AiChecklistTools(
+				request, auditService, checklistHandler, checklistItemHandler
+			));
+			case ADD_PLACE_TO_ITINERARY -> List.of(new AiAddPlaceTools(
+				request, auditService, itineraryToolService
+			));
+			case MOVE_ITINERARY_ITEM -> List.of(new AiMoveItineraryItemTools(
+				request, auditService, updateItemHandler
+			));
+			default -> List.of();
+		};
 	}
 }

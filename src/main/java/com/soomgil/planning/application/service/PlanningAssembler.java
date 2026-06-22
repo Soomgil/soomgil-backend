@@ -23,7 +23,7 @@ import org.springframework.stereotype.Component;
  * planning domain record를 API 응답 DTO로 조립한다.
  *
  * <p>member status의 {@link UserSummary}는 {@link FindDisplayNameQueryHandler}를 통해
- * auth 모듈의 application interface로 해결한다. profile image URL은 아직 미구현이므로 null.
+	 * auth 모듈의 application interface로 해결한다.
  *
  * <p>{@link PlanningMutationResponse}의 {@code itineraryVersion}/{@code commandEventId}/
  * {@code undoAvailable}/{@code redoAvailable}은 collaboration/itinerary 모듈 연동 전까지 stub.
@@ -113,8 +113,13 @@ public class PlanningAssembler {
 	 * @return member status DTO
 	 */
 	public ChecklistMemberStatus toMemberStatusDto(ChecklistMemberStatusRecord record) {
+		FindDisplayNameQuery query = new FindDisplayNameQuery(record.userId());
 		return new ChecklistMemberStatus(
-			new UserSummary(record.userId(), resolveDisplayName(record.userId()), null),
+			new UserSummary(
+				record.userId(),
+				displayNameQueryHandler.handle(query),
+				displayNameQueryHandler.findProfileImageUrl(query)
+			),
 			record.isCompleted(),
 			toOffsetDateTime(record.completedAt()),
 			toOffsetDateTime(record.updatedAt())
@@ -168,10 +173,6 @@ public class PlanningAssembler {
 		UUID tripId, ChecklistMemberStatus status) {
 		return new PlanningMutationResponse(
 			tripId, null, null, false, false, null, null, null, status);
-	}
-
-	private String resolveDisplayName(UUID userId) {
-		return displayNameQueryHandler.handle(new FindDisplayNameQuery(userId));
 	}
 
 	private OffsetDateTime toOffsetDateTime(java.time.Instant instant) {

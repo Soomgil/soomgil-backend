@@ -101,11 +101,22 @@ public class AiChatService {
 			.toList());
 		UUID requestMessageId = UUID.randomUUID();
 		mapper.insertMessage(requestMessageId, session.id(), userId, AiMessageRole.USER.name(), question, Instant.now());
-		AiTripContext tripContext = contextService.load(tripId, userId);
-		AiGuideReply reply = model.reply(new AiGuideRequest(
+		AiGuideRequest classificationRequest = new AiGuideRequest(
 			tripId, userId, session.id(), requestMessageId, session.summary(), recent,
-			question, baseVersion, viewport, tripContext
-		));
+			question, baseVersion, viewport, null
+		);
+		AiIntentDecision decision = applySafetyPolicy(question, model.classify(classificationRequest));
+		AiGuideRequest replyRequest = decision.intent().usesReadTools() || decision.intent().usesWriteTools()
+			? withTripContext(classificationRequest, contextService.load(tripId, userId))
+			: classificationRequest;
+		AiGuideReply reply = switch (decision.intent()) {
+			case READ_ITINERARY, SEARCH_PLACES, RECOMMEND_PLACES ->
+				model.replyWithReadTools(replyRequest, decision);
+			case WRITE_NOTE, WRITE_CHECKLIST, ADD_PLACE_TO_ITINERARY, MOVE_ITINERARY_ITEM ->
+				model.replyWithWriteTools(replyRequest, decision);
+			case GENERAL_CHAT, HELP, AMBIGUOUS, UNSUPPORTED ->
+				model.replyWithoutTools(replyRequest, decision);
+		};
 		String answer = reply.content();
 		if (answer == null || answer.isBlank()) {
 			throw new BusinessException(ErrorCode.AI_PROVIDER_UNAVAILABLE, "AI provider returned an empty response.");
@@ -130,6 +141,70 @@ public class AiChatService {
 		);
 		messagingTemplate.convertAndSend("/topic/trips/" + tripId + "/ai", response);
 		return response;
+	}
+
+	private AiGuideRequest withTripContext(AiGuideRequest request, AiTripContext tripContext) {
+		return new AiGuideRequest(
+			request.tripId(), request.requesterUserId(), request.sessionId(), request.requestMessageId(),
+			request.sessionSummary(), request.recentMessages(), request.question(), request.baseVersion(),
+			request.viewport(), tripContext
+		);
+	}
+
+	private AiIntentDecision applySafetyPolicy(String question, AiIntentDecision classified) {
+		AiIntentDecision decision = classified == null
+			? new AiIntentDecision(AiIntent.AMBIGUOUS, 0.0, "분류 결과가 없습니다.", null)
+			: classified;
+		String normalized = question.toLowerCase()
+			.replaceAll("[\\s!?.,~]+", "")
+			.trim();
+		if (normalized.matches("(ㅎㅇ|안녕|안녕하세요|안녕하십니까|반가워|반가워요|반갑습니다|하이|헬로|hi|hello)")) {
+			return decision.force(AiIntent.GENERAL_CHAT, "단순 인사는 도구를 사용하지 않습니다.");
+		}
+		if (normalized.matches("(고마워|고마워요|고맙습니다|감사|감사해|감사해요|감사합니다|thanks|thankyou)")) {
+			return decision.force(AiIntent.GENERAL_CHAT, "단순 감사는 도구를 사용하지 않습니다.");
+		}
+		if (normalized.matches(".*(뭐할수있어|무엇을할수있어|어떤걸할수있어|사용법|기능알려줘|howtouse).*")) {
+			return decision.force(AiIntent.HELP, "사용법 질문은 도구를 사용하지 않습니다.");
+		}
+		if ((decision.intent().usesReadTools() || decision.intent().usesWriteTools())
+			&& !hasExplicitIntentCue(decision.intent(), normalized)) {
+			return new AiIntentDecision(
+				AiIntent.AMBIGUOUS,
+				decision.confidence(),
+				"도구 실행에 필요한 명시적인 요청 표현이 없습니다.",
+				"조회하거나 변경하려는 내용을 조금 더 구체적으로 말씀해주시겠어요?"
+			);
+		}
+		if (decision.confidence() < 0.55 && decision.intent() != AiIntent.GENERAL_CHAT
+			&& decision.intent() != AiIntent.HELP && decision.intent() != AiIntent.UNSUPPORTED) {
+			return new AiIntentDecision(
+				AiIntent.AMBIGUOUS,
+				decision.confidence(),
+				"분류 확신도가 낮아 실행하지 않습니다.",
+				decision.clarificationQuestion() == null
+					? "어떤 정보를 확인하거나 변경하고 싶은지 조금 더 구체적으로 알려주시겠어요?"
+					: decision.clarificationQuestion()
+			);
+		}
+		return decision;
+	}
+
+	private boolean hasExplicitIntentCue(AiIntent intent, String question) {
+		return switch (intent) {
+			case READ_ITINERARY -> question.matches(".*(일정|일차|동선|경로).*(보여|조회|알려|확인|어떻게|뭐야).*"
+				) || question.matches(".*(보여|조회|알려|확인).*(일정|일차|동선|경로).*");
+			case SEARCH_PLACES -> question.matches(".*(찾아|검색|찾아줘|어디있|장소알려).*");
+			case RECOMMEND_PLACES -> question.matches(".*(추천|어디갈|어디가좋|갈만한).*");
+			case WRITE_NOTE -> question.contains("메모")
+				&& question.matches(".*(써|작성|기록|추가|수정|바꿔|저장).*");
+			case WRITE_CHECKLIST -> question.contains("체크리스트")
+				&& question.matches(".*(만들|작성|추가|수정|바꿔|넣어|체크).*");
+			case ADD_PLACE_TO_ITINERARY -> question.matches(".*(일정|일차).*(추가|넣어|등록).*")
+				|| question.matches(".*(추가|넣어|등록).*(일정|일차).*");
+			case MOVE_ITINERARY_ITEM -> question.matches(".*(옮겨|이동|재배치|순서.*바꿔).*");
+			default -> false;
+		};
 	}
 
 	private AiChatSessionRow requireSession(UUID tripId) {

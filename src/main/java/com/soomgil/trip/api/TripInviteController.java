@@ -16,6 +16,8 @@ import com.soomgil.trip.application.query.dto.TripDetailView;
 import com.soomgil.trip.application.query.dto.TripMemberView;
 import com.soomgil.trip.application.query.handler.FindTripDetailHandler;
 import com.soomgil.user.api.dto.UserSummary;
+import com.soomgil.auth.application.handler.FindDisplayNameQueryHandler;
+import com.soomgil.auth.application.query.FindDisplayNameQuery;
 import jakarta.validation.Valid;
 import java.security.Principal;
 import java.time.OffsetDateTime;
@@ -40,10 +42,12 @@ public class TripInviteController {
 
 	private final AcceptTripInviteHandler acceptTripInviteHandler;
 	private final FindTripDetailHandler findTripDetailHandler;
+	private final FindDisplayNameQueryHandler displayNameHandler;
 
 	public TripInviteController(
 		AcceptTripInviteHandler acceptTripInviteHandler,
-		FindTripDetailHandler findTripDetailHandler
+		FindTripDetailHandler findTripDetailHandler,
+		FindDisplayNameQueryHandler displayNameHandler
 	) {
 		this.acceptTripInviteHandler = Objects.requireNonNull(
 			acceptTripInviteHandler,
@@ -53,6 +57,7 @@ public class TripInviteController {
 			findTripDetailHandler,
 			"findTripDetailHandler must not be null"
 		);
+		this.displayNameHandler = Objects.requireNonNull(displayNameHandler, "displayNameHandler must not be null");
 	}
 
 	@PostMapping("/{inviteCode}/accept")
@@ -98,10 +103,15 @@ public class TripInviteController {
 	}
 
 	private TripMember toTripMember(TripMemberView view) {
+		FindDisplayNameQuery query = new FindDisplayNameQuery(view.userId());
 		return new TripMember(
 			view.id(),
 			view.tripId(),
-			new UserSummary(view.userId(), view.userId().toString(), null),
+			new UserSummary(
+				view.userId(),
+				displayNameHandler.handle(query),
+				displayNameHandler.findProfileImageUrl(query)
+			),
 			com.soomgil.trip.api.dto.TripMemberRole.valueOf(view.role().name()),
 			TripAccessRole.valueOf(view.accessRole().name()),
 			com.soomgil.trip.api.dto.TripMemberStatus.valueOf(view.status().name()),
