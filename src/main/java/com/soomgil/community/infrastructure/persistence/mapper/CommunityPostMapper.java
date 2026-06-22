@@ -121,6 +121,63 @@ public interface CommunityPostMapper {
 	long countPublicFeed();
 
 	/**
+	 * 통합 검색용 — 키워드 매칭 공개 게시글을 좋아요 순으로 조회.
+	 *
+	 * <p>post_likes 집계를 LEFT JOIN 해 like_count가 0이어도 결과에 포함.
+	 * 키워드는 title 또는 summary에 대소문자 무시 매칭. q가 null/빈 값이면 키워드 필터 없음.
+	 *
+	 * @param q      검색 키워드
+	 * @param offset 건너뛸 row 수
+	 * @param size   가져올 row 수
+	 * @return 게시글 목록
+	 */
+	@Select("""
+		SELECT p.id, p.source_trip_id, p.source_trip_version, p.published_by_user_id,
+		       p.visibility, p.title, p.summary, p.cover_media_file_id, p.snapshot_version,
+		       p.share_token_hash, p.share_token_created_at, p.share_token_rotated_at,
+		       p.moderation_status, p.published_at, p.deleted_at, p.snapshot::text AS snapshot_json
+		FROM community.posts p
+		LEFT JOIN (
+		    SELECT post_id, COUNT(*) AS like_count
+		    FROM community.post_likes
+		    WHERE deleted_at IS NULL
+		    GROUP BY post_id
+		) likes ON likes.post_id = p.id
+		WHERE p.deleted_at IS NULL
+		  AND p.moderation_status = 'VISIBLE'
+		  AND p.visibility = 'PUBLIC'
+		  AND (
+		    #{q} IS NULL OR #{q} = ''
+		    OR LOWER(p.title) LIKE LOWER('%' || #{q} || '%')
+		    OR LOWER(COALESCE(p.summary, '')) LIKE LOWER('%' || #{q} || '%')
+		  )
+		ORDER BY COALESCE(likes.like_count, 0) DESC, p.published_at DESC
+		LIMIT #{size} OFFSET #{offset}
+		""")
+	List<CommunityPostRecord> searchPublicFeedByLikes(
+		@Param("q") String q,
+		@Param("offset") int offset,
+		@Param("size") int size
+	);
+
+	/**
+	 * 통합 검색용 — 키워드 매칭 공개 게시글 총 수.
+	 */
+	@Select("""
+		SELECT COUNT(*)
+		FROM community.posts p
+		WHERE p.deleted_at IS NULL
+		  AND p.moderation_status = 'VISIBLE'
+		  AND p.visibility = 'PUBLIC'
+		  AND (
+		    #{q} IS NULL OR #{q} = ''
+		    OR LOWER(p.title) LIKE LOWER('%' || #{q} || '%')
+		    OR LOWER(COALESCE(p.summary, '')) LIKE LOWER('%' || #{q} || '%')
+		  )
+		""")
+	long countSearchPublicFeed(@Param("q") String q);
+
+	/**
 	 * 특정 사용자가 발행한 게시글 목록을 페이지네이션한다.
 	 *
 	 * @param userId 사용자 식별자

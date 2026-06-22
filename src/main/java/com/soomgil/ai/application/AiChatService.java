@@ -110,9 +110,10 @@ public class AiChatService {
 			? withTripContext(classificationRequest, contextService.load(tripId, userId))
 			: classificationRequest;
 		AiGuideReply reply = switch (decision.intent()) {
-			case READ_ITINERARY, SEARCH_PLACES, RECOMMEND_PLACES ->
+			case READ_ITINERARY, SEARCH_PLACES, RECOMMEND_PLACES, SUMMARIZE_ITINERARY ->
 				model.replyWithReadTools(replyRequest, decision);
-			case WRITE_NOTE, WRITE_CHECKLIST, ADD_PLACE_TO_ITINERARY, MOVE_ITINERARY_ITEM ->
+			case WRITE_NOTE, WRITE_CHECKLIST, ADD_PLACE_TO_ITINERARY, MOVE_ITINERARY_ITEM,
+					FILTER_PLACES_BY_CONDITION, GENERATE_CHECKLIST_FROM_ITINERARY, OPTIMIZE_ROUTE ->
 				model.replyWithWriteTools(replyRequest, decision);
 			case GENERAL_CHAT, HELP, AMBIGUOUS, UNSUPPORTED ->
 				model.replyWithoutTools(replyRequest, decision);
@@ -203,6 +204,14 @@ public class AiChatService {
 			case ADD_PLACE_TO_ITINERARY -> question.matches(".*(일정|일차).*(추가|넣어|등록).*")
 				|| question.matches(".*(추가|넣어|등록).*(일정|일차).*");
 			case MOVE_ITINERARY_ITEM -> question.matches(".*(옮겨|이동|재배치|순서.*바꿔).*");
+			case SUMMARIZE_ITINERARY -> question.matches(".*(요약|정리|분석|리뷰|코스.*봐줘|코스.*리뷰).*")
+				|| question.matches(".*(여행일정|여행.*일정|전체.*일정).*(어때|어떨까|봐줘).*");
+			case FILTER_PLACES_BY_CONDITION -> question.matches(".*(유료|무료|장애인|유모차|접근|휴무|닫은|폐업).*(빼|삭제|제거|없애).*")
+				|| question.matches(".*(빼|삭제|제거|없애).*(유료|무료|장애인|유모카|접근).*");
+			case GENERATE_CHECKLIST_FROM_ITINERARY -> question.matches(".*(체크리스트.*(자동|만들어|생성|추천|분석)|"
+				+ "준비물.*알려|필요.*준비|예약.*필요.*체크).*");
+			case OPTIMIZE_ROUTE -> question.matches(".*(동선.*최적화|최적화.*동선|가까운.*곳.*묶어|동선.*정리|"
+				+ "이동.*순서.*정리|효율.*동선).*");
 			default -> false;
 		};
 	}

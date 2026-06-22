@@ -5,7 +5,7 @@ spring:
     name: soomgil-backend
   ai:
     model:
-      chat: ${AI_CHAT_MODEL:}
+      chat: ${AI_CHAT_MODEL:google-genai}
     google:
       genai:
         api-key: ${GEMINI_API_KEY:}

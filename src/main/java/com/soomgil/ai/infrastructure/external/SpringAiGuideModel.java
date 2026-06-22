@@ -15,10 +15,14 @@ import com.soomgil.ai.application.LocalFallbackAiGuideModel;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
 
 public class SpringAiGuideModel implements AiGuideModel {
+
+	private static final Logger log = LoggerFactory.getLogger(SpringAiGuideModel.class);
 
 	private static final String INTENT_PROMPT = """
 		당신은 여행방 AI 요청 라우터입니다. 답변을 작성하거나 도구를 호출하지 말고 의도만 분류하세요.
@@ -28,7 +32,7 @@ public class SpringAiGuideModel implements AiGuideModel {
 		GENERAL_CHAT: 인사, 감사, 잡담
 		HELP: 무엇을 할 수 있는지, 사용법, 기능 질문
 		AMBIGUOUS: 대상·행동이 불명확하여 되물어야 함
-		UNSUPPORTED: 삭제, 결제, 예약, 공개 공유, 초대, 권한 변경 등 지원하지 않는 요청
+		UNSUPPORTED: 결제, 예약, 공개 공유, 초대, 권한 변경 등 지원하지 않는 요청
 		READ_ITINERARY: 현재 일정·일차·동선 조회
 		SEARCH_PLACES: 일반 장소 검색
 		RECOMMEND_PLACES: 멤버 취향 기반 장소 추천
@@ -36,7 +40,11 @@ public class SpringAiGuideModel implements AiGuideModel {
 		WRITE_CHECKLIST: 체크리스트 생성·수정·항목 추가
 		ADD_PLACE_TO_ITINERARY: 장소를 일정에 추가
 		MOVE_ITINERARY_ITEM: 기존 일정 항목 이동·재정렬
-		쓰기 intent는 사용자가 작성·추가·이동 의사를 명시한 경우에만 선택하세요.
+		SUMMARIZE_ITINERARY: 현재 여행 일정을 요약·분석해 조언. "요약해줘", "정리해줘", "일정 분석", "여행 코스 리뷰" 등
+		FILTER_PLACES_BY_CONDITION: 특정 조건(유료/무료, 장애인 이용 불가, 유모차 진입 불가, 휴무 등)에 해당하는 일정 항목 삭제. "유료 시설 빼줘", "장애인 접근 불가 장소 삭제" 등
+		GENERATE_CHECKLIST_FROM_ITINERARY: 현재 일정을 분석해 필요한 체크리스트를 자동 생성. "이 여행에 필요한 준비물 알려줘", "체크리스트 자동으로 만들어줘", "예약 필요한 곳 체크리스트에 넣어줘" 등
+		OPTIMIZE_ROUTE: 여행 동선 최적화. 가까운 장소끼리 같은 일차로 묶거나 이동 순서 재배치. "동선 최적화", "가까운 곳끼리 묶어줘", "이동 경로 정리" 등
+		쓰기 intent는 사용자가 작성·추가·이동·삭제·최적화 의사를 명시한 경우에만 선택하세요.
 		애매하면 반드시 AMBIGUOUS로 분류하고 clarificationQuestion에 한국어 질문을 넣으세요.
 		"안녕", "고마워"는 GENERAL_CHAT, "뭐 할 수 있어?"는 HELP입니다.
 		""";
@@ -73,6 +81,8 @@ public class SpringAiGuideModel implements AiGuideModel {
 			return parseDecision(raw);
 		}
 		catch (RuntimeException exception) {
+			log.warn("AI classifier failed, falling back to local classifier. question='{}', error={}",
+				request.question(), exception.toString());
 			return fallback.classify(request);
 		}
 	}
@@ -82,7 +92,8 @@ public class SpringAiGuideModel implements AiGuideModel {
 		String mode = switch (decision.intent()) {
 			case AMBIGUOUS -> "요청을 추측해 실행하지 말고 필요한 대상이나 행동을 한 가지 질문으로 되물으세요.";
 			case UNSUPPORTED -> "지원하지 않는 작업임을 설명하고 가능한 안전한 대안을 짧게 안내하세요.";
-			case HELP -> "조회, 장소 검색·추천, 메모·체크리스트, 일정 추가·이동 기능의 사용법만 안내하세요.";
+			case HELP -> "조회, 장소 검색·추천, 메모·체크리스트, 일정 추가·이동, 여행 요약·분석, 조건 기반 장소 삭제, "
+				+ "체크리스트 자동 생성, 동선 최적화 기능의 사용법만 안내하세요.";
 			default -> "도구 없이 자연스럽게 대화하세요. 어떤 변경도 수행했다고 말하지 마세요.";
 		};
 		try {
@@ -92,11 +103,14 @@ public class SpringAiGuideModel implements AiGuideModel {
 				.call()
 				.content();
 			if (content == null || content.isBlank()) {
+				log.warn("AI reply (no-tools) returned empty content for intent={}, falling back.", decision.intent());
 				return fallback.replyWithoutTools(request, decision);
 			}
 			return new AiGuideReply(content, List.of());
 		}
 		catch (RuntimeException exception) {
+			log.warn("AI reply (no-tools) failed for intent={}, error={}",
+				decision.intent(), exception.toString());
 			return fallback.replyWithoutTools(request, decision);
 		}
 	}
@@ -106,11 +120,12 @@ public class SpringAiGuideModel implements AiGuideModel {
 		if (!decision.intent().usesReadTools()) {
 			throw new IllegalArgumentException("Read tools cannot handle intent: " + decision.intent());
 		}
-		return replyWithTools(
-			request,
-			decision,
-			"등록된 조회 도구만 사용하세요. 데이터를 변경하지 마세요. 요청을 답하려면 조회 결과를 먼저 확인하세요."
-		);
+		String mode = switch (decision.intent()) {
+			case SUMMARIZE_ITINERARY -> "등록된 조회 도구로 현재 일정을 먼저 확인한 뒤, 3~5줄로 핵심 코스를 요약하거나 분석 조언을 작성하세요. "
+				+ "일차별 대표 장소, 이동 거리, 특징을 한국어로 구체적으로 담으세요.";
+			default -> "등록된 조회 도구만 사용하세요. 데이터를 변경하지 마세요. 요청을 답하려면 조회 결과를 먼저 확인하세요.";
+		};
+		return replyWithTools(request, decision, mode);
 	}
 
 	@Override
@@ -118,11 +133,19 @@ public class SpringAiGuideModel implements AiGuideModel {
 		if (!decision.intent().usesWriteTools()) {
 			throw new IllegalArgumentException("Write tools cannot handle intent: " + decision.intent());
 		}
-		return replyWithTools(
-			request,
-			decision,
-			"등록된 단 하나의 쓰기 도구 범위만 사용하세요. 다른 종류의 변경을 시도하지 마세요."
-		);
+		String mode = switch (decision.intent()) {
+			case FILTER_PLACES_BY_CONDITION -> "여행 맥락 JSON의 days[].items[] 에서 placeName·address 로 삭제 대상을 직접 판별해 "
+				+ "removeItineraryItemsByCondition 도구에 itemId 목록을 전달하라. "
+				+ "DB에 accessibility 메타데이터가 없으므로 장소 이름·유형(테마파크, 유료 관광지 등)으로 판단한다. "
+				+ "애매하면 삭제하지 말고 후보를 먼저 사용자에게 확인하라.";
+			case GENERATE_CHECKLIST_FROM_ITINERARY -> "여행 맥락 JSON의 days[].items[] 를 분석해 예약 필수 장소, 날씨 대비, "
+				+ "이동 수단, 입장료 등 필요한 준비물·할 일을 generateChecklistItems 도구로 자동 추가하라. "
+				+ "각 항목은 짧은 한국어 명령문 형태로 작성한다.";
+			case OPTIMIZE_ROUTE -> "여행 맥락 JSON의 days[].items[].lat,lng 로 가까운 장소끼리 같은 일차로 묶어 "
+				+ "optimizeRoute 도구에 이동 계획(moves)을 전달하라. 같은 날 여러 장소 이동 시 sort_order도 재정렬한다.";
+			default -> "등록된 단 하나의 쓰기 도구 범위만 사용하세요. 다른 종류의 변경을 시도하지 마세요.";
+		};
+		return replyWithTools(request, decision, mode);
 	}
 
 	private AiGuideReply replyWithTools(AiGuideRequest request, AiIntentDecision decision, String mode) {
@@ -140,6 +163,8 @@ public class SpringAiGuideModel implements AiGuideModel {
 				.content();
 			List<AiToolCall> calls = executedCalls(tools);
 			if (content == null || content.isBlank()) {
+				log.warn("AI reply (tools) returned empty content for intent={}, calls={}, falling back.",
+					decision.intent(), calls.size());
 				if (!calls.isEmpty()) {
 					return new AiGuideReply("요청한 작업은 처리했어요. 최신 여행방 상태를 확인해주세요.", calls);
 				}
@@ -151,6 +176,8 @@ public class SpringAiGuideModel implements AiGuideModel {
 		}
 		catch (RuntimeException exception) {
 			List<AiToolCall> calls = executedCalls(tools);
+			log.warn("AI reply (tools) failed for intent={}, calls={}, error={}",
+				decision.intent(), calls.size(), exception.toString());
 			if (!calls.isEmpty()) {
 				return new AiGuideReply("요청한 작업은 처리했어요. 최신 여행방 상태를 확인해주세요.", calls);
 			}

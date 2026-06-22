@@ -1,7 +1,5 @@
 package com.soomgil.ai.application;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.soomgil.ai.api.dto.AiToolCall;
 import com.soomgil.planning.api.dto.PlanningMutationResponse;
 import java.util.List;
@@ -10,15 +8,20 @@ import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/** 외부 모델이 비활성 또는 일시 장애여도 기본 대화와 안전한 핵심 도구를 제공한다. */
+/**
+ * 외부 모델이 비활성 또는 일시 장애여도 기본 대화와 안전한 핵심 도구를 제공한다.
+ *
+ * <p>외부 LLM이 응답하지 못할 때 도구는 호출하지만, 자연어 요약/분석은 포기한다.
+ * 그 대신 도구 결과(JSON)를 그대로 노출하지 않고, 사용자가 이해할 수 있는 안내문과
+ * tool_call id를 함께 반환해 프론트가 필요시 결과를 직접 조회할 수 있게 한다.
+ */
 public class LocalFallbackAiGuideModel implements AiGuideModel {
+
 	private static final Pattern DAY_PATTERN = Pattern.compile("(\\d+)일차");
 	private final AiTripToolsFactory toolsFactory;
-	private final ObjectMapper objectMapper;
 
-	public LocalFallbackAiGuideModel(AiTripToolsFactory toolsFactory, ObjectMapper objectMapper) {
+	public LocalFallbackAiGuideModel(AiTripToolsFactory toolsFactory, com.fasterxml.jackson.databind.ObjectMapper objectMapper) {
 		this.toolsFactory = toolsFactory;
-		this.objectMapper = objectMapper;
 	}
 
 	@Override
@@ -28,8 +31,27 @@ public class LocalFallbackAiGuideModel implements AiGuideModel {
 		if (q.matches("(ㅎㅇ|안녕.*|반가워.*|하이|헬로|hi|hello|고마워.*|고맙습니다|감사.*)")) {
 			intent = AiIntent.GENERAL_CHAT;
 		}
-		else if (q.matches(".*(뭐할수있어|무엇을할수|사용법|기능알려|도와줄수).*")) {
+		else if (q.matches(".*(뭐할수있어|무엇을할수|사용법|기능알려|도와줄수|뭐도와줘).*")) {
 			intent = AiIntent.HELP;
+		}
+		else if (q.matches(".*(동선|이동경로|이동.*경로).*(최적화|정리|개선|재구성|짜줘|짜기)|"
+			+ ".*(최적화|개선|재구성).*(동선|이동경로|경로)|"
+			+ ".*가까운.*곳.*묶어|.*가까운.*곳.*같이|효율.*동선.*")) {
+			intent = AiIntent.OPTIMIZE_ROUTE;
+		}
+		else if (q.matches(".*(체크리스트|준비물).*(자동|만들|생성|추천|분석|작성|알려|짜)|"
+			+ ".*(자동|분석).*(체크리스트|준비물)|"
+			+ ".*여행.*필요.*준비|.*예약.*필요.*체크|.*준비물.*뭐.*|.*체크리스트.*뭐.*")) {
+			intent = AiIntent.GENERATE_CHECKLIST_FROM_ITINERARY;
+		}
+		else if (q.matches(".*(유료|무료|장애인|유모차|접근|휴무|닫은|폐업|예약.*필수|입장료).*(빼|삭제|제거|없애)|"
+			+ ".*(빼|삭제|제거|없애).*(유료|무료|장애인|유모차|접근|입장료)|"
+			+ ".*장애인.*이용.*불가.*|.*유모차.*진입.*불가.*")) {
+			intent = AiIntent.FILTER_PLACES_BY_CONDITION;
+		}
+		else if (q.matches(".*(요약|정리|분석|리뷰|코스.*봐줘|코스.*리뷰|한눈에.*보)|"
+			+ ".*(여행일정|여행.*일정|전체.*일정|일정.*전체).*(어때|어떨까|봐줘|알려)")) {
+			intent = AiIntent.SUMMARIZE_ITINERARY;
 		}
 		else if (q.contains("체크리스트")) {
 			intent = q.matches(".*(추가|만들|작성|수정|넣어|체크).*") ? AiIntent.WRITE_CHECKLIST : AiIntent.AMBIGUOUS;
@@ -37,19 +59,20 @@ public class LocalFallbackAiGuideModel implements AiGuideModel {
 		else if (q.contains("메모")) {
 			intent = q.matches(".*(써|작성|기록|추가|수정|바꿔|저장).*") ? AiIntent.WRITE_NOTE : AiIntent.AMBIGUOUS;
 		}
-		else if (q.matches(".*(옮겨|이동|재배치|순서.*바꿔).*")) {
+		else if (q.matches(".*(옮겨|이동|재배치|순서.*바꿔|2일차로|3일차로|1일차로|내일로|오늘로).*")) {
 			intent = AiIntent.MOVE_ITINERARY_ITEM;
 		}
 		else if (q.matches(".*(일정|일차).*(추가|넣어|등록).*|.*(추가|넣어|등록).*(일정|일차).*")) {
 			intent = AiIntent.ADD_PLACE_TO_ITINERARY;
 		}
-		else if (q.matches(".*(추천|어디갈|어디가좋|갈만한).*")) {
+		else if (q.matches(".*(추천|어디갈|어디가좋|갈만한|여행지.*알려|명소).*")) {
 			intent = AiIntent.RECOMMEND_PLACES;
 		}
 		else if (q.matches(".*(찾아|검색|어디있|장소알려).*")) {
 			intent = AiIntent.SEARCH_PLACES;
 		}
-		else if (q.matches(".*(일정|일차|동선|경로).*(보여|조회|알려|확인|어떻게|뭐야).*|.*(보여|조회|알려|확인).*(일정|일차|동선|경로).*")) {
+		else if (q.matches(".*(일정|일차|동선|경로).*(보여|조회|알려|확인|어떻게|뭐야).*|"
+			+ ".*(보여|조회|알려|확인).*(일정|일차|동선|경로).*")) {
 			intent = AiIntent.READ_ITINERARY;
 		}
 		else {
@@ -61,7 +84,9 @@ public class LocalFallbackAiGuideModel implements AiGuideModel {
 	@Override
 	public AiGuideReply replyWithoutTools(AiGuideRequest request, AiIntentDecision decision) {
 		String answer = switch (decision.intent()) {
-			case HELP -> "일정 조회, 장소 검색·추천, 공동 메모와 체크리스트 작성, 일정 장소 추가·이동을 도와드릴 수 있어요. 원하시는 작업을 구체적으로 말씀해주세요.";
+			case HELP -> "일정 조회·요약, 장소 검색·추천, 공동 메모·체크리스트 작성, 일정 장소 추가·이동, "
+				+ "조건(유료/접근성) 기반 장소 삭제, 체크리스트 자동 생성, 동선 최적화까지 도와드릴 수 있어요. "
+				+ "원하시는 작업을 편하게 말씀해주세요.";
 			case AMBIGUOUS -> decision.clarificationQuestion() == null
 				? "어떤 여행 정보를 확인하거나 변경하고 싶은지 조금 더 구체적으로 알려주시겠어요?"
 				: decision.clarificationQuestion();
@@ -79,6 +104,7 @@ public class LocalFallbackAiGuideModel implements AiGuideModel {
 			AiExecutableTools executable = toolsFactory.create(request, decision.intent()).getFirst();
 			Object result = switch (decision.intent()) {
 				case READ_ITINERARY -> ((AiItineraryReadTools) executable).getCurrentItinerary();
+				case SUMMARIZE_ITINERARY -> ((AiSummarizeItineraryTools) executable).summarizeItinerary();
 				case SEARCH_PLACES -> ((AiPlaceSearchTools) executable).searchPlaces(
 					new AiPlaceSearchTools.SearchPlacesInput(request.question(), viewport(request), null, null)
 				);
@@ -87,7 +113,17 @@ public class LocalFallbackAiGuideModel implements AiGuideModel {
 				);
 				default -> null;
 			};
-			return new AiGuideReply("조회 결과를 확인했어요. " + summary(result), executable.executedCalls());
+			List<AiToolCall> calls = executable.executedCalls();
+			if (calls.isEmpty()) {
+				return new AiGuideReply(
+					"AI 분석 서버가 일시적으로 원활하지 않아요. 잠시 후 다시 시도해주세요.", List.of()
+				);
+			}
+			return new AiGuideReply(
+				"AI 분석 서버가 일시적으로 원활하지 않아요. 방금 조회한 데이터는 화면에서 확인할 수 있어요. "
+				+ "잠시 후 다시 요청해주시면 자연어로 정리해드릴게요.",
+				calls
+			);
 		}
 		catch (RuntimeException exception) {
 			return failed("조회", exception);
@@ -106,6 +142,11 @@ public class LocalFallbackAiGuideModel implements AiGuideModel {
 					"정확한 장소 정보가 필요해요. 먼저 장소를 검색하거나 추천받은 뒤 추가할 장소와 일차를 지정해주세요.",
 					List.of()
 				);
+				case FILTER_PLACES_BY_CONDITION, GENERATE_CHECKLIST_FROM_ITINERARY, OPTIMIZE_ROUTE ->
+					new AiGuideReply(
+						"AI 분석 서버가 일시적으로 원활하지 않아요. 잠시 후 다시 시도해주시면 일정을 분석해 처리해드릴게요.",
+						List.of()
+					);
 				default -> replyWithoutTools(request, decision);
 			};
 		}
@@ -146,17 +187,33 @@ public class LocalFallbackAiGuideModel implements AiGuideModel {
 		}
 		if (checklistId == null) return new AiGuideReply("체크리스트를 만들지 못했어요. 다시 시도해주세요.", tools.executedCalls());
 		tools.addChecklistItem(new AiChecklistTools.ChecklistItemInput(checklistId, itemText, null));
-		return new AiGuideReply("체크리스트에 ‘" + itemText + "’ 항목을 추가했어요.", tools.executedCalls());
+		return new AiGuideReply("체크리스트에 '" + itemText + "' 항목을 추가했어요.", tools.executedCalls());
 	}
 
 	private AiGuideReply moveItem(AiGuideRequest request, AiMoveItineraryItemTools tools) {
 		if (request.tripContext() == null) return new AiGuideReply("이동할 일정 정보를 확인하지 못했어요.", List.of());
-		AiTripContext.ItemSummary item = request.tripContext().days().stream().flatMap(day -> day.items().stream())
-			.filter(candidate -> candidate.placeName() != null && request.question().contains(candidate.placeName()))
+		String normalizedQuestion = normalize(request.question());
+		AiTripContext.ItemSummary item = request.tripContext().days().stream()
+			.flatMap(day -> day.items().stream())
+			.filter(candidate -> candidate.placeName() != null
+				&& normalizedQuestion.contains(normalize(candidate.placeName())))
 			.findFirst().orElse(null);
 		UUID targetDayId = dayId(request);
-		if (item == null || targetDayId == null) {
-			return new AiGuideReply("이동할 장소 이름과 목표 일차를 함께 알려주세요. 예: ‘성심당을 2일차로 옮겨줘’.", List.of());
+		if (item == null && targetDayId == null) {
+			return new AiGuideReply(
+				"어떤 장소를 어느 일차로 옮길지 알려주세요. 예: '성심당 2일차로 옮겨줘'.", List.of()
+			);
+		}
+		if (item == null) {
+			return new AiGuideReply(
+				"일정에서 찾을 수 없는 장소예요. 정확한 장소 이름을 다시 알려주세요.", List.of()
+			);
+		}
+		if (targetDayId == null) {
+			return new AiGuideReply(
+				item.placeName() + "을(를) 몇 일차로 옮길지 알려주세요. 예: '" + item.placeName() + " 2일차로 옮겨줘'.",
+				List.of()
+			);
 		}
 		tools.moveItineraryItem(new AiMoveItineraryItemTools.MoveItemInput(
 			request.baseVersion(), item.id(), targetDayId, null
@@ -192,18 +249,11 @@ public class LocalFallbackAiGuideModel implements AiGuideModel {
 			+ "," + request.viewport().maxLng() + "," + request.viewport().maxLat();
 	}
 
-	private String summary(Object result) {
-		try {
-			String value = objectMapper.writeValueAsString(result);
-			return value.length() > 1_200 ? value.substring(0, 1_200) + "…" : value;
-		}
-		catch (JsonProcessingException exception) {
-			return "요청한 데이터를 불러왔습니다.";
-		}
-	}
-
 	private AiGuideReply failed(String action, RuntimeException exception) {
-		return new AiGuideReply(action + "을 처리하지 못했어요. 요청 내용을 확인한 뒤 다시 말씀해주세요.", List.<AiToolCall>of());
+		return new AiGuideReply(
+			action + "을 처리하지 못했어요. AI 분석 서버가 일시적으로 원활하지 않을 수 있어요. 잠시 후 다시 시도해주세요.",
+			List.<AiToolCall>of()
+		);
 	}
 
 	private boolean greeting(String question) {

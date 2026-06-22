@@ -62,6 +62,18 @@ public class AiTripToolsFactory {
 			case MOVE_ITINERARY_ITEM -> List.of(new AiMoveItineraryItemTools(
 				request, auditService, updateItemHandler
 			));
+			case SUMMARIZE_ITINERARY -> List.of(new AiSummarizeItineraryTools(
+				request, auditService, itineraryHandler
+			));
+			case FILTER_PLACES_BY_CONDITION -> List.of(new AiFilterPlacesTools(
+				request, auditService, itineraryToolService
+			));
+			case GENERATE_CHECKLIST_FROM_ITINERARY -> List.of(new AiGenerateChecklistTools(
+				request, auditService, checklistHandler, checklistItemHandler
+			));
+			case OPTIMIZE_ROUTE -> List.of(new AiOptimizeRouteTools(
+				request, auditService, itineraryToolService
+			));
 			default -> List.of();
 		};
 	}

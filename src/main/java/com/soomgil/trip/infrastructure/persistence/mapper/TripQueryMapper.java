@@ -74,6 +74,27 @@ public interface TripQueryMapper {
 	long countMyTrips(@Param("userId") UUID userId, @Param("status") String status, @Param("role") String role);
 
 	/**
+	 * 통합 검색용 — 내 여행방 중 제목/목적지에 q가 포함된 목록을 조회한다.
+	 *
+	 * @param userId 사용자 ID
+	 * @param q      검색 키워드 (null/빈 값이면 필터 없음)
+	 * @param size   페이지 크기
+	 * @param offset 시작 offset
+	 * @return 여행방 목록
+	 */
+	List<TripRow> searchMyTrips(
+		@Param("userId") UUID userId,
+		@Param("q") String q,
+		@Param("size") int size,
+		@Param("offset") int offset
+	);
+
+	/**
+	 * 통합 검색용 — 내 여행방 중 키워드 매칭 개수.
+	 */
+	long countSearchMyTrips(@Param("userId") UUID userId, @Param("q") String q);
+
+	/**
 	 * 여행방 초대 목록을 조회한다.
 	 *
 	 * @param tripId 여행방 ID

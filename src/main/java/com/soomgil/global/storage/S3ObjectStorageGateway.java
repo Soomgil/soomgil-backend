@@ -134,7 +134,9 @@ public class S3ObjectStorageGateway implements ObjectStorageGateway {
 	public byte[] read(StorageObjectKey objectKey) {
 		try {
 			return client.getObjectAsBytes(GetObjectRequest.builder()
-				.bucket(properties.bucket()).key(objectKey.value()).build()).asByteArray();
+				.bucket(properties.bucket())
+				.key(objectKey.value())
+				.build()).asByteArray();
 		}
 		catch (NoSuchKeyException exception) {
 			throw new BusinessException(ErrorCode.OBJECT_NOT_FOUND);

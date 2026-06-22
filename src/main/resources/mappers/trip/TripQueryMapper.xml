@@ -98,6 +98,45 @@
     <include refid="myTripsFilter" />
   </select>
 
+  <sql id="searchMyTripsFilter">
+    FROM trip.trips t
+    JOIN trip.trip_members m
+      ON m.trip_id = t.id
+      AND m.user_id = #{userId}
+      AND m.status = 'ACTIVE'
+    WHERE t.status != 'DELETED'
+    <if test="q != null and q != ''">
+      AND (
+        LOWER(t.title) LIKE LOWER(CONCAT('%', #{q}, '%'))
+        OR LOWER(COALESCE(t.display_destination, '')) LIKE LOWER(CONCAT('%', #{q}, '%'))
+      )
+    </if>
+  </sql>
+
+  <select id="searchMyTrips" resultType="com.soomgil.trip.infrastructure.persistence.row.TripRow">
+    SELECT
+      t.id,
+      t.owner_user_id,
+      t.title,
+      t.display_destination,
+      t.status,
+      t.itinerary_version,
+      t.retripped_from_post_id,
+      t.retripped_from_snapshot_version,
+      t.created_at,
+      t.updated_at,
+      t.deleted_at
+    <include refid="searchMyTripsFilter" />
+    ORDER BY t.created_at DESC, t.id DESC
+    LIMIT #{size}
+    OFFSET #{offset}
+  </select>
+
+  <select id="countSearchMyTrips" resultType="long">
+    SELECT count(*)
+    <include refid="searchMyTripsFilter" />
+  </select>
+
   <select id="findTripInvites" resultType="com.soomgil.trip.infrastructure.persistence.row.TripInviteRow">
     SELECT
       id,

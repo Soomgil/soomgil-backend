@@ -12,14 +12,22 @@ public enum AiIntent {
 	WRITE_NOTE,
 	WRITE_CHECKLIST,
 	ADD_PLACE_TO_ITINERARY,
-	MOVE_ITINERARY_ITEM;
+	MOVE_ITINERARY_ITEM,
+	SUMMARIZE_ITINERARY,
+	FILTER_PLACES_BY_CONDITION,
+	GENERATE_CHECKLIST_FROM_ITINERARY,
+	OPTIMIZE_ROUTE;
 
 	public boolean usesReadTools() {
-		return this == READ_ITINERARY || this == SEARCH_PLACES || this == RECOMMEND_PLACES;
+		return this == READ_ITINERARY || this == SEARCH_PLACES || this == RECOMMEND_PLACES
+			|| this == SUMMARIZE_ITINERARY;
 	}
 
 	public boolean usesWriteTools() {
 		return this == WRITE_NOTE || this == WRITE_CHECKLIST
-			|| this == ADD_PLACE_TO_ITINERARY || this == MOVE_ITINERARY_ITEM;
+			|| this == ADD_PLACE_TO_ITINERARY || this == MOVE_ITINERARY_ITEM
+			|| this == FILTER_PLACES_BY_CONDITION
+			|| this == GENERATE_CHECKLIST_FROM_ITINERARY
+			|| this == OPTIMIZE_ROUTE;
 	}
 }

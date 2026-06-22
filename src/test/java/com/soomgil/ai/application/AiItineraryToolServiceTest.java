@@ -10,6 +10,8 @@ import com.soomgil.itinerary.application.command.dto.ItineraryDayView;
 import com.soomgil.itinerary.application.command.dto.ItineraryMutationResult;
 import com.soomgil.itinerary.application.command.handler.CreateItineraryDayHandler;
 import com.soomgil.itinerary.application.command.handler.CreateItineraryItemHandler;
+import com.soomgil.itinerary.application.command.handler.DeleteItineraryItemHandler;
+import com.soomgil.itinerary.application.command.handler.UpdateItineraryItemHandler;
 import com.soomgil.itinerary.application.query.dto.FindItineraryQuery;
 import com.soomgil.itinerary.application.query.dto.ItineraryView;
 import com.soomgil.itinerary.application.query.handler.FindItineraryHandler;
@@ -41,7 +43,10 @@ class AiItineraryToolServiceTest {
 			), null, null, null, List.of()
 		));
 
-		new AiItineraryToolService(itineraryHandler, dayHandler, itemHandler).addPlace(
+		new AiItineraryToolService(
+			itineraryHandler, dayHandler, itemHandler,
+			mock(DeleteItineraryItemHandler.class), mock(UpdateItineraryItemHandler.class)
+		).addPlace(
 			tripId, userId, 7L, new AiItineraryToolService.AddPlaceInput(
 				null, 0, "KTO", "place-1", "협재해수욕장", "제주시", 33.39, 126.24, null
 			)
