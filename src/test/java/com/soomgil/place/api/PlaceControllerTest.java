@@ -1,6 +1,7 @@
 package com.soomgil.place.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -20,6 +21,7 @@ import com.soomgil.place.application.query.dto.PlaceDetailQuery;
 import com.soomgil.place.application.query.dto.PlaceSearchQuery;
 import com.soomgil.place.application.query.handler.PlaceDetailQueryHandler;
 import com.soomgil.place.application.query.handler.PlaceSearchQueryHandler;
+import com.soomgil.place.application.query.handler.PopularPlacesQueryHandler;
 import java.net.URI;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -40,7 +42,9 @@ class PlaceControllerTest {
 	void setUp() {
 		searchHandler = new RecordingPlaceSearchQueryHandler();
 		detailHandler = new RecordingPlaceDetailQueryHandler();
-		mockMvc = MockMvcBuilders.standaloneSetup(new PlaceController(searchHandler, detailHandler))
+		mockMvc = MockMvcBuilders.standaloneSetup(new PlaceController(
+			searchHandler, detailHandler, mock(PopularPlacesQueryHandler.class)
+		))
 			.setControllerAdvice(new GlobalExceptionHandler(new ProblemDetailsFactory()))
 			.setMessageConverters(new MappingJackson2HttpMessageConverter(
 				Jackson2ObjectMapperBuilder.json()

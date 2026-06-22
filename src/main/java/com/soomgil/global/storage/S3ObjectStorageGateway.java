@@ -131,7 +131,6 @@ public class S3ObjectStorageGateway implements ObjectStorageGateway {
 	}
 
 	@Override
-<<<<<<< HEAD
 	public byte[] read(StorageObjectKey objectKey) {
 		try {
 			return client.getObjectAsBytes(GetObjectRequest.builder()
@@ -148,7 +147,10 @@ public class S3ObjectStorageGateway implements ObjectStorageGateway {
 		}
 		catch (SdkException exception) {
 			throw new IllegalStateException("Object storage read failed.", exception);
-=======
+		}
+	}
+
+	@Override
 	public void delete(StorageObjectKey objectKey) {
 		try {
 			client.deleteObject(DeleteObjectRequest.builder()
@@ -158,7 +160,6 @@ public class S3ObjectStorageGateway implements ObjectStorageGateway {
 		}
 		catch (SdkException exception) {
 			throw new IllegalStateException("Object storage deletion failed.", exception);
->>>>>>> feature/record-photo-summaries
 		}
 	}
 
@@ -170,4 +171,3 @@ public class S3ObjectStorageGateway implements ObjectStorageGateway {
 		return URI.create((base.endsWith("/") ? base : base + "/") + objectKey.value());
 	}
 }
-

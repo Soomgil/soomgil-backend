@@ -26,6 +26,7 @@ import com.soomgil.trip.application.port.TripReadModel;
 import com.soomgil.trip.application.port.TripSettingsUpdate;
 import com.soomgil.trip.application.port.TripSummaryPage;
 import com.soomgil.trip.application.query.handler.FindTripDetailHandler;
+import com.soomgil.trip.application.query.handler.FindNearestTripHandler;
 import com.soomgil.trip.application.query.handler.ListTripInvitesHandler;
 import com.soomgil.trip.application.query.handler.ListMyTripsHandler;
 import com.soomgil.trip.application.query.handler.ListTripMembersHandler;
@@ -82,7 +83,8 @@ class TripControllerTest {
 			new FindTripDetailHandler(accessGuard, queryRepository),
 			new ListTripMembersHandler(accessGuard, queryRepository),
 			new ListTripInvitesHandler(accessGuard, queryRepository),
-			mock(FindDisplayNameQueryHandler.class)
+			mock(FindDisplayNameQueryHandler.class),
+			mock(FindNearestTripHandler.class)
 		);
 	}
 

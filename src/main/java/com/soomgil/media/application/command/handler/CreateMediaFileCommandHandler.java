@@ -91,7 +91,6 @@ public class CreateMediaFileCommandHandler implements CommandHandler<CreateMedia
 			throw new BusinessException(ErrorCode.MEDIA_METADATA_MISMATCH);
 		}
 
-		OffsetDateTime createdAt = OffsetDateTime.ofInstant(timeProvider.now(), ZoneOffset.UTC);
 		UUID mediaFileId = idGenerator.get();
 		MediaFileMetadata mediaFile = new MediaFileMetadata(
 			mediaFileId, command.userId(), "S3_COMPATIBLE", object.metadata().bucket(), key,
@@ -137,4 +136,3 @@ public class CreateMediaFileCommandHandler implements CommandHandler<CreateMedia
 			&& (command.height() == null || Objects.equals(command.height(), object.height()));
 	}
 }
-
