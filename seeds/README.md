@@ -1,7 +1,10 @@
 # 서울·대전 데모 데이터
 
-`soomgil_demo_seoul_daejeon.sql`은 Flyway V1~V37 적용 후 넣는 로컬 전용 데이터입니다.
+`soomgil_demo_seoul_daejeon.sql`은 Flyway V1~V38 적용 후 넣는 로컬 전용 데이터입니다.
 운영 마이그레이션에는 포함되지 않으며 기존 데이터를 삭제하지 않습니다.
+
+`load-seeds.sh`는 기본 데이터 다음에 `soomgil_demo_realistic_patch.sql`을 적용하고
+`verify_demo_data.sql`로 사용자 테스트 품질 조건을 검사합니다.
 
 포함 범위:
 
@@ -9,8 +12,10 @@
 - 서울 40곳, 대전 28곳의 검색 가능한 실재 장소와 이미지·취향 태그
 - 스와이프 반응, 저장 장소, 사용자별 취향 가중치
 - 원본·파생 여행 80여 개와 일차별 일정, 경로, 메모, 체크리스트, 채팅
-- 완료 여행 기록과 미디어 200여 개
-- 커뮤니티 게시물 59개, 해시태그, 미디어, 좋아요 수천 개, 댓글 400여 개
+- 완료 여행 기록 225개와 실제 S3 미디어
+- 서로 다른 제목·요약의 커뮤니티 게시물 59개
+- 게시물마다 다른 좋아요 수 3,297개
+- 내용이 모두 다른 댓글·대댓글 320개
 - 게시물 스냅샷에서 복제된 리트립 여행 24개
 - 알림과 운영 감사 로그
 
@@ -19,8 +24,23 @@
 백엔드를 한 번 실행해 Flyway 마이그레이션을 적용하고 PostgreSQL 컨테이너가 실행 중인 상태에서:
 
 ```bash
-./load-seeds.sh
+bash load-seeds.sh
 ```
+
+## S3 이미지 동기화
+
+시드를 넣은 다음 `.env`의 AWS S3 설정을 사용해 프로필, 장소, 여행 기록,
+커뮤니티 이미지를 비공개 S3에 업로드합니다.
+
+```bash
+python3 -m venv /tmp/soomgil-demo-media-venv
+/tmp/soomgil-demo-media-venv/bin/pip install -r seeds/requirements.txt
+/tmp/soomgil-demo-media-venv/bin/python seeds/sync_demo_media.py
+```
+
+동기화기는 DB에서 필요한 객체 목록을 읽고 549개 파일을 업로드한 뒤 각 객체를
+`HeadObject`로 다시 확인합니다. 출처, 라이선스, 체크섬은
+`seeds/generated/demo-media-manifest.csv`에 기록됩니다.
 
 PowerShell에서 직접 적용할 수도 있습니다.
 
