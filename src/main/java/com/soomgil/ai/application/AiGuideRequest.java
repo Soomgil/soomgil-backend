@@ -13,7 +13,8 @@ public record AiGuideRequest(
 	List<AiGuideTurn> recentMessages,
 	String question,
 	Long baseVersion,
-	Viewport viewport
+	Viewport viewport,
+	AiTripContext tripContext
 ) {
 	public record AiGuideTurn(String role, String content) {
 	}
