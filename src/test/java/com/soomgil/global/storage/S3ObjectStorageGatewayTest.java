@@ -46,6 +46,24 @@ class S3ObjectStorageGatewayTest {
 	}
 
 	@Test
+	void createsThirtyMinuteAwsV4SignedReadUrl() {
+		S3StorageConfig config = new S3StorageConfig();
+		try (S3Presigner presigner = config.s3Presigner(properties)) {
+			S3ObjectStorageGateway gateway = new S3ObjectStorageGateway(
+				mock(S3Client.class), presigner, properties, new MediaContentInspector()
+			);
+
+			PresignedStorageRead read = gateway.presignRead(new StorageReadRequest(
+				new StorageObjectKey("media/user/trip-record/file.jpg"),
+				Duration.ofMinutes(30)
+			));
+
+			assertThat(read.readUrl().getQuery()).contains("X-Amz-Signature=").contains("X-Amz-Expires=1800");
+			assertThat(read.readUrl().getPath()).endsWith("/soomgil-media/media/user/trip-record/file.jpg");
+		}
+	}
+
+	@Test
 	void inspectsStoredImageBytesAndDimensions() throws Exception {
 		byte[] png = png(3, 2);
 		S3Client client = mock(S3Client.class);

@@ -44,6 +44,24 @@ services:
       - '${S3_CONSOLE_PORT:-9001}:9001'
     volumes:
       - minio-data:/data
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:9000/minio/health/live']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+  minio-init:
+    image: 'minio/mc:latest'
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:-soomgil}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-change-me-change-me}
+      S3_BUCKET: ${S3_BUCKET:-soomgil-local}
+    entrypoint: >-
+      /bin/sh -c "mc alias set local http://minio:9000 $$MINIO_ROOT_USER $$MINIO_ROOT_PASSWORD
+      && mc mb --ignore-existing local/$$S3_BUCKET"
+    restart: 'no'
 
 volumes:
   postgres-data:

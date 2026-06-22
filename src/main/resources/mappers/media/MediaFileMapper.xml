@@ -34,4 +34,31 @@
       AND record_entry.status = 'ACTIVE'
       AND (trip_row.owner_user_id = #{userId} OR member.id IS NOT NULL)
   </select>
+
+  <select id="findDueForPurge" resultType="com.soomgil.media.infrastructure.persistence.row.MediaFileRow">
+    SELECT id, owner_user_id, storage_provider, bucket, object_key, public_url, mime_type, byte_size,
+           width, height, linked_resource_type, linked_resource_id, status, created_at, deleted_at, purge_after_at
+    FROM media.media_files
+    WHERE status = 'DELETED' AND purge_after_at &lt;= #{now}
+    ORDER BY purge_after_at
+    LIMIT #{limit}
+  </select>
+
+  <update id="markPurged">
+    UPDATE media.media_files
+    SET status = 'PURGED', purged_at = #{purgedAt}
+    WHERE id = #{mediaFileId} AND status = 'DELETED'
+  </update>
+
+  <update id="claimUnlinkedForPurge">
+    UPDATE media.media_files mf
+    SET status = 'DELETED', deleted_at = #{now}, purge_after_at = #{now}
+    WHERE mf.id = #{mediaFileId}
+      AND mf.status = 'ACTIVE'
+      AND mf.linked_resource_id IS NULL
+      AND NOT EXISTS (SELECT 1 FROM record.trip_record_media rm WHERE rm.media_file_id = mf.id)
+      AND NOT EXISTS (SELECT 1 FROM community.post_media pm WHERE pm.media_file_id = mf.id)
+      AND NOT EXISTS (SELECT 1 FROM community.posts p WHERE p.cover_media_file_id = mf.id)
+      AND NOT EXISTS (SELECT 1 FROM auth.user_profiles up WHERE up.profile_media_file_id = mf.id)
+  </update>
 </mapper>

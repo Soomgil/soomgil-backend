@@ -1,6 +1,5 @@
 package com.soomgil.record.application.port;
 
-import java.net.URI;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
@@ -15,7 +14,8 @@ public record TripRecordPhotoReadModel(
 	UUID itineraryItemId,
 	UUID uploadedByUserId,
 	UUID mediaFileId,
-	URI publicUrl,
+	String objectKey,
+	String publicUrl,
 	String mimeType,
 	Long byteSize,
 	Integer width,

@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.soomgil.media.infrastructure.persistence.mapper.MediaUploadIntentMapper">
+  <insert id="insert">
+    INSERT INTO media.upload_intents (id, owner_user_id, object_key, status, expires_at, created_at)
+    VALUES (#{id}, #{ownerUserId}, #{objectKey}, #{status}, #{expiresAt}, #{createdAt})
+  </insert>
+
+  <select id="findPendingOwned" resultType="com.soomgil.media.infrastructure.persistence.row.MediaUploadIntentRow">
+    SELECT id, owner_user_id, object_key, status, media_file_id, expires_at, created_at, completed_at
+    FROM media.upload_intents
+    WHERE owner_user_id = #{ownerUserId} AND object_key = #{objectKey} AND status = 'PENDING'
+    FOR UPDATE
+  </select>
+
+  <update id="markCompleted">
+    UPDATE media.upload_intents
+    SET status = 'COMPLETED', media_file_id = #{mediaFileId}, completed_at = #{completedAt}
+    WHERE id = #{id} AND status = 'PENDING'
+  </update>
+
+  <select id="findExpiredPending" resultType="com.soomgil.media.infrastructure.persistence.row.MediaUploadIntentRow">
+    SELECT id, owner_user_id, object_key, status, media_file_id, expires_at, created_at, completed_at
+    FROM media.upload_intents
+    WHERE status IN ('PENDING', 'PURGING') AND expires_at &lt;= #{now}
+    ORDER BY expires_at
+    LIMIT #{limit}
+  </select>
+
+  <update id="claimPendingForPurge">
+    UPDATE media.upload_intents SET status = 'PURGING' WHERE id = #{id} AND status = 'PENDING'
+  </update>
+
+  <select id="findExpiredCompletedUnlinked" resultType="com.soomgil.media.infrastructure.persistence.row.MediaUploadIntentRow">
+    SELECT ui.id, ui.owner_user_id, ui.object_key, ui.status, ui.media_file_id,
+           ui.expires_at, ui.created_at, ui.completed_at
+    FROM media.upload_intents ui
+    JOIN media.media_files mf ON mf.id = ui.media_file_id AND mf.status = 'ACTIVE'
+    WHERE ui.status = 'COMPLETED'
+      AND ui.expires_at &lt;= #{now}
+      AND mf.linked_resource_id IS NULL
+      AND NOT EXISTS (SELECT 1 FROM record.trip_record_media rm WHERE rm.media_file_id = mf.id)
+      AND NOT EXISTS (SELECT 1 FROM community.post_media pm WHERE pm.media_file_id = mf.id)
+      AND NOT EXISTS (SELECT 1 FROM community.posts p WHERE p.cover_media_file_id = mf.id)
+      AND NOT EXISTS (SELECT 1 FROM auth.user_profiles up WHERE up.profile_media_file_id = mf.id)
+    ORDER BY ui.expires_at
+    LIMIT #{limit}
+  </select>
+
+  <update id="markPurged">
+    UPDATE media.upload_intents SET status = 'PURGED' WHERE id = #{id} AND status != 'PURGED'
+  </update>
+
+  <update id="markPurgedByMediaFileId">
+    UPDATE media.upload_intents
+    SET status = 'PURGED'
+    WHERE media_file_id = #{mediaFileId} AND status != 'PURGED'
+  </update>
+</mapper>

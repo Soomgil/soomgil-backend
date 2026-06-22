@@ -59,6 +59,8 @@ public class MediaFileQueryService {
 		return new MediaFile(
 			record.id(),
 			record.publicUrl() == null ? null : URI.create(record.publicUrl()),
+			null,
+			null,
 			record.mimeType(),
 			record.byteSize(),
 			record.width(),

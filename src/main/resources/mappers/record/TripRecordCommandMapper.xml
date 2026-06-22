@@ -87,4 +87,21 @@
       #{createdAt}
     )
   </insert>
+
+  <select id="lockCreateRequest">
+    SELECT 1 FROM (SELECT pg_advisory_xact_lock(hashtextextended(#{lockKey}, 0))) locked
+  </select>
+
+  <select id="findCreateRequest" resultType="com.soomgil.record.application.port.TripRecordCreateRequestReadModel">
+    SELECT request_hash, record_id
+    FROM record.trip_record_create_requests
+    WHERE user_id = #{userId} AND trip_id = #{tripId} AND idempotency_key = #{idempotencyKey}
+  </select>
+
+  <insert id="insertCreateRequest">
+    INSERT INTO record.trip_record_create_requests
+      (user_id, trip_id, idempotency_key, request_hash, record_id, created_at)
+    VALUES
+      (#{userId}, #{tripId}, #{idempotencyKey}, #{requestHash}, #{recordId}, #{createdAt})
+  </insert>
 </mapper>

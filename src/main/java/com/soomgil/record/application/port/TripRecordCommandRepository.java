@@ -18,4 +18,11 @@ public interface TripRecordCommandRepository {
 	void deleteMediaLinks(UUID recordId);
 
 	void insertMediaLinks(UUID recordId, List<UUID> mediaFileIds, OffsetDateTime createdAt);
+
+	void lockCreateRequest(UUID userId, UUID tripId, String idempotencyKey);
+
+	TripRecordCreateRequestReadModel findCreateRequest(UUID userId, UUID tripId, String idempotencyKey);
+
+	void insertCreateRequest(UUID userId, UUID tripId, String idempotencyKey, String requestHash, UUID recordId,
+		OffsetDateTime createdAt);
 }

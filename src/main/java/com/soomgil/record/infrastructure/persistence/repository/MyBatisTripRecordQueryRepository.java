@@ -4,6 +4,8 @@ import com.soomgil.record.application.port.TripRecordEntryReadModel;
 import com.soomgil.record.application.port.TripRecordMediaReadModel;
 import com.soomgil.record.application.port.TripRecordPage;
 import com.soomgil.record.application.port.TripRecordPhotoPage;
+import com.soomgil.record.application.port.TripRecordPhotoSummaryReadModel;
+import com.soomgil.record.application.port.TripRecordPhotoUrlReadModel;
 import com.soomgil.record.application.port.TripRecordQueryRepository;
 import com.soomgil.record.infrastructure.persistence.mapper.TripRecordQueryMapper;
 import java.util.List;
@@ -50,5 +52,15 @@ public class MyBatisTripRecordQueryRepository implements TripRecordQueryReposito
 			mapper.findPhotosByUser(userId, size, page * size),
 			mapper.countPhotosByUser(userId)
 		);
+	}
+
+	@Override
+	public Optional<TripRecordPhotoUrlReadModel> findAccessiblePhotoUrl(UUID userId, UUID mediaFileId) {
+		return Optional.ofNullable(mapper.findAccessiblePhotoUrl(userId, mediaFileId));
+	}
+
+	@Override
+	public List<TripRecordPhotoSummaryReadModel> findPhotoSummariesByUser(UUID userId, List<UUID> tripIds) {
+		return mapper.findPhotoSummariesByUser(userId, tripIds);
 	}
 }

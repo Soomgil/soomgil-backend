@@ -15,6 +15,8 @@ import com.soomgil.media.domain.model.MediaFileMetadata;
 import com.soomgil.media.domain.model.MediaPurpose;
 import com.soomgil.media.domain.policy.MediaObjectKeyPolicy;
 import com.soomgil.media.domain.policy.MediaUploadPolicy;
+import com.soomgil.media.infrastructure.persistence.mapper.MediaUploadIntentMapper;
+import com.soomgil.media.infrastructure.persistence.row.MediaUploadIntentRow;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.net.URI;
@@ -36,6 +38,7 @@ public class CreateMediaFileCommandHandler implements CommandHandler<CreateMedia
 	private final MediaObjectKeyPolicy keyPolicy;
 	private final TimeProvider timeProvider;
 	private final Supplier<UUID> idGenerator;
+	private final MediaUploadIntentMapper uploadIntentMapper;
 
 	@Autowired
 	public CreateMediaFileCommandHandler(
@@ -44,9 +47,10 @@ public class CreateMediaFileCommandHandler implements CommandHandler<CreateMedia
 		LinkedMediaResourceAuthorizer resourceAuthorizer,
 		MediaUploadPolicy uploadPolicy,
 		MediaObjectKeyPolicy keyPolicy,
-		TimeProvider timeProvider
+		TimeProvider timeProvider,
+		MediaUploadIntentMapper uploadIntentMapper
 	) {
-		this(storage, repository, resourceAuthorizer, uploadPolicy, keyPolicy, timeProvider, Ids::newUuid);
+		this(storage, repository, resourceAuthorizer, uploadPolicy, keyPolicy, timeProvider, uploadIntentMapper, Ids::newUuid);
 	}
 
 	CreateMediaFileCommandHandler(
@@ -56,6 +60,7 @@ public class CreateMediaFileCommandHandler implements CommandHandler<CreateMedia
 		MediaUploadPolicy uploadPolicy,
 		MediaObjectKeyPolicy keyPolicy,
 		TimeProvider timeProvider,
+		MediaUploadIntentMapper uploadIntentMapper,
 		Supplier<UUID> idGenerator
 	) {
 		this.storage = storage;
@@ -65,6 +70,7 @@ public class CreateMediaFileCommandHandler implements CommandHandler<CreateMedia
 		this.keyPolicy = keyPolicy;
 		this.timeProvider = timeProvider;
 		this.idGenerator = idGenerator;
+		this.uploadIntentMapper = uploadIntentMapper;
 	}
 
 	@Transactional
@@ -72,6 +78,11 @@ public class CreateMediaFileCommandHandler implements CommandHandler<CreateMedia
 	public MediaFileMetadata handle(CreateMediaFileCommand command) {
 		StorageObjectKey key = new StorageObjectKey(command.objectKey());
 		MediaPurpose purpose = keyPolicy.requireOwnedPurpose(command.userId(), key);
+		MediaUploadIntentRow intent = uploadIntentMapper.findPendingOwned(command.userId(), key.value());
+		OffsetDateTime createdAt = OffsetDateTime.ofInstant(timeProvider.now(), ZoneOffset.UTC);
+		if (intent == null || !intent.expiresAt().isAfter(createdAt)) {
+			throw new BusinessException(ErrorCode.OBJECT_NOT_FOUND, "Active upload intent was not found.");
+		}
 		uploadPolicy.validate(purpose, command.mimeType(), command.byteSize());
 		validateLink(command, purpose);
 
@@ -90,6 +101,7 @@ public class CreateMediaFileCommandHandler implements CommandHandler<CreateMedia
 			command.linkedResourceType(), command.linkedResourceId(), "ACTIVE", createdAt, null, null
 		);
 		repository.save(mediaFile);
+		uploadIntentMapper.markCompleted(intent.id(), mediaFile.id(), createdAt);
 		return mediaFile;
 	}
 
@@ -125,3 +137,4 @@ public class CreateMediaFileCommandHandler implements CommandHandler<CreateMedia
 			&& (command.height() == null || Objects.equals(command.height(), object.height()));
 	}
 }
+

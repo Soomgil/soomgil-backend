@@ -2,12 +2,16 @@ package com.soomgil.media.application.command.handler;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.soomgil.common.time.TimeProvider;
 import com.soomgil.global.error.BusinessException;
 import com.soomgil.global.error.ErrorCode;
 import com.soomgil.global.storage.ObjectStorageGateway;
+import com.soomgil.global.storage.PresignedStorageRead;
 import com.soomgil.global.storage.PresignedStorageUpload;
+import com.soomgil.global.storage.StorageReadRequest;
 import com.soomgil.global.storage.StorageObjectKey;
 import com.soomgil.global.storage.StorageObjectMetadata;
 import com.soomgil.global.storage.StorageUploadRequest;
@@ -21,6 +25,8 @@ import com.soomgil.media.domain.model.MediaFileMetadata;
 import com.soomgil.media.domain.model.MediaPurpose;
 import com.soomgil.media.domain.policy.MediaObjectKeyPolicy;
 import com.soomgil.media.domain.policy.MediaUploadPolicy;
+import com.soomgil.media.infrastructure.persistence.mapper.MediaUploadIntentMapper;
+import com.soomgil.media.infrastructure.persistence.row.MediaUploadIntentRow;
 import java.net.URI;
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -46,7 +52,7 @@ class MediaCommandHandlersTest {
 	void createsPresignedUploadForOwnedPurposeKey() {
 		FakeStorage storage = new FakeStorage();
 		CreateUploadUrlCommandHandler handler = new CreateUploadUrlCommandHandler(
-			storage, uploadPolicy, keyPolicy, IDS
+			storage, uploadPolicy, keyPolicy, mock(MediaUploadIntentMapper.class), TIME, IDS
 		);
 
 		var result = handler.handle(new CreateUploadUrlCommand(
@@ -69,7 +75,7 @@ class MediaCommandHandlersTest {
 		FakeRepository repository = new FakeRepository();
 		CreateMediaFileCommandHandler handler = new CreateMediaFileCommandHandler(
 			storage, repository, (userId, type, resourceId) -> true,
-			uploadPolicy, keyPolicy, TIME, IDS
+			uploadPolicy, keyPolicy, TIME, intentMapper(key), IDS
 		);
 
 		MediaFileMetadata result = handler.handle(new CreateMediaFileCommand(
@@ -90,7 +96,7 @@ class MediaCommandHandlersTest {
 		FakeRepository repository = new FakeRepository();
 		CreateMediaFileCommandHandler handler = new CreateMediaFileCommandHandler(
 			storage, repository, (userId, type, resourceId) -> true,
-			uploadPolicy, keyPolicy, TIME, IDS
+			uploadPolicy, keyPolicy, TIME, intentMapper(key), IDS
 		);
 
 		assertThatThrownBy(() -> handler.handle(new CreateMediaFileCommand(
@@ -107,7 +113,7 @@ class MediaCommandHandlersTest {
 		storage.storedObject = storedObject(key, "image/jpeg", "image/jpeg", 2048L);
 		CreateMediaFileCommandHandler handler = new CreateMediaFileCommandHandler(
 			storage, new FakeRepository(), (userId, type, resourceId) -> false,
-			uploadPolicy, keyPolicy, TIME, IDS
+			uploadPolicy, keyPolicy, TIME, intentMapper(key), IDS
 		);
 
 		assertThatThrownBy(() -> handler.handle(new CreateMediaFileCommand(
@@ -167,6 +173,16 @@ class MediaCommandHandlersTest {
 		);
 	}
 
+	private MediaUploadIntentMapper intentMapper(StorageObjectKey key) {
+		MediaUploadIntentMapper mapper = mock(MediaUploadIntentMapper.class);
+		when(mapper.findPendingOwned(USER_ID, key.value())).thenReturn(new MediaUploadIntentRow(
+			GENERATED_ID, USER_ID, key.value(), "PENDING", null,
+			OffsetDateTime.ofInstant(NOW.plusSeconds(86400), ZoneOffset.UTC),
+			OffsetDateTime.ofInstant(NOW, ZoneOffset.UTC), null
+		));
+		return mapper;
+	}
+
 	private static final class FakeStorage implements ObjectStorageGateway {
 		private StorageUploadRequest uploadRequest;
 		private StoredObject storedObject;
@@ -182,8 +198,20 @@ class MediaCommandHandlersTest {
 		}
 
 		@Override
+		public PresignedStorageRead presignRead(StorageReadRequest request) {
+			return new PresignedStorageRead(
+				URI.create("https://storage.example.com/read"),
+				OffsetDateTime.ofInstant(NOW.plusSeconds(request.validity().toSeconds()), ZoneOffset.UTC)
+			);
+		}
+
+		@Override
 		public StoredObject inspect(StorageObjectKey objectKey) {
 			return storedObject;
+		}
+
+		@Override
+		public void delete(StorageObjectKey objectKey) {
 		}
 	}
 
