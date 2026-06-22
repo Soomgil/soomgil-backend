@@ -18,6 +18,7 @@ import com.soomgil.trip.application.command.handler.DeleteTripHandler;
 import com.soomgil.trip.application.command.handler.RemoveTripMemberHandler;
 import com.soomgil.trip.application.command.handler.RevokeTripInviteHandler;
 import com.soomgil.trip.application.command.handler.UpdateTripHandler;
+import com.soomgil.trip.application.query.dto.FindNearestTripQuery;
 import com.soomgil.trip.application.query.dto.FindTripDetailQuery;
 import com.soomgil.trip.application.query.dto.ListMyTripsQuery;
 import com.soomgil.trip.application.query.dto.ListTripInvitesQuery;
@@ -27,12 +28,14 @@ import com.soomgil.trip.application.query.dto.TripDetailView;
 import com.soomgil.trip.application.query.dto.TripInviteView;
 import com.soomgil.trip.application.query.dto.TripMemberView;
 import com.soomgil.trip.application.query.dto.TripSummaryView;
+import com.soomgil.trip.application.query.handler.FindNearestTripHandler;
 import com.soomgil.trip.application.query.handler.FindTripDetailHandler;
 import com.soomgil.trip.application.query.handler.ListTripInvitesHandler;
 import com.soomgil.trip.application.query.handler.ListMyTripsHandler;
 import com.soomgil.trip.application.query.handler.ListTripMembersHandler;
 import com.soomgil.trip.api.dto.CreateTripInviteRequest;
 import com.soomgil.trip.api.dto.CreateTripRequest;
+import com.soomgil.trip.api.dto.NearestTripDto;
 import com.soomgil.trip.api.dto.PagedTripSummary;
 import com.soomgil.trip.api.dto.TripAccessRole;
 import com.soomgil.trip.api.dto.TripDetail;
@@ -77,6 +80,7 @@ public class TripController extends ApiControllerSupport {
 	private final FindTripDetailHandler findTripDetailHandler;
 	private final ListTripMembersHandler listTripMembersHandler;
 	private final ListTripInvitesHandler listTripInvitesHandler;
+	private final FindNearestTripHandler findNearestTripHandler;
 
 	public TripController(
 		CreateTripHandler createTripHandler,
@@ -88,7 +92,8 @@ public class TripController extends ApiControllerSupport {
 		ListMyTripsHandler listMyTripsHandler,
 		FindTripDetailHandler findTripDetailHandler,
 		ListTripMembersHandler listTripMembersHandler,
-		ListTripInvitesHandler listTripInvitesHandler
+		ListTripInvitesHandler listTripInvitesHandler,
+		FindNearestTripHandler findNearestTripHandler
 	) {
 		this.createTripHandler = Objects.requireNonNull(createTripHandler, "createTripHandler must not be null");
 		this.createTripInviteHandler = Objects.requireNonNull(createTripInviteHandler, "createTripInviteHandler must not be null");
@@ -100,6 +105,7 @@ public class TripController extends ApiControllerSupport {
 		this.findTripDetailHandler = Objects.requireNonNull(findTripDetailHandler, "findTripDetailHandler must not be null");
 		this.listTripMembersHandler = Objects.requireNonNull(listTripMembersHandler, "listTripMembersHandler must not be null");
 		this.listTripInvitesHandler = Objects.requireNonNull(listTripInvitesHandler, "listTripInvitesHandler must not be null");
+		this.findNearestTripHandler = Objects.requireNonNull(findNearestTripHandler, "findNearestTripHandler must not be null");
 	}
 
 	@GetMapping
@@ -121,6 +127,12 @@ public class TripController extends ApiControllerSupport {
 			sort
 		));
 		return toPagedTripSummary(result);
+	}
+
+	@GetMapping("/nearest")
+	public NearestTripDto getNearestTrip(Principal principal) {
+		UUID currentUserId = currentUserId(principal);
+		return findNearestTripHandler.handle(new FindNearestTripQuery(currentUserId));
 	}
 
 	@PostMapping

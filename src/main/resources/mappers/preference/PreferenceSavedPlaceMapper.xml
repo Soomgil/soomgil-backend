@@ -114,4 +114,44 @@
 		LIMIT #{limit}
 		OFFSET #{offset}
 	</select>
+
+	<select id="listPopularPlaces" resultType="com.soomgil.preference.infrastructure.persistence.row.PopularPlaceRow">
+		SELECT
+			sp.provider,
+			sp.external_place_id AS externalPlaceId,
+			a.title AS name,
+			CONCAT_WS(' ', a.addr1, a.addr2) AS address,
+			a.latitude AS lat,
+			a.longitude AS lng,
+			img.public_url AS thumbnailUrl,
+			ct.content_type_name AS category,
+			COUNT(*) AS savedCount
+		FROM preference.user_saved_places sp
+		LEFT JOIN tourism_source.attractions a
+			ON sp.provider = 'KTO'
+			AND CAST(a.content_id AS text) = sp.external_place_id
+		LEFT JOIN tourism_source.contenttypes ct
+			ON ct.content_type_id = a.content_type_id
+		LEFT JOIN LATERAL (
+			SELECT public_url
+			FROM tourism_source.attraction_images
+			WHERE attraction_no = a.no
+				AND is_active = true
+			ORDER BY display_order ASC, created_at ASC
+			LIMIT 1
+		) img ON true
+		WHERE sp.deleted_at IS NULL
+		GROUP BY
+			sp.provider,
+			sp.external_place_id,
+			a.title,
+			a.addr1,
+			a.addr2,
+			a.latitude,
+			a.longitude,
+			img.public_url,
+			ct.content_type_name
+		ORDER BY savedCount DESC
+		LIMIT #{limit}
+	</select>
 </mapper>

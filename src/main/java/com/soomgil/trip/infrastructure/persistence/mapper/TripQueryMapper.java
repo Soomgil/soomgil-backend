@@ -5,6 +5,7 @@ import com.soomgil.trip.infrastructure.persistence.row.TripInviteRow;
 import com.soomgil.trip.infrastructure.persistence.row.TripInviteAcceptRow;
 import com.soomgil.trip.infrastructure.persistence.row.TripMemberReadRow;
 import com.soomgil.trip.infrastructure.persistence.row.TripRow;
+import com.soomgil.trip.infrastructure.persistence.row.NearestTripRow;
 import java.util.List;
 import java.util.UUID;
 import org.apache.ibatis.annotations.Mapper;
@@ -88,4 +89,8 @@ public interface TripQueryMapper {
 	 * @return 초대가 없으면 null
 	 */
 	TripInviteAcceptRow findTripInviteForAccept(@Param("inviteCode") String inviteCode);
+
+	NearestTripRow findNearestTrip(@Param("userId") UUID userId);
+
+	List<String> findTripMemberThumbnails(@Param("tripId") UUID tripId);
 }
