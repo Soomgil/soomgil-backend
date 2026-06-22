@@ -2,13 +2,10 @@ package com.soomgil.ai.application;
 
 import com.soomgil.auth.application.handler.FindDisplayNameQueryHandler;
 import com.soomgil.auth.application.query.FindDisplayNameQuery;
-import com.soomgil.global.error.BusinessException;
-import com.soomgil.global.error.ErrorCode;
 import com.soomgil.itinerary.application.query.dto.FindItineraryQuery;
 import com.soomgil.itinerary.application.query.dto.ItineraryView;
 import com.soomgil.itinerary.application.query.handler.FindItineraryHandler;
 import com.soomgil.planning.api.dto.Checklist;
-import com.soomgil.planning.api.dto.Note;
 import com.soomgil.planning.api.dto.PlanningScopeType;
 import com.soomgil.planning.application.handler.GetNoteQueryHandler;
 import com.soomgil.planning.application.handler.ListChecklistsQueryHandler;
@@ -143,15 +140,10 @@ public class AiTripContextService {
 		PlanningScopeType scope,
 		UUID dayId
 	) {
-		try {
-			Note note = noteHandler.handle(new GetNoteQuery(tripId, scope, dayId, userId));
-			notes.add(new AiTripContext.NoteSummary(scope.name(), dayId, truncate(note.content(), MAX_NOTE_LENGTH)));
-		}
-		catch (BusinessException exception) {
-			if (exception.errorCode() != ErrorCode.PLANNING_NOTE_NOT_FOUND) {
-				throw exception;
-			}
-		}
+		noteHandler.findOptional(new GetNoteQuery(tripId, scope, dayId, userId))
+			.ifPresent(note -> notes.add(new AiTripContext.NoteSummary(
+				scope.name(), dayId, truncate(note.content(), MAX_NOTE_LENGTH)
+			)));
 	}
 
 	private AiTripContext.ChecklistSummary checklistSummary(Checklist checklist) {

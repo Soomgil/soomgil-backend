@@ -10,4 +10,8 @@ public interface ObjectStorageGateway {
 	PresignedStorageUpload presignUpload(StorageUploadRequest request);
 
 	StoredObject inspect(StorageObjectKey objectKey);
+
+	default byte[] read(StorageObjectKey objectKey) {
+		throw new UnsupportedOperationException("Object read is not implemented.");
+	}
 }

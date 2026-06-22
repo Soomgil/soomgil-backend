@@ -99,7 +99,9 @@ class PreferenceListPlaceRecommendationsQueryHandlerTest {
 		assertThat(result.items().getFirst().matchedMembers())
 			.extracting(member -> member.id())
 			.containsExactly(MEMBER_A_ID, MEMBER_B_ID);
-		assertThat(result.items().get(1).matchedMembers()).isEmpty();
+		assertThat(result.items().get(1).matchedMembers())
+			.extracting(member -> member.id())
+			.containsExactly(MEMBER_A_ID, MEMBER_B_ID);
 		assertThat(result.page().totalElements()).isEqualTo(2);
 
 		ArgumentCaptor<ListTripMembersQuery> memberQuery = ArgumentCaptor.forClass(ListTripMembersQuery.class);
@@ -149,6 +151,21 @@ class PreferenceListPlaceRecommendationsQueryHandlerTest {
 			sourceWithTime("cafe", MEMBER_B_ID, null),
 			sourceWithTime("beach", MEMBER_A_ID, null),
 			sourceWithTime("beach", MEMBER_B_ID, "2026-06-20T00:00:00Z")
+		));
+
+		var result = handler.handle(query(RecommendationTab.SUPER_LIKE));
+
+		assertThat(result.items()).extracting(item -> item.place().externalPlaceId())
+			.containsExactly("beach", "cafe");
+	}
+
+	@Test
+	void superLikeTabUsesOnlySuperLikingMembersTagMatchForTheSecondSortKey() {
+		when(recommendationMapper.findScoreSources(any(), any())).thenReturn(List.of(
+			source("cafe", "quiet", "1.00", "1.00", MEMBER_A_ID, "0.20", "SUPER_LIKE"),
+			source("cafe", "quiet", "1.00", "1.00", MEMBER_B_ID, "1.00", null),
+			source("beach", "quiet", "1.00", "1.00", MEMBER_A_ID, "0.80", "SUPER_LIKE"),
+			source("beach", "quiet", "1.00", "1.00", MEMBER_B_ID, "0.10", null)
 		));
 
 		var result = handler.handle(query(RecommendationTab.SUPER_LIKE));

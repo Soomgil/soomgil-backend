@@ -111,6 +111,26 @@ public class S3ObjectStorageGateway implements ObjectStorageGateway {
 		}
 	}
 
+	@Override
+	public byte[] read(StorageObjectKey objectKey) {
+		try {
+			return client.getObjectAsBytes(GetObjectRequest.builder()
+				.bucket(properties.bucket()).key(objectKey.value()).build()).asByteArray();
+		}
+		catch (NoSuchKeyException exception) {
+			throw new BusinessException(ErrorCode.OBJECT_NOT_FOUND);
+		}
+		catch (S3Exception exception) {
+			if (exception.statusCode() == 404) {
+				throw new BusinessException(ErrorCode.OBJECT_NOT_FOUND);
+			}
+			throw new IllegalStateException("Object storage read failed.", exception);
+		}
+		catch (SdkException exception) {
+			throw new IllegalStateException("Object storage read failed.", exception);
+		}
+	}
+
 	private URI publicUrl(StorageObjectKey objectKey) {
 		if (properties.publicBaseUrl() == null) {
 			return null;

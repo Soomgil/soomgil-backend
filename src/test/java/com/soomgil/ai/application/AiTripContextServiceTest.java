@@ -13,7 +13,6 @@ import com.soomgil.itinerary.application.query.handler.FindItineraryHandler;
 import com.soomgil.planning.application.handler.GetNoteQueryHandler;
 import com.soomgil.planning.application.handler.ListChecklistsQueryHandler;
 import com.soomgil.planning.application.query.ListChecklistsQuery;
-import com.soomgil.planning.domain.model.PlanningException;
 import com.soomgil.record.api.dto.PagedTripRecordEntry;
 import com.soomgil.record.api.dto.RecordVisibility;
 import com.soomgil.record.api.dto.TripRecordEntry;
@@ -32,7 +31,7 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
-import com.soomgil.global.error.ErrorCode;
+import java.util.Optional;
 
 class AiTripContextServiceTest {
 
@@ -70,8 +69,8 @@ class AiTripContextServiceTest {
 		));
 		when(checklistHandler.handle(new ListChecklistsQuery(tripId, null, null, userId)))
 			.thenReturn(List.of());
-		when(noteHandler.handle(org.mockito.ArgumentMatchers.any()))
-			.thenThrow(new PlanningException(ErrorCode.PLANNING_NOTE_NOT_FOUND));
+		when(noteHandler.findOptional(org.mockito.ArgumentMatchers.any()))
+			.thenReturn(Optional.empty());
 
 		AiTripContext context = new AiTripContextService(
 			tripHandler, itineraryHandler, recordService, noteHandler, checklistHandler, displayNameHandler
@@ -83,5 +82,6 @@ class AiTripContextServiceTest {
 			assertThat(item.title()).isEqualTo("해변 산책");
 			assertThat(item.uploadedByName()).isEqualTo("윤정");
 		});
+		assertThat(context.notes()).isEmpty();
 	}
 }

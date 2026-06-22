@@ -64,7 +64,7 @@ class RecalculateTagStatisticsCommandHandlerIntegrationTest {
 	}
 
 	@Test
-	void calculatesServingStatisticsFromEachUsersFinalPlaceReaction() {
+	void calculatesServingStatisticsFromRealSwipeEventsIncludingHistory() {
 		assertThatThrownBy(() -> handler.handle(new RecalculateTagStatisticsCommand(
 			new BigDecimal("2"),
 			TagStatisticSource.REAL_USER,
@@ -97,11 +97,11 @@ class RecalculateTagStatisticsCommandHandlerIntegrationTest {
 		assertThat(run)
 			.containsEntry("source", "REAL_USER")
 			.containsEntry("status", "SUCCEEDED")
-			.containsEntry("total_reaction_count", 4L)
-			.containsEntry("positive_reaction_count", 2L)
+			.containsEntry("total_reaction_count", 7L)
+			.containsEntry("positive_reaction_count", 4L)
 			.containsEntry("is_serving", true);
 		assertThat((BigDecimal) run.get("alpha")).isEqualByComparingTo("2");
-		assertThat((BigDecimal) run.get("global_positive_rate")).isEqualByComparingTo("0.500000");
+		assertThat((BigDecimal) run.get("global_positive_rate")).isEqualByComparingTo("0.571429");
 
 		List<Map<String, Object>> statistics = jdbcTemplate.queryForList("""
 			SELECT
@@ -117,8 +117,8 @@ class RecalculateTagStatisticsCommandHandlerIntegrationTest {
 			""", result.runId());
 
 		assertThat(statistics).hasSize(2);
-		assertStatistic(statistics.get(0), "museum", 0L, 1L, "0.333333", "0.296296");
-		assertStatistic(statistics.get(1), "park", 2L, 3L, "0.600000", "0.576000");
+		assertStatistic(statistics.get(0), "museum", 0L, 1L, "0.380952", "0.333333");
+		assertStatistic(statistics.get(1), "park", 4L, 6L, "0.642857", "0.125000");
 	}
 
 	@Test
@@ -192,6 +192,7 @@ class RecalculateTagStatisticsCommandHandlerIntegrationTest {
 			)
 			VALUES (?, ?, 'KTO', ?, ?, ?)
 			""", UUID.randomUUID(), UUID.fromString(userId), externalPlaceId, reaction, enrichmentId);
+		insertHistoricalEvent(userId, externalPlaceId, reaction, enrichmentId);
 	}
 
 	private void insertHistoricalEvent(

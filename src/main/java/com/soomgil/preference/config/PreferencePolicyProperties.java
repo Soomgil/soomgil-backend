@@ -74,14 +74,14 @@ public class PreferencePolicyProperties {
 
 	public static class Recommendation {
 
-		private BigDecimal matchedMemberLiftThreshold = new BigDecimal("0.15");
+		private BigDecimal matchedMemberThreshold = new BigDecimal("0.15");
 
-		public BigDecimal getMatchedMemberLiftThreshold() {
-			return matchedMemberLiftThreshold;
+		public BigDecimal getMatchedMemberThreshold() {
+			return matchedMemberThreshold;
 		}
 
-		public void setMatchedMemberLiftThreshold(BigDecimal matchedMemberLiftThreshold) {
-			this.matchedMemberLiftThreshold = matchedMemberLiftThreshold;
+		public void setMatchedMemberThreshold(BigDecimal matchedMemberThreshold) {
+			this.matchedMemberThreshold = matchedMemberThreshold;
 		}
 	}
 

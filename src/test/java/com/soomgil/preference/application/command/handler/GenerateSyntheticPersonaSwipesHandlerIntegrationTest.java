@@ -68,6 +68,9 @@ class GenerateSyntheticPersonaSwipesHandlerIntegrationTest {
 		assertThat(count("preference.synthetic_personas")).isEqualTo(50);
 		assertThat(count("preference.synthetic_swipe_events")).isEqualTo(100);
 		assertThat(count("preference.user_swipe_events")).isZero();
+		assertThat(firstEvents).allSatisfy(event ->
+			assertThat(event).containsEntry("source", "SYNTHETIC_PERSONA")
+		);
 		assertThat(syntheticEvents()).containsExactlyElementsOf(firstEvents);
 	}
 
@@ -186,6 +189,7 @@ class GenerateSyntheticPersonaSwipesHandlerIntegrationTest {
 				persona_id,
 				provider,
 				external_place_id,
+				source,
 				reaction,
 				generator_version,
 				seed,
@@ -210,6 +214,18 @@ class GenerateSyntheticPersonaSwipesHandlerIntegrationTest {
 			)
 			VALUES (
 				'00000000-0000-0000-0000-000000002203',
+				'00000000-0000-0000-0000-000000002204',
+				'KTO',
+				'1001',
+				'NOPE',
+				?
+			)
+			""", FIRST_ENRICHMENT_ID);
+		jdbcTemplate.update("""
+			INSERT INTO preference.user_swipe_events (
+				user_id, provider, external_place_id, reaction, place_tag_enrichment_id
+			)
+			VALUES (
 				'00000000-0000-0000-0000-000000002204',
 				'KTO',
 				'1001',

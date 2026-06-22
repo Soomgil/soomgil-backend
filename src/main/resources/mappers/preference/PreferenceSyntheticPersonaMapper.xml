@@ -133,6 +133,7 @@
 			persona_id,
 			provider,
 			external_place_id,
+			source,
 			reaction,
 			place_tag_enrichment_id,
 			generator_version,
@@ -145,6 +146,7 @@
 				CAST(#{row.personaId} AS uuid),
 				#{row.provider},
 				#{row.externalPlaceId},
+				'SYNTHETIC_PERSONA',
 				#{row.reaction},
 				CAST(#{row.enrichmentId} AS uuid),
 				#{row.generatorVersion},
@@ -154,6 +156,7 @@
 		</foreach>
 		ON CONFLICT (persona_id, provider, external_place_id, generator_version, seed)
 		DO UPDATE SET
+			source = excluded.source,
 			reaction = excluded.reaction,
 			place_tag_enrichment_id = excluded.place_tag_enrichment_id,
 			persona_place_score = excluded.persona_place_score,

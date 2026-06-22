@@ -1,5 +1,5 @@
 -- Soomgil local demo dataset: Seoul + Daejeon
--- Target schema: Flyway V1..V36
+-- Target schema: Flyway V1..V37
 -- Safe to re-run: deterministic identifiers and ON CONFLICT clauses are used throughout.
 -- Apply after migrations:
 --   docker compose exec -T postgres psql -U soomgil -d soomgil < seeds/soomgil_demo_seoul_daejeon.sql
@@ -94,7 +94,7 @@ ON CONFLICT (user_id) DO NOTHING;
 INSERT INTO auth.user_password_credentials
   (user_id, password_hash, password_algorithm, password_changed_at, created_at, updated_at)
 SELECT md5('demo-user:' || n)::uuid,
-       '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy',
+       '$2b$10$LcCmC64iYPhk8JYniS.Bt.9FFjERfngVrWMmes0gElUhLZGOVPk7q',
        'bcrypt', now() - interval '90 days', now() - interval '90 days', now()
 FROM generate_series(1, 20) n
 ON CONFLICT (user_id) DO NOTHING;
@@ -1007,8 +1007,8 @@ SELECT md5('demo-bulk-record:'||id)::uuid,trip_id,itinerary_day_id,id,owner_user
  CASE rn WHEN 1 THEN '여행의 첫 장면' WHEN 2 THEN '걷다가 멈춘 곳' WHEN 3 THEN '함께여서 좋았던 순간' ELSE '다시 보고 싶은 풍경' END,
  CASE rn%4 WHEN 0 THEN '다음 여행에도 꼭 다시 넣고 싶은 장소.' WHEN 1 THEN '아침 일찍 가니 한적해서 천천히 둘러볼 수 있었다.'
   WHEN 2 THEN '근처 골목까지 걸으니 예상보다 볼거리가 많았다.' ELSE '일정 사이에 여유를 둔 덕분에 오래 머물렀다.' END,
- place_name,lat,lng,date::timestamptz+make_interval(hours=>9+rn*2),'TRIP_MEMBERS','ACTIVE',
- date::timestamptz+make_interval(hours=>9+rn*2),now()
+ place_name,lat,lng,date::timestamptz+make_interval(hours=>(9+rn*2)::int),'TRIP_MEMBERS','ACTIVE',
+ date::timestamptz+make_interval(hours=>(9+rn*2)::int),now()
 FROM ranked WHERE rn<=4 ON CONFLICT(id) DO NOTHING;
 
 INSERT INTO media.media_files

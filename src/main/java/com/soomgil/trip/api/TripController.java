@@ -42,6 +42,8 @@ import com.soomgil.trip.api.dto.TripStatus;
 import com.soomgil.trip.api.dto.UpdateTripRequest;
 import com.soomgil.common.api.dto.PageMeta;
 import com.soomgil.user.api.dto.UserSummary;
+import com.soomgil.auth.application.handler.FindDisplayNameQueryHandler;
+import com.soomgil.auth.application.query.FindDisplayNameQuery;
 import jakarta.validation.Valid;
 import java.security.Principal;
 import java.time.OffsetDateTime;
@@ -77,6 +79,7 @@ public class TripController extends ApiControllerSupport {
 	private final FindTripDetailHandler findTripDetailHandler;
 	private final ListTripMembersHandler listTripMembersHandler;
 	private final ListTripInvitesHandler listTripInvitesHandler;
+	private final FindDisplayNameQueryHandler displayNameHandler;
 
 	public TripController(
 		CreateTripHandler createTripHandler,
@@ -88,7 +91,8 @@ public class TripController extends ApiControllerSupport {
 		ListMyTripsHandler listMyTripsHandler,
 		FindTripDetailHandler findTripDetailHandler,
 		ListTripMembersHandler listTripMembersHandler,
-		ListTripInvitesHandler listTripInvitesHandler
+		ListTripInvitesHandler listTripInvitesHandler,
+		FindDisplayNameQueryHandler displayNameHandler
 	) {
 		this.createTripHandler = Objects.requireNonNull(createTripHandler, "createTripHandler must not be null");
 		this.createTripInviteHandler = Objects.requireNonNull(createTripInviteHandler, "createTripInviteHandler must not be null");
@@ -100,6 +104,7 @@ public class TripController extends ApiControllerSupport {
 		this.findTripDetailHandler = Objects.requireNonNull(findTripDetailHandler, "findTripDetailHandler must not be null");
 		this.listTripMembersHandler = Objects.requireNonNull(listTripMembersHandler, "listTripMembersHandler must not be null");
 		this.listTripInvitesHandler = Objects.requireNonNull(listTripInvitesHandler, "listTripInvitesHandler must not be null");
+		this.displayNameHandler = Objects.requireNonNull(displayNameHandler, "displayNameHandler must not be null");
 	}
 
 	@GetMapping
@@ -340,7 +345,12 @@ public class TripController extends ApiControllerSupport {
 	}
 
 	private UserSummary userSummary(UUID userId) {
-		return new UserSummary(userId, userId.toString(), null);
+		FindDisplayNameQuery query = new FindDisplayNameQuery(userId);
+		return new UserSummary(
+			userId,
+			displayNameHandler.handle(query),
+			displayNameHandler.findProfileImageUrl(query)
+		);
 	}
 
 	private com.soomgil.trip.domain.model.TripStatus toDomainStatus(TripStatus status) {

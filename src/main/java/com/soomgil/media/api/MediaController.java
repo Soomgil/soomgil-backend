@@ -16,10 +16,18 @@ import com.soomgil.media.application.command.handler.CreateMediaFileCommandHandl
 import com.soomgil.media.application.command.handler.CreateUploadUrlCommandHandler;
 import com.soomgil.media.application.command.handler.DeleteMediaFileCommandHandler;
 import com.soomgil.media.domain.model.MediaFileMetadata;
+import com.soomgil.media.domain.model.MediaPurpose;
+import com.soomgil.media.application.port.MediaFileRepository;
+import com.soomgil.global.storage.ObjectStorageGateway;
+import com.soomgil.media.domain.policy.MediaObjectKeyPolicy;
 import jakarta.validation.Valid;
 import java.security.Principal;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.CacheControl;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -28,6 +36,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.beans.factory.annotation.Autowired;
 
 @Validated
 @RestController
@@ -37,15 +46,49 @@ public class MediaController extends ApiControllerSupport {
 	private final CreateUploadUrlCommandHandler uploadUrlHandler;
 	private final CreateMediaFileCommandHandler createMediaFileHandler;
 	private final DeleteMediaFileCommandHandler deleteMediaFileHandler;
+	private final MediaFileRepository mediaFileRepository;
+	private final ObjectStorageGateway storage;
+	private final MediaObjectKeyPolicy keyPolicy;
 
+	@Autowired
 	public MediaController(
 		CreateUploadUrlCommandHandler uploadUrlHandler,
 		CreateMediaFileCommandHandler createMediaFileHandler,
-		DeleteMediaFileCommandHandler deleteMediaFileHandler
+		DeleteMediaFileCommandHandler deleteMediaFileHandler,
+		MediaFileRepository mediaFileRepository,
+		ObjectStorageGateway storage,
+		MediaObjectKeyPolicy keyPolicy
 	) {
 		this.uploadUrlHandler = uploadUrlHandler;
 		this.createMediaFileHandler = createMediaFileHandler;
 		this.deleteMediaFileHandler = deleteMediaFileHandler;
+		this.mediaFileRepository = mediaFileRepository;
+		this.storage = storage;
+		this.keyPolicy = keyPolicy;
+	}
+
+	MediaController(
+		CreateUploadUrlCommandHandler uploadUrlHandler,
+		CreateMediaFileCommandHandler createMediaFileHandler,
+		DeleteMediaFileCommandHandler deleteMediaFileHandler
+	) {
+		this(uploadUrlHandler, createMediaFileHandler, deleteMediaFileHandler, null, null, null);
+	}
+
+	@GetMapping("/files/{mediaId}/content")
+	public ResponseEntity<byte[]> getPublicContent(@PathVariable UUID mediaId) {
+		MediaFileMetadata mediaFile = mediaFileRepository.findById(mediaId);
+		if (mediaFile == null || !"ACTIVE".equals(mediaFile.status())) {
+			throw new BusinessException(ErrorCode.OBJECT_NOT_FOUND);
+		}
+		MediaPurpose purpose = keyPolicy.requireOwnedPurpose(mediaFile.ownerUserId(), mediaFile.objectKey());
+		if (!purpose.publicServingAllowed()) {
+			throw new BusinessException(ErrorCode.FORBIDDEN);
+		}
+		return ResponseEntity.ok()
+			.cacheControl(CacheControl.noCache())
+			.contentType(MediaType.parseMediaType(mediaFile.mimeType()))
+			.body(storage.read(mediaFile.objectKey()));
 	}
 
 	@PostMapping("/upload-urls")

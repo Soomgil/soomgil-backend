@@ -1,6 +1,6 @@
 # 서울·대전 데모 데이터
 
-`soomgil_demo_seoul_daejeon.sql`은 Flyway V1~V36 적용 후 넣는 로컬 전용 데이터입니다.
+`soomgil_demo_seoul_daejeon.sql`은 Flyway V1~V37 적용 후 넣는 로컬 전용 데이터입니다.
 운영 마이그레이션에는 포함되지 않으며 기존 데이터를 삭제하지 않습니다.
 
 포함 범위:

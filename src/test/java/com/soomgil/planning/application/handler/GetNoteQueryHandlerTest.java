@@ -66,4 +66,20 @@ class GetNoteQueryHandlerTest {
 			.satisfies(ex -> assertThat(((PlanningException) ex).errorCode())
 				.isEqualTo(ErrorCode.PLANNING_NOTE_NOT_FOUND));
 	}
+
+	@Test
+	@DisplayName("선택 조회는 note가 없어도 예외 없이 empty를 반환한다")
+	void optionalLookupReturnsEmptyWithoutException() {
+		UUID tripId = UUID.randomUUID();
+		UUID viewerId = UUID.randomUUID();
+		when(noteMapper.findByTripScopeDay(tripId, PlanningScopeType.TRIP, null))
+			.thenReturn(Optional.empty());
+
+		Optional<Note> result = handler.findOptional(new GetNoteQuery(
+			tripId, PlanningScopeType.TRIP, null, viewerId
+		));
+
+		assertThat(result).isEmpty();
+		verify(accessChecker).requireMember(tripId, viewerId);
+	}
 }

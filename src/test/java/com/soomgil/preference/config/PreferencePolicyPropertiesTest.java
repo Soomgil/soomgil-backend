@@ -14,7 +14,7 @@ class PreferencePolicyPropertiesTest {
 		.withUserConfiguration(TestConfiguration.class)
 		.withPropertyValues(
 			"soomgil.preference.tag-selection.minimum-confidence=0.60",
-			"soomgil.preference.recommendation.matched-member-lift-threshold=0.20",
+			"soomgil.preference.recommendation.matched-member-threshold=0.20",
 			"soomgil.preference.synthetic-persona.required-count=40",
 			"soomgil.preference.real-user.minimum-total-reaction-count=20000"
 		);
@@ -26,7 +26,7 @@ class PreferencePolicyPropertiesTest {
 
 			assertThat(properties.getTagSelection().getMinimumConfidence())
 				.isEqualByComparingTo(new BigDecimal("0.60"));
-			assertThat(properties.getRecommendation().getMatchedMemberLiftThreshold())
+			assertThat(properties.getRecommendation().getMatchedMemberThreshold())
 				.isEqualByComparingTo(new BigDecimal("0.20"));
 			assertThat(properties.getSyntheticPersona().getRequiredCount()).isEqualTo(40);
 			assertThat(properties.getRealUser().getMinimumTotalReactionCount()).isEqualTo(20_000);

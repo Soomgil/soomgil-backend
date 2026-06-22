@@ -33,9 +33,9 @@ class RecommendationScorerTest {
 	}
 
 	@Test
-	void matchesMembersOnlyWhenTheirScoreIsAboveNeutralByTheThreshold() {
-		assertThat(scorer.isMatchedMember(new BigDecimal("0.649999"))).isFalse();
-		assertThat(scorer.isMatchedMember(new BigDecimal("0.650000"))).isTrue();
+	void matchesMembersWhenTheirScoreMeetsTheConfiguredThreshold() {
+		assertThat(scorer.isMatchedMember(new BigDecimal("0.149999"))).isFalse();
+		assertThat(scorer.isMatchedMember(new BigDecimal("0.150000"))).isTrue();
 	}
 
 	@Test

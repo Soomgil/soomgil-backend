@@ -39,6 +39,7 @@ import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -105,15 +106,15 @@ public class PlanningController extends ApiControllerSupport {
 	}
 
 	@GetMapping("/notes")
-	public Note getNote(
+	public ResponseEntity<Note> getNote(
 		@PathVariable UUID tripId,
 		@AuthenticationPrincipal CurrentUser currentUser,
 		@RequestParam PlanningScopeType scopeType,
 		@RequestParam(required = false) UUID itineraryDayId
 	) {
-		return getNoteQueryHandler.handle(new GetNoteQuery(
+		return getNoteQueryHandler.findOptional(new GetNoteQuery(
 			tripId, scopeType, itineraryDayId, currentUser.userId()
-		));
+		)).map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.noContent().build());
 	}
 
 	@PutMapping("/notes")

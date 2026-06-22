@@ -85,8 +85,12 @@ public class CommunityReportAssembler {
 	}
 
 	private UserSummary resolveUser(UUID userId) {
-		String displayName = displayNameQueryHandler.handle(new FindDisplayNameQuery(userId));
-		return new UserSummary(userId, displayName, null);
+		FindDisplayNameQuery query = new FindDisplayNameQuery(userId);
+		return new UserSummary(
+			userId,
+			displayNameQueryHandler.handle(query),
+			displayNameQueryHandler.findProfileImageUrl(query)
+		);
 	}
 
 	private OffsetDateTime toOffsetDateTime(Instant instant) {
