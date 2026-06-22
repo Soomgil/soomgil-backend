@@ -111,7 +111,7 @@ soomgil:
       minimum-confidence: ${PREFERENCE_TAG_MIN_CONFIDENCE:0.55}
       maximum-confirmed-tags: ${PREFERENCE_TAG_MAX_CONFIRMED:10}
     recommendation:
-      matched-member-lift-threshold: ${PREFERENCE_MATCHED_MEMBER_LIFT:0.15}
+      matched-member-threshold: ${PREFERENCE_MATCHED_MEMBER_THRESHOLD:0.15}
     synthetic-persona:
       required-count: ${PREFERENCE_SYNTHETIC_PERSONA_COUNT:50}
       maximum-noise-rate: ${PREFERENCE_SYNTHETIC_MAX_NOISE_RATE:0.05}

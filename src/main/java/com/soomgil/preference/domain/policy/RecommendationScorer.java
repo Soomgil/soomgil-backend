@@ -8,22 +8,21 @@ import java.util.List;
  * 멤버별 장소 점수, 그룹 합계, matched member 여부를 계산한다.
  *
  * <p>멤버별 점수는 태그 선호도의 가중평균이라 {@code 0..1} 범위다.
- * matched threshold는 중립값 {@code 0.5}보다 얼마나 높아야 하는지를 뜻한다.
+ * matched threshold는 멤버별 장소 점수에 직접 적용한다.
  */
 public class RecommendationScorer {
 
-	private static final BigDecimal NEUTRAL_SCORE = new BigDecimal("0.5");
 	private static final int SCORE_SCALE = 6;
 
-	private final BigDecimal matchedMemberLiftThreshold;
+	private final BigDecimal matchedMemberThreshold;
 
-	public RecommendationScorer(BigDecimal matchedMemberLiftThreshold) {
-		if (matchedMemberLiftThreshold == null
-			|| matchedMemberLiftThreshold.compareTo(BigDecimal.ZERO) < 0
-			|| matchedMemberLiftThreshold.compareTo(NEUTRAL_SCORE) > 0) {
-			throw new IllegalArgumentException("matched member lift threshold must be between 0 and 0.5");
+	public RecommendationScorer(BigDecimal matchedMemberThreshold) {
+		if (matchedMemberThreshold == null
+			|| matchedMemberThreshold.compareTo(BigDecimal.ZERO) < 0
+			|| matchedMemberThreshold.compareTo(BigDecimal.ONE) > 0) {
+			throw new IllegalArgumentException("matched member threshold must be between 0 and 1");
 		}
-		this.matchedMemberLiftThreshold = matchedMemberLiftThreshold;
+		this.matchedMemberThreshold = matchedMemberThreshold;
 	}
 
 	public BigDecimal calculateMemberScore(List<RecommendationTagScoreInput> inputs) {
@@ -59,7 +58,7 @@ public class RecommendationScorer {
 
 	public boolean isMatchedMember(BigDecimal memberScore) {
 		validateRate(memberScore, "memberScore");
-		return memberScore.compareTo(NEUTRAL_SCORE.add(matchedMemberLiftThreshold)) >= 0;
+		return memberScore.compareTo(matchedMemberThreshold) >= 0;
 	}
 
 	private void validateRate(BigDecimal value, String name) {

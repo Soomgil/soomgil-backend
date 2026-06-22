@@ -144,21 +144,21 @@ public class PreferenceRecalculateTagStatisticsCommandHandler implements Recalcu
 		if (command.source() == TagStatisticSource.SYNTHETIC_PERSONA) {
 			return mapper.countSyntheticReactions(command.generatorVersion());
 		}
-		return mapper.countFinalReactions();
+		return mapper.countRealSwipeEvents();
 	}
 
 	private long positiveReactionCount(RecalculateTagStatisticsCommand command) {
 		if (command.source() == TagStatisticSource.SYNTHETIC_PERSONA) {
 			return mapper.countPositiveSyntheticReactions(command.generatorVersion());
 		}
-		return mapper.countPositiveFinalReactions();
+		return mapper.countPositiveRealSwipeEvents();
 	}
 
 	private List<TagReactionAggregateRow> aggregates(RecalculateTagStatisticsCommand command) {
 		if (command.source() == TagStatisticSource.SYNTHETIC_PERSONA) {
 			return mapper.aggregateSyntheticReactionsByTag(command.generatorVersion());
 		}
-		return mapper.aggregateFinalReactionsByTag();
+		return mapper.aggregateRealSwipeEventsByTag();
 	}
 
 	private void validateSyntheticQuality(String generatorVersion) {
@@ -183,7 +183,7 @@ public class PreferenceRecalculateTagStatisticsCommandHandler implements Recalcu
 
 	private void validateRealUserTransition(RecalculateTagStatisticsCommand command) {
 		if (!realUserTransitionPolicy.canPromote(
-			mapper.countFinalReactions(),
+			mapper.countRealSwipeEvents(),
 			mapper.findRealCoreTagReactionCounts(),
 			command.offlineEvaluationApproved()
 		)) {

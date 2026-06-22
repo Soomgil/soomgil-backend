@@ -8,7 +8,7 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
 /**
- * 최종 사용자 반응 집계와 태그 통계 저장을 담당하는 MyBatis mapper.
+ * 실제·합성 스와이프 이벤트 집계와 태그 통계 저장을 담당하는 MyBatis mapper.
  */
 @Mapper
 public interface PreferenceTagStatisticsMapper {
@@ -17,11 +17,11 @@ public interface PreferenceTagStatisticsMapper {
 
 	String findServingRunSource();
 
-	long countFinalReactions();
+	long countRealSwipeEvents();
 
-	long countPositiveFinalReactions();
+	long countPositiveRealSwipeEvents();
 
-	List<TagReactionAggregateRow> aggregateFinalReactionsByTag();
+	List<TagReactionAggregateRow> aggregateRealSwipeEventsByTag();
 
 	List<Long> findRealCoreTagReactionCounts();
 

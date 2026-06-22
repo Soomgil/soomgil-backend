@@ -64,7 +64,9 @@ class PlaceRecommendationQueryHandlerIntegrationTest {
 		assertThat(result.items().getFirst().matchedMembers())
 			.extracting(member -> member.displayName())
 			.containsExactly("민경철", "여행 친구");
-		assertThat(result.items().get(1).matchedMembers()).isEmpty();
+		assertThat(result.items().get(1).matchedMembers())
+			.extracting(member -> member.displayName())
+			.containsExactly("민경철", "여행 친구");
 	}
 
 	private void createUserProfileContract() {

@@ -9,7 +9,7 @@ import com.soomgil.preference.application.command.dto.UpsertSwipeReactionCommand
 import com.soomgil.preference.domain.policy.PlaceTagEvidence;
 import com.soomgil.preference.domain.policy.PlaceTagEvidenceCalculator;
 import com.soomgil.preference.domain.policy.PlaceTagEvidenceInput;
-import com.soomgil.preference.domain.policy.UserPreferenceScoreCalculator;
+import com.soomgil.preference.domain.policy.UserPreferenceWeightCalculator;
 import com.soomgil.preference.infrastructure.persistence.mapper.PreferenceSwipeReactionMapper;
 import com.soomgil.preference.infrastructure.persistence.row.PlaceTagEvidenceSourceRow;
 import com.soomgil.preference.infrastructure.persistence.row.UserPlaceReactionInsertRow;
@@ -37,7 +37,7 @@ public class PreferenceUpsertSwipeReactionCommandHandler implements UpsertSwipeR
 	private final ObjectProvider<CurrentUserProvider> currentUserProvider;
 	private final PreferenceSwipeReactionMapper mapper;
 	private final PlaceTagEvidenceCalculator evidenceCalculator;
-	private final UserPreferenceScoreCalculator preferenceScoreCalculator;
+	private final UserPreferenceWeightCalculator preferenceWeightCalculator;
 
 	public PreferenceUpsertSwipeReactionCommandHandler(
 		ObjectProvider<CurrentUserProvider> currentUserProvider,
@@ -46,7 +46,7 @@ public class PreferenceUpsertSwipeReactionCommandHandler implements UpsertSwipeR
 		this.currentUserProvider = currentUserProvider;
 		this.mapper = mapper;
 		this.evidenceCalculator = new PlaceTagEvidenceCalculator();
-		this.preferenceScoreCalculator = new UserPreferenceScoreCalculator();
+		this.preferenceWeightCalculator = new UserPreferenceWeightCalculator();
 	}
 
 	@Transactional
@@ -170,7 +170,7 @@ public class PreferenceUpsertSwipeReactionCommandHandler implements UpsertSwipeR
 			mapper.updateUserTagPreferenceScore(new UserTagPreferenceScoreUpdateRow(
 				userId.toString(),
 				tagId,
-				preferenceScoreCalculator.calculate(
+				preferenceWeightCalculator.calculatePreferenceScore(
 					source.smoothedPositiveRate(),
 					source.preferenceDiscrimination(),
 					source.positiveEvidence(),

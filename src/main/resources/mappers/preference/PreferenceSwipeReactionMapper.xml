@@ -133,7 +133,9 @@
 		parameterType="com.soomgil.preference.infrastructure.persistence.row.UserTagEvidenceAdjustmentRow">
 		UPDATE preference.user_preference_tag_weights
 		SET positive_evidence = CASE
-				WHEN #{reaction} IN ('LIKE', 'SUPER_LIKE')
+				WHEN #{reaction} = 'SUPER_LIKE'
+					THEN greatest(0, positive_evidence - (#{evidence} * 2.0))
+				WHEN #{reaction} = 'LIKE'
 					THEN greatest(0, positive_evidence - #{evidence})
 				ELSE positive_evidence
 			END,
@@ -169,7 +171,11 @@
 		VALUES (
 			CAST(#{userId} AS uuid),
 			CAST(#{tagId} AS uuid),
-			CASE WHEN #{reaction} IN ('LIKE', 'SUPER_LIKE') THEN #{evidence} ELSE 0 END,
+			CASE
+				WHEN #{reaction} = 'SUPER_LIKE' THEN #{evidence} * 2.0
+				WHEN #{reaction} = 'LIKE' THEN #{evidence}
+				ELSE 0
+			END,
 			CASE WHEN #{reaction} = 'NOPE' THEN #{evidence} ELSE 0 END,
 			0.5,
 			CASE WHEN #{reaction} = 'LIKE' THEN 1 ELSE 0 END,

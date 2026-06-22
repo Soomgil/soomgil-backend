@@ -79,7 +79,7 @@ public class PreferenceListPlaceRecommendationsQueryHandler
 			recommendationMapper,
 			new PlaceTagEvidenceCalculator(),
 			new RecommendationScorer(
-				properties.getRecommendation().getMatchedMemberLiftThreshold()
+				properties.getRecommendation().getMatchedMemberThreshold()
 			)
 		);
 	}
@@ -182,11 +182,18 @@ public class PreferenceListPlaceRecommendationsQueryHandler
 			.map(memberSummaries::get)
 			.filter(Objects::nonNull)
 			.toList();
+		BigDecimal superLikeTagMatchScore = recommendationScorer.calculateGroupScore(
+			superLikedMemberIds.stream()
+				.map(memberScores::get)
+				.filter(Objects::nonNull)
+				.toList()
+		);
 
 		return new ScoredRecommendation(
 			candidate,
 			recommendationScorer.calculateGroupScore(new ArrayList<>(memberScores.values())),
 			superLikedMemberIds.size(),
+			superLikeTagMatchScore,
 			matchedMembers,
 			superLikedMembers,
 			latestSuperLikedAt,
@@ -297,7 +304,10 @@ public class PreferenceListPlaceRecommendationsQueryHandler
 		if (tab == RecommendationTab.SUPER_LIKE) {
 			return Comparator.comparingInt(ScoredRecommendation::superLikeCount)
 				.reversed()
-				.thenComparing(ScoredRecommendation::groupScore, Comparator.reverseOrder())
+				.thenComparing(
+					ScoredRecommendation::superLikeTagMatchScore,
+					Comparator.reverseOrder()
+				)
 				.thenComparing(
 					ScoredRecommendation::latestSuperLikedAt,
 					Comparator.nullsLast(Comparator.reverseOrder())
@@ -393,6 +403,7 @@ public class PreferenceListPlaceRecommendationsQueryHandler
 		PlaceViewportCandidate place,
 		BigDecimal groupScore,
 		int superLikeCount,
+		BigDecimal superLikeTagMatchScore,
 		List<UserSummary> matchedMembers,
 		List<UserSummary> superLikedMembers,
 		OffsetDateTime latestSuperLikedAt,

@@ -88,8 +88,8 @@ class SwipeReactionPreferenceEvidenceIntegrationTest {
 		assertEvidence("museum", "0.60000000", "0.00000000", "0.478261", 1, 0, 0);
 
 		react(SwipeReaction.SUPER_LIKE);
-		assertEvidence("park", "0.40000000", "0.00000000", "0.846154", 0, 1, 0);
-		assertEvidence("museum", "0.60000000", "0.00000000", "0.478261", 0, 1, 0);
+		assertEvidence("park", "0.80000000", "0.00000000", "0.904762", 0, 1, 0);
+		assertEvidence("museum", "1.20000000", "0.00000000", "0.538462", 0, 1, 0);
 
 		react(SwipeReaction.NOPE);
 		assertEvidence("park", "0.00000000", "0.40000000", "0.230769", 0, 0, 1);

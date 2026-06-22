@@ -4,14 +4,14 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 
 /**
- * 태그별 보정 좋아요율과 호불호 균형 점수를 계산한다.
+ * 태그별 보정 긍정률과 취향 구분력을 계산한다.
  *
- * <p>호불호 점수는 긍정과 부정이 균형일수록 커지며, 반응 수가 사전 반응 수보다 적으면
- * 실제 반응 비율만큼 낮아진다.
+ * <p>취향 구분력은 태그의 보정 긍정률이 전체 긍정률과 얼마나 다른지를 전체 긍정률의
+ * 가능한 최대 거리로 정규화한 값이다. 좋아함/싫어함의 방향은 이 값이 아니라 사용자별
+ * preference score가 표현한다.
  */
 public class PreferenceDiscriminationCalculator {
 
-	private static final BigDecimal FOUR = BigDecimal.valueOf(4);
 	private static final int CALCULATION_SCALE = 12;
 	private static final int STORAGE_SCALE = 6;
 
@@ -28,16 +28,16 @@ public class PreferenceDiscriminationCalculator {
 		BigDecimal smoothedPositiveRate = BigDecimal.valueOf(positiveCount)
 			.add(priorReactionCount.multiply(globalPositiveRate))
 			.divide(denominator, CALCULATION_SCALE, RoundingMode.HALF_UP);
-		BigDecimal reactionReliability = reactions
-			.divide(denominator, CALCULATION_SCALE, RoundingMode.HALF_UP);
-		BigDecimal polarization = FOUR
-			.multiply(smoothedPositiveRate)
-			.multiply(BigDecimal.ONE.subtract(smoothedPositiveRate))
-			.multiply(reactionReliability);
+		BigDecimal distance = smoothedPositiveRate.subtract(globalPositiveRate).abs();
+		BigDecimal maximumDistance = globalPositiveRate.max(BigDecimal.ONE.subtract(globalPositiveRate));
+		BigDecimal preferenceDiscrimination = distance
+			.divide(maximumDistance, CALCULATION_SCALE, RoundingMode.HALF_UP)
+			.max(BigDecimal.ZERO)
+			.min(BigDecimal.ONE);
 
 		return new TagPreferenceStatistics(
 			smoothedPositiveRate.setScale(STORAGE_SCALE, RoundingMode.HALF_UP),
-			polarization.setScale(STORAGE_SCALE, RoundingMode.HALF_UP)
+			preferenceDiscrimination.setScale(STORAGE_SCALE, RoundingMode.HALF_UP)
 		);
 	}
 
