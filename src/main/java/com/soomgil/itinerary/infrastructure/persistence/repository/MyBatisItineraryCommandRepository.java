@@ -18,7 +18,11 @@ import com.soomgil.itinerary.application.port.RouteSegmentCreate;
 import com.soomgil.itinerary.application.port.RouteSegmentUpdate;
 import com.soomgil.itinerary.application.port.RouteSegmentUpdateResult;
 import com.soomgil.itinerary.application.port.RouteSegmentSnapshotUpdate;
+import com.soomgil.itinerary.domain.model.ItineraryItemType;
 import com.soomgil.itinerary.infrastructure.persistence.mapper.ItineraryCommandMapper;
+import com.soomgil.itinerary.infrastructure.persistence.row.ItineraryItemRow;
+import java.math.BigDecimal;
+import java.net.URI;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.Optional;
@@ -87,12 +91,14 @@ public class MyBatisItineraryCommandRepository implements ItineraryCommandReposi
 
 	@Override
 	public Optional<ItineraryItemReadModel> findItem(UUID tripId, UUID itemId) {
-		return Optional.ofNullable(mapper.findItem(tripId, itemId));
+		return Optional.ofNullable(mapper.findItem(tripId, itemId))
+			.map(this::toItemReadModel);
 	}
 
 	@Override
 	public Optional<ItineraryItemReadModel> updateItem(ItineraryItemUpdate update) {
-		return Optional.ofNullable(mapper.updateItem(update));
+		return Optional.ofNullable(mapper.updateItem(update))
+			.map(this::toItemReadModel);
 	}
 
 	@Override
@@ -213,5 +219,30 @@ public class MyBatisItineraryCommandRepository implements ItineraryCommandReposi
 	@Override
 	public void updateItemOrder(ItineraryItemOrderUpdate update) {
 		mapper.updateItemOrder(update);
+	}
+
+	private ItineraryItemReadModel toItemReadModel(ItineraryItemRow row) {
+		return new ItineraryItemReadModel(
+			row.id(),
+			row.itineraryDayId(),
+			row.sortOrder(),
+			ItineraryItemType.valueOf(row.itemType()),
+			row.placeProvider(),
+			row.externalPlaceId(),
+			row.placeName(),
+			row.address(),
+			toDouble(row.lat()),
+			toDouble(row.lng()),
+			toUri(row.thumbnailUrl()),
+			row.sourceStatus()
+		);
+	}
+
+	private Double toDouble(BigDecimal value) {
+		return value == null ? null : value.doubleValue();
+	}
+
+	private URI toUri(String value) {
+		return value == null || value.isBlank() ? null : URI.create(value);
 	}
 }

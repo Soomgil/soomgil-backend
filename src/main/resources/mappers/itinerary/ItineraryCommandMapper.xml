@@ -157,7 +157,7 @@
     )
   </insert>
 
-  <select id="findItem" resultType="com.soomgil.itinerary.application.port.ItineraryItemReadModel">
+  <select id="findItem" resultType="com.soomgil.itinerary.infrastructure.persistence.row.ItineraryItemRow">
     SELECT
       id,
       itinerary_day_id,
@@ -177,7 +177,7 @@
       AND deleted_at IS NULL
   </select>
 
-  <select id="updateItem" resultType="com.soomgil.itinerary.application.port.ItineraryItemReadModel" flushCache="true" useCache="false">
+  <select id="updateItem" resultType="com.soomgil.itinerary.infrastructure.persistence.row.ItineraryItemRow" flushCache="true" useCache="false">
     UPDATE itinerary.itinerary_items
     SET
       itinerary_day_id = #{update.itineraryDayId},
