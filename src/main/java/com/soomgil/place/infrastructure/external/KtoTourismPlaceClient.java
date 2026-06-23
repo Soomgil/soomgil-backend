@@ -5,16 +5,25 @@ import com.soomgil.place.application.port.TourismPlaceFeedClient;
 import com.soomgil.place.application.port.TourismPlaceFeedItem;
 import com.soomgil.place.application.port.TourismPlaceFeedRequest;
 import com.soomgil.place.application.port.TourismPlaceFeedResult;
+import jakarta.annotation.PreDestroy;
 import java.net.URI;
+import java.net.http.HttpClient;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Function;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
@@ -26,6 +35,10 @@ import org.springframework.web.util.UriComponentsBuilder;
  */
 @Component
 public class KtoTourismPlaceClient implements TourismPlaceFeedClient {
+
+	private static final int DETAIL_CONCURRENCY = 12;
+	private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(2);
+	private static final Duration READ_TIMEOUT = Duration.ofSeconds(4);
 
 	private static final Map<String, String> CONTENT_TYPE_NAMES = Map.of(
 		"12", "관광지",
@@ -40,10 +53,20 @@ public class KtoTourismPlaceClient implements TourismPlaceFeedClient {
 
 	private final KtoTourismPlaceProperties properties;
 	private final RestClient restClient;
+	private final ExecutorService detailExecutor;
 
 	public KtoTourismPlaceClient(KtoTourismPlaceProperties properties) {
 		this.properties = properties;
-		this.restClient = RestClient.builder().build();
+		HttpClient httpClient = HttpClient.newBuilder()
+			.connectTimeout(CONNECT_TIMEOUT)
+			.build();
+		JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(httpClient);
+		requestFactory.setReadTimeout(READ_TIMEOUT);
+		this.restClient = RestClient.builder().requestFactory(requestFactory).build();
+		this.detailExecutor = Executors.newFixedThreadPool(
+			DETAIL_CONCURRENCY,
+			Thread.ofPlatform().daemon(true).name("kto-detail-", 0).factory()
+		);
 	}
 
 	@Override
@@ -54,10 +77,28 @@ public class KtoTourismPlaceClient implements TourismPlaceFeedClient {
 			: request.seed();
 		int page = Math.floorMod(currentSeed.hashCode(), 20) + 1;
 		JsonNode listResponse = get(buildListUri(request, page));
-		List<TourismPlaceFeedItem> places = parseList(listResponse).stream()
-			.map(this::loadDetailSafely)
-			.toList();
+		List<TourismPlaceFeedItem> places = enrichDetailsConcurrently(
+			parseList(listResponse),
+			this::loadDetailSafely,
+			detailExecutor
+		);
 		return new TourismPlaceFeedResult(places, UUID.randomUUID().toString());
+	}
+
+	static List<TourismPlaceFeedItem> enrichDetailsConcurrently(
+		List<TourismPlaceFeedItem> places,
+		Function<TourismPlaceFeedItem, TourismPlaceFeedItem> detailLoader,
+		Executor executor
+	) {
+		List<CompletableFuture<TourismPlaceFeedItem>> tasks = places.stream()
+			.map(place -> CompletableFuture.supplyAsync(() -> detailLoader.apply(place), executor))
+			.toList();
+		return tasks.stream().map(CompletableFuture::join).toList();
+	}
+
+	@PreDestroy
+	void close() {
+		detailExecutor.shutdownNow();
 	}
 
 	private TourismPlaceFeedItem loadDetailSafely(TourismPlaceFeedItem place) {
