@@ -140,7 +140,6 @@ public interface CommunityPostMapper {
 		LEFT JOIN (
 		    SELECT post_id, COUNT(*) AS like_count
 		    FROM community.post_likes
-		    WHERE deleted_at IS NULL
 		    GROUP BY post_id
 		) likes ON likes.post_id = p.id
 		WHERE p.deleted_at IS NULL
