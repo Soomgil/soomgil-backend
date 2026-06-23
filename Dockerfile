@@ -10,4 +10,4 @@ COPY . .
 
 EXPOSE 8080
 
-CMD ["./gradlew", "bootRun", "--continuous", "--no-daemon"]
+CMD ["./gradlew", "bootRun", "--no-daemon"]
