@@ -3,7 +3,12 @@ package com.soomgil.place.infrastructure.external;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.soomgil.place.application.port.TourismPlaceFeedItem;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 
 class KtoTourismPlaceClientTest {
@@ -62,5 +67,43 @@ class KtoTourismPlaceClientTest {
 		org.assertj.core.api.Assertions.assertThatThrownBy(() -> KtoTourismPlaceClient.parseList(body))
 			.isInstanceOf(KtoTourismPlaceException.class)
 			.hasMessageContaining("SERVICE KEY");
+	}
+
+	@Test
+	void enrichesDetailsConcurrentlyWhilePreservingFeedOrder() throws Exception {
+		var places = List.of(place("1"), place("2"), place("3"));
+		var allStarted = new CountDownLatch(places.size());
+		var release = new CountDownLatch(1);
+		try (var detailExecutor = Executors.newFixedThreadPool(places.size())) {
+			var result = CompletableFuture.supplyAsync(() ->
+				KtoTourismPlaceClient.enrichDetailsConcurrently(places, place -> {
+					allStarted.countDown();
+					try {
+						release.await();
+					}
+					catch (InterruptedException exception) {
+						Thread.currentThread().interrupt();
+						throw new IllegalStateException(exception);
+					}
+					return new TourismPlaceFeedItem(
+						place.externalPlaceId(), place.name(), place.address(), place.lat(), place.lng(),
+						place.thumbnailUrl(), place.category(), "detail-" + place.externalPlaceId(),
+						place.photos(), place.sourceModifiedAt()
+					);
+				}, detailExecutor)
+			);
+
+			assertThat(allStarted.await(1, TimeUnit.SECONDS)).isTrue();
+			release.countDown();
+			assertThat(result.get(1, TimeUnit.SECONDS))
+				.extracting(TourismPlaceFeedItem::description)
+				.containsExactly("detail-1", "detail-2", "detail-3");
+		}
+	}
+
+	private TourismPlaceFeedItem place(String id) {
+		return new TourismPlaceFeedItem(
+			id, "place-" + id, null, null, null, null, "12", null, List.of(), null
+		);
 	}
 }
