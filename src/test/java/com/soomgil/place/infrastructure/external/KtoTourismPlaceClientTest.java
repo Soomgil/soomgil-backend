@@ -3,6 +3,7 @@ package com.soomgil.place.infrastructure.external;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.soomgil.place.application.port.PlaceIntroRaw;
 import com.soomgil.place.application.port.TourismPlaceFeedItem;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -67,6 +68,73 @@ class KtoTourismPlaceClientTest {
 		org.assertj.core.api.Assertions.assertThatThrownBy(() -> KtoTourismPlaceClient.parseList(body))
 			.isInstanceOf(KtoTourismPlaceException.class)
 			.hasMessageContaining("SERVICE KEY");
+	}
+
+	@Test
+	void extractsAccessibilityFieldsFromKtoDetailIntro() throws Exception {
+		var body = objectMapper.readTree("""
+			{"response":{"header":{"resultCode":"0000"},"body":{"items":{"item":[{
+			  "contenttypeid":"12","usetime":"09:00~18:00","restdate":"매주 월요일",
+			  "parking":"무료 주차 가능",
+			  "chkbabycarriage":"가능","chkpet":"불가능"
+			}]}}}}
+			""");
+
+		PlaceIntroRaw intro = KtoTourismPlaceClient.parseIntro(body, "12");
+
+		assertThat(intro.useTime()).isEqualTo("09:00~18:00");
+		assertThat(intro.restDate()).isEqualTo("매주 월요일");
+		assertThat(intro.parking()).isEqualTo("무료 주차 가능");
+		assertThat(intro.disability()).isNull();
+		assertThat(intro.chkBabyCarriage()).isEqualTo("가능");
+		assertThat(intro.chkPet()).isEqualTo("불가능");
+	}
+
+	@Test
+	void extractsContentTypeSpecificKtoIntroFields() throws Exception {
+		var cultureBody = objectMapper.readTree("""
+			{"response":{"header":{"resultCode":"0000"},"body":{"items":{"item":[{
+			  "contenttypeid":"14","usetimeculture":"10:00~19:00","restdateculture":"월요일",
+			  "parkingculture":"유료","chkbabycarriageculture":"가능","chkpetculture":"불가능"
+			}]}}}}
+			""");
+		var leisureBody = objectMapper.readTree("""
+			{"response":{"header":{"resultCode":"0000"},"body":{"items":{"item":[{
+			  "contenttypeid":"28","usetimeleports":"09:00~17:00","restdateleports":"화요일",
+			  "parkingleports":"무료","chkbabycarriageleports":"불가능","chkpetleports":"가능"
+			}]}}}}
+			""");
+		var shoppingBody = objectMapper.readTree("""
+			{"response":{"header":{"resultCode":"0000"},"body":{"items":{"item":[{
+			  "contenttypeid":"38","opentime":"11:00~20:00","restdateshopping":"수요일",
+			  "parkingshopping":"주차 가능","chkbabycarriageshopping":"가능","chkpetshopping":"가능"
+			}]}}}}
+			""");
+
+		assertThat(KtoTourismPlaceClient.parseIntro(cultureBody, "14").useTime()).isEqualTo("10:00~19:00");
+		assertThat(KtoTourismPlaceClient.parseIntro(leisureBody, "28").parking()).isEqualTo("무료");
+		assertThat(KtoTourismPlaceClient.parseIntro(shoppingBody, "38").restDate()).isEqualTo("수요일");
+	}
+
+	@Test
+	void mergesBarrierFreeTourFieldsWithOperatingInformation() throws Exception {
+		var body = objectMapper.readTree("""
+			{"response":{"header":{"resultCode":"0000"},"body":{"items":{"item":[{
+			  "contentid":"2633956","publictransport":"출입구까지 휠체어 접근 가능",
+			  "restroom":"장애인 화장실 있음","stroller":"유모차 대여 가능"
+			}]}}}}
+			""");
+		var intro = new PlaceIntroRaw("09:00~18:00", "월요일", "무료", null, null, "불가능");
+
+		PlaceIntroRaw merged = KtoTourismPlaceClient.mergeIntro(
+			intro,
+			KtoTourismPlaceClient.parseBarrierFree(body)
+		);
+
+		assertThat(merged.useTime()).isEqualTo("09:00~18:00");
+		assertThat(merged.disability()).contains("휠체어 접근 가능", "장애인 화장실 있음");
+		assertThat(merged.chkBabyCarriage()).isEqualTo("유모차 대여 가능");
+		assertThat(merged.chkPet()).isEqualTo("불가능");
 	}
 
 	@Test

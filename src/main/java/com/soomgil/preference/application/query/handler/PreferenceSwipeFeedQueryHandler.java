@@ -7,6 +7,9 @@ import com.soomgil.place.api.dto.PlaceSourceStatus;
 import com.soomgil.place.application.port.TourismPlaceFeedClient;
 import com.soomgil.place.application.port.TourismPlaceFeedItem;
 import com.soomgil.place.application.port.TourismPlaceFeedRequest;
+import com.soomgil.place.application.query.dto.PlaceAccessibilityInfo;
+import com.soomgil.place.application.service.KtoContentTypeResolver;
+import com.soomgil.place.application.service.PlaceAccessibilityCacheService;
 import com.soomgil.preference.api.dto.SwipeFeedItem;
 import com.soomgil.preference.api.dto.SwipeFeedPlace;
 import com.soomgil.preference.api.dto.SwipeFeedResponse;
@@ -42,19 +45,22 @@ public class PreferenceSwipeFeedQueryHandler implements SwipeFeedQueryHandler {
 	private final PreferenceSwipeFeedMapper mapper;
 	private final FindFolloweePlaceReactionsQueryHandler followeeReactionQueryHandler;
 	private final SwipeTagPreparationService tagPreparationService;
+	private final PlaceAccessibilityCacheService accessibilityCacheService;
 
 	public PreferenceSwipeFeedQueryHandler(
 		ObjectProvider<CurrentUserProvider> currentUserProvider,
 		TourismPlaceFeedClient placeFeedClient,
 		PreferenceSwipeFeedMapper mapper,
 		FindFolloweePlaceReactionsQueryHandler followeeReactionQueryHandler,
-		SwipeTagPreparationService tagPreparationService
+		SwipeTagPreparationService tagPreparationService,
+		PlaceAccessibilityCacheService accessibilityCacheService
 	) {
 		this.currentUserProvider = currentUserProvider;
 		this.placeFeedClient = placeFeedClient;
 		this.mapper = mapper;
 		this.followeeReactionQueryHandler = followeeReactionQueryHandler;
 		this.tagPreparationService = tagPreparationService;
+		this.accessibilityCacheService = accessibilityCacheService;
 	}
 
 	@Transactional(readOnly = true)
@@ -83,8 +89,9 @@ public class PreferenceSwipeFeedQueryHandler implements SwipeFeedQueryHandler {
 		Map<String, SwipeTagPreparation> tagPreparations = selectedIds.isEmpty()
 			? Map.of() : tagPreparationService.prepare(selectedPlaces);
 		Map<PlaceRef, List<UserSummary>> likedByFollowees = findLikedByFollowees(selectedPlaces);
+		Map<String, PlaceAccessibilityInfo> accessibilityMap = fetchAccessibility(selectedPlaces);
 		List<SwipeFeedItem> items = selectedPlaces.stream()
-			.map(place -> toItem(place, reactions, tagPreparations, likedByFollowees))
+			.map(place -> toItem(place, reactions, tagPreparations, likedByFollowees, accessibilityMap))
 			.toList();
 
 		return new SwipeFeedResponse(items, remoteFeed.nextSeed());
@@ -111,16 +118,35 @@ public class PreferenceSwipeFeedQueryHandler implements SwipeFeedQueryHandler {
 			));
 	}
 
+	private Map<String, PlaceAccessibilityInfo> fetchAccessibility(List<TourismPlaceFeedItem> places) {
+		if (places.isEmpty()) {
+			return Map.of();
+		}
+		List<PlaceAccessibilityCacheService.PlaceRef> refs = places.stream()
+			.map(place -> new PlaceAccessibilityCacheService.PlaceRef(
+				PlaceProvider.KTO.name(),
+				place.externalPlaceId(),
+				KtoContentTypeResolver.contentTypeIdFor(place.category())
+			))
+			.toList();
+		return accessibilityCacheService.getMany(refs);
+	}
+
 	private SwipeFeedItem toItem(
 		TourismPlaceFeedItem place,
 		Map<String, SwipeReaction> reactions,
 		Map<String, SwipeTagPreparation> tagPreparations,
-		Map<PlaceRef, List<UserSummary>> likedByFollowees
+		Map<PlaceRef, List<UserSummary>> likedByFollowees,
+		Map<String, PlaceAccessibilityInfo> accessibilityMap
 	) {
 		PlaceRef placeRef = toPlaceRef(place);
 		SwipeTagPreparation tagPreparation = tagPreparations.getOrDefault(
 			place.externalPlaceId(),
 			new SwipeTagPreparation(List.of(), com.soomgil.preference.api.dto.TagPreparationStatus.PENDING)
+		);
+		PlaceAccessibilityInfo accessibility = accessibilityMap.getOrDefault(
+			PlaceProvider.KTO.name() + ":" + place.externalPlaceId(),
+			PlaceAccessibilityInfo.unknown()
 		);
 		return new SwipeFeedItem(
 			new SwipeFeedPlace(
@@ -136,7 +162,8 @@ public class PreferenceSwipeFeedQueryHandler implements SwipeFeedQueryHandler {
 				place.description(),
 				place.photos(),
 				tagPreparation.tags(),
-				tagPreparation.status()
+				tagPreparation.status(),
+				accessibility
 			),
 			reactions.get(place.externalPlaceId()),
 			likedByFollowees.getOrDefault(placeRef, List.of())

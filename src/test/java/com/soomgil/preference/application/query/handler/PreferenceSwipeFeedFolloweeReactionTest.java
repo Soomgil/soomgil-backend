@@ -12,6 +12,7 @@ import com.soomgil.place.api.dto.PlaceRef;
 import com.soomgil.place.application.port.TourismPlaceFeedClient;
 import com.soomgil.place.application.port.TourismPlaceFeedItem;
 import com.soomgil.place.application.port.TourismPlaceFeedResult;
+import com.soomgil.place.application.service.PlaceAccessibilityCacheService;
 import com.soomgil.preference.application.query.dto.SwipeFeedQuery;
 import com.soomgil.preference.application.service.SwipeTagPreparation;
 import com.soomgil.preference.application.service.SwipeTagPreparationService;
@@ -47,6 +48,7 @@ class PreferenceSwipeFeedFolloweeReactionTest {
 		FindFolloweePlaceReactionsQueryHandler reactionHandler =
 			mock(FindFolloweePlaceReactionsQueryHandler.class);
 		SwipeTagPreparationService tagPreparationService = mock(SwipeTagPreparationService.class);
+		PlaceAccessibilityCacheService accessibilityCacheService = mock(PlaceAccessibilityCacheService.class);
 
 		when(currentUserProvider.getIfAvailable())
 			.thenReturn(() -> new CurrentUser(currentUserId, "min@example.com"));
@@ -69,13 +71,15 @@ class PreferenceSwipeFeedFolloweeReactionTest {
 		));
 		when(reactionHandler.handle(any()))
 			.thenReturn(List.of(new FolloweePlaceReaction(place, followee)));
+		when(accessibilityCacheService.getMany(any())).thenReturn(Map.of());
 
 		var handler = new PreferenceSwipeFeedQueryHandler(
 			currentUserProvider,
 			placeClient,
 			feedMapper,
 			reactionHandler,
-			tagPreparationService
+			tagPreparationService,
+			accessibilityCacheService
 		);
 
 		var response = handler.handle(new SwipeFeedQuery(null, null, 20, true, null));

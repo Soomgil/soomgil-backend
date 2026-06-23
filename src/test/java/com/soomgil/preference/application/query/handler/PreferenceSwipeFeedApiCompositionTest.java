@@ -9,6 +9,10 @@ import com.soomgil.global.security.CurrentUserProvider;
 import com.soomgil.place.application.port.TourismPlaceFeedClient;
 import com.soomgil.place.application.port.TourismPlaceFeedItem;
 import com.soomgil.place.application.port.TourismPlaceFeedResult;
+import com.soomgil.place.application.query.dto.AccessibilityFlag;
+import com.soomgil.place.application.query.dto.ParkingType;
+import com.soomgil.place.application.query.dto.PlaceAccessibilityInfo;
+import com.soomgil.place.application.service.PlaceAccessibilityCacheService;
 import com.soomgil.preference.application.query.dto.SwipeFeedQuery;
 import com.soomgil.preference.application.service.SwipeTagPreparation;
 import com.soomgil.preference.application.service.SwipeTagPreparationService;
@@ -18,6 +22,7 @@ import com.soomgil.preference.infrastructure.persistence.row.SwipeFeedReactionRo
 import com.soomgil.social.application.query.handler.FindFolloweePlaceReactionsQueryHandler;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
@@ -33,6 +38,7 @@ class PreferenceSwipeFeedApiCompositionTest {
 		PreferenceSwipeFeedMapper mapper = mock(PreferenceSwipeFeedMapper.class);
 		FindFolloweePlaceReactionsQueryHandler followees = mock(FindFolloweePlaceReactionsQueryHandler.class);
 		SwipeTagPreparationService tagPreparationService = mock(SwipeTagPreparationService.class);
+		PlaceAccessibilityCacheService accessibilityCacheService = mock(PlaceAccessibilityCacheService.class);
 
 		when(currentUserProvider.getIfAvailable())
 			.thenReturn(() -> new CurrentUser(userId, "min@example.com"));
@@ -50,9 +56,14 @@ class PreferenceSwipeFeedApiCompositionTest {
 			"126508", new SwipeTagPreparation(List.of("바다·해안", "산책"), TagPreparationStatus.READY)
 		));
 		when(followees.handle(org.mockito.ArgumentMatchers.any())).thenReturn(List.of());
+		when(accessibilityCacheService.getMany(org.mockito.ArgumentMatchers.any())).thenReturn(Map.of(
+			"KTO:126508", new PlaceAccessibilityInfo(
+				"09:00~18:00", null, ParkingType.FREE, Set.of(AccessibilityFlag.WHEELCHAIR)
+			)
+		));
 
 		var handler = new PreferenceSwipeFeedQueryHandler(
-			currentUserProvider, placeClient, mapper, followees, tagPreparationService
+			currentUserProvider, placeClient, mapper, followees, tagPreparationService, accessibilityCacheService
 		);
 		var response = handler.handle(new SwipeFeedQuery(null, null, 20, false, "seed"));
 
@@ -62,6 +73,8 @@ class PreferenceSwipeFeedApiCompositionTest {
 			assertThat(item.place().description()).isEqualTo("넓은 백사장이 있는 해수욕장");
 			assertThat(item.place().photos()).hasSize(2);
 			assertThat(item.place().tags()).containsExactly("바다·해안", "산책");
+			assertThat(item.place().accessibility().openingHours()).isEqualTo("09:00~18:00");
+			assertThat(item.place().accessibility().flags()).containsExactly(AccessibilityFlag.WHEELCHAIR);
 			assertThat(item.myReaction().name()).isEqualTo("LIKE");
 		});
 	}

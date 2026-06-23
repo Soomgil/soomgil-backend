@@ -1,6 +1,7 @@
 package com.soomgil.place.infrastructure.external;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.soomgil.place.application.port.PlaceIntroRaw;
 import com.soomgil.place.application.port.TourismPlaceFeedClient;
 import com.soomgil.place.application.port.TourismPlaceFeedItem;
 import com.soomgil.place.application.port.TourismPlaceFeedRequest;
@@ -85,6 +86,41 @@ public class KtoTourismPlaceClient implements TourismPlaceFeedClient {
 		return new TourismPlaceFeedResult(places, UUID.randomUUID().toString());
 	}
 
+	@Override
+	public PlaceIntroRaw fetchIntro(String contentId, String contentTypeId) {
+		validateConfiguration();
+		if (contentId == null || contentId.isBlank()) {
+			return PlaceIntroRaw.empty();
+		}
+		CompletableFuture<PlaceIntroRaw> introTask = CompletableFuture.supplyAsync(
+			() -> fetchIntroSafely(contentId, contentTypeId),
+			detailExecutor
+		);
+		CompletableFuture<PlaceIntroRaw> barrierFreeTask = CompletableFuture.supplyAsync(
+			() -> fetchBarrierFreeSafely(contentId),
+			detailExecutor
+		);
+		return mergeIntro(introTask.join(), barrierFreeTask.join());
+	}
+
+	private PlaceIntroRaw fetchIntroSafely(String contentId, String contentTypeId) {
+		try {
+			return parseIntro(get(buildIntroUri(contentId, contentTypeId)), contentTypeId);
+		}
+		catch (KtoTourismPlaceException exception) {
+			return PlaceIntroRaw.empty();
+		}
+	}
+
+	private PlaceIntroRaw fetchBarrierFreeSafely(String contentId) {
+		try {
+			return parseBarrierFree(get(buildBarrierFreeUri(contentId)));
+		}
+		catch (KtoTourismPlaceException exception) {
+			return PlaceIntroRaw.empty();
+		}
+	}
+
 	static List<TourismPlaceFeedItem> enrichDetailsConcurrently(
 		List<TourismPlaceFeedItem> places,
 		Function<TourismPlaceFeedItem, TourismPlaceFeedItem> detailLoader,
@@ -140,12 +176,36 @@ public class KtoTourismPlaceClient implements TourismPlaceFeedClient {
 	private URI buildDetailUri(String contentId) {
 		return commonUri("/detailCommon2")
 			.queryParam("contentId", contentId)
+			.queryParam("defaultYN", "Y")
+			.queryParam("firstImageYN", "Y")
+			.queryParam("overviewYN", "Y")
+			.build(true)
+			.toUri();
+	}
+
+	private URI buildIntroUri(String contentId, String contentTypeId) {
+		UriComponentsBuilder builder = commonUri("/detailIntro2")
+			.queryParam("contentId", contentId);
+		if (contentTypeId != null && !contentTypeId.isBlank()) {
+			builder.queryParam("contentTypeId", contentTypeId);
+		}
+		return builder.build(true).toUri();
+	}
+
+	private URI buildBarrierFreeUri(String contentId) {
+		String barrierFreeBaseUrl = properties.getBaseUrl().replace("KorService2", "KorWithService2");
+		return commonUri(barrierFreeBaseUrl, "/detailWithTour2")
+			.queryParam("contentId", contentId)
 			.build(true)
 			.toUri();
 	}
 
 	private UriComponentsBuilder commonUri(String path) {
-		return UriComponentsBuilder.fromUriString(properties.getBaseUrl())
+		return commonUri(properties.getBaseUrl(), path);
+	}
+
+	private UriComponentsBuilder commonUri(String baseUrl, String path) {
+		return UriComponentsBuilder.fromUriString(baseUrl)
 			.path(path)
 			.queryParam("serviceKey", properties.getApiKey())
 			.queryParam("MobileOS", "ETC")
@@ -210,6 +270,104 @@ public class KtoTourismPlaceClient implements TourismPlaceFeedClient {
 			plainText(text(detail, "overview")),
 			photos,
 			newer(place.sourceModifiedAt(), modifiedAt(text(detail, "modifiedtime")))
+		);
+	}
+
+	static PlaceIntroRaw parseIntro(JsonNode response, String contentTypeId) {
+		JsonNode body = successfulBody(response);
+		JsonNode items = body.path("items").path("item");
+		if (!items.isArray() || items.isEmpty()) {
+			return PlaceIntroRaw.empty();
+		}
+		JsonNode item = items.get(0);
+		String typeId = contentTypeId != null && !contentTypeId.isBlank()
+			? contentTypeId
+			: text(item, "contenttypeid");
+		return switch (typeId == null ? "" : typeId) {
+			case "12" -> new PlaceIntroRaw(
+				text(item, "usetime"),
+				text(item, "restdate"),
+				text(item, "parking"),
+				null,
+				text(item, "chkbabycarriage"),
+				text(item, "chkpet")
+			);
+			case "14" -> new PlaceIntroRaw(
+				text(item, "usetimeculture"),
+				text(item, "restdateculture"),
+				text(item, "parkingculture"),
+				null,
+				text(item, "chkbabycarriageculture"),
+				text(item, "chkpetculture")
+			);
+			case "28" -> new PlaceIntroRaw(
+				text(item, "usetimeleports"),
+				text(item, "restdateleports"),
+				text(item, "parkingleports"),
+				null,
+				text(item, "chkbabycarriageleports"),
+				text(item, "chkpetleports")
+			);
+			case "39" -> new PlaceIntroRaw(
+				text(item, "opentimefood"),
+				text(item, "restdatefood"),
+				text(item, "parkingfood"),
+				null,
+				null,
+				null
+			);
+			case "38" -> new PlaceIntroRaw(
+				text(item, "opentime"),
+				text(item, "restdateshopping"),
+				text(item, "parkingshopping"),
+				null,
+				text(item, "chkbabycarriageshopping"),
+				text(item, "chkpetshopping")
+			);
+			default -> new PlaceIntroRaw(
+				text(item, "usetime"),
+				text(item, "restdate"),
+				text(item, "parking"),
+				text(item, "handicap1"),
+				text(item, "chkbabycarriage"),
+				text(item, "chkpet")
+			);
+		};
+	}
+
+	static PlaceIntroRaw parseBarrierFree(JsonNode response) {
+		JsonNode body = successfulBody(response);
+		JsonNode items = body.path("items").path("item");
+		if (!items.isArray() || items.isEmpty()) {
+			return PlaceIntroRaw.empty();
+		}
+		JsonNode item = items.get(0);
+		return new PlaceIntroRaw(
+			null,
+			null,
+			null,
+			joinNonBlank(
+				text(item, "wheelchair"),
+				text(item, "publictransport"),
+				text(item, "exit"),
+				text(item, "elevator"),
+				text(item, "restroom"),
+				text(item, "room"),
+				text(item, "handicapetc")
+			),
+			text(item, "stroller"),
+			null
+		);
+	}
+
+	static PlaceIntroRaw mergeIntro(PlaceIntroRaw intro, PlaceIntroRaw barrierFree) {
+		return new PlaceIntroRaw(
+			intro.useTime(),
+			intro.restDate(),
+			firstNonBlank(intro.parking(), barrierFree.parking()),
+			joinNonBlank(intro.disability(), barrierFree.disability()),
+			firstNonBlank(intro.chkBabyCarriage(), barrierFree.chkBabyCarriage()),
+			intro.chkPet()
 		);
 	}
 
@@ -284,6 +442,18 @@ public class KtoTourismPlaceClient implements TourismPlaceFeedClient {
 			}
 		}
 		return List.copyOf(urls);
+	}
+
+	private static String firstNonBlank(String first, String second) {
+		if (first != null && !first.isBlank()) return first;
+		return second;
+	}
+
+	private static String joinNonBlank(String... values) {
+		return java.util.stream.Stream.of(values)
+			.filter(value -> value != null && !value.isBlank())
+			.reduce((left, right) -> left + "\n" + right)
+			.orElse(null);
 	}
 
 }
