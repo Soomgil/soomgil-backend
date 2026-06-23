@@ -24,6 +24,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.Function;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -37,6 +39,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 @Component
 public class KtoTourismPlaceClient implements TourismPlaceFeedClient {
 
+	private static final Logger log = LoggerFactory.getLogger(KtoTourismPlaceClient.class);
 	private static final int DETAIL_CONCURRENCY = 12;
 	private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(2);
 	private static final Duration READ_TIMEOUT = Duration.ofSeconds(4);
@@ -53,11 +56,16 @@ public class KtoTourismPlaceClient implements TourismPlaceFeedClient {
 	);
 
 	private final KtoTourismPlaceProperties properties;
+	private final KtoPlaceDescriptionCache descriptionCache;
 	private final RestClient restClient;
 	private final ExecutorService detailExecutor;
 
-	public KtoTourismPlaceClient(KtoTourismPlaceProperties properties) {
+	public KtoTourismPlaceClient(
+		KtoTourismPlaceProperties properties,
+		KtoPlaceDescriptionCache descriptionCache
+	) {
 		this.properties = properties;
+		this.descriptionCache = descriptionCache;
 		HttpClient httpClient = HttpClient.newBuilder()
 			.connectTimeout(CONNECT_TIMEOUT)
 			.build();
@@ -138,12 +146,34 @@ public class KtoTourismPlaceClient implements TourismPlaceFeedClient {
 	}
 
 	private TourismPlaceFeedItem loadDetailSafely(TourismPlaceFeedItem place) {
+		var cachedDescription = descriptionCache.find(place);
+		if (cachedDescription.isPresent()) {
+			return withDescription(place, cachedDescription.get());
+		}
 		try {
-			return withDetail(place, get(buildDetailUri(place.externalPlaceId())));
+			TourismPlaceFeedItem enriched = withDetail(place, get(buildDetailUri(place.externalPlaceId())));
+			descriptionCache.put(place, enriched.description());
+			return enriched;
 		}
 		catch (KtoTourismPlaceException exception) {
+			log.warn("KTO detailCommon2 failed for contentId={}", place.externalPlaceId(), exception);
 			return place;
 		}
+	}
+
+	private static TourismPlaceFeedItem withDescription(TourismPlaceFeedItem place, String description) {
+		return new TourismPlaceFeedItem(
+			place.externalPlaceId(),
+			place.name(),
+			place.address(),
+			place.lat(),
+			place.lng(),
+			place.thumbnailUrl(),
+			place.category(),
+			description,
+			place.photos(),
+			place.sourceModifiedAt()
+		);
 	}
 
 	private JsonNode get(URI uri) {
