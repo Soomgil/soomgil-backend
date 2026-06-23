@@ -24,6 +24,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.Function;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -37,6 +39,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 @Component
 public class KtoTourismPlaceClient implements TourismPlaceFeedClient {
 
+	private static final Logger log = LoggerFactory.getLogger(KtoTourismPlaceClient.class);
 	private static final int DETAIL_CONCURRENCY = 12;
 	private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(2);
 	private static final Duration READ_TIMEOUT = Duration.ofSeconds(4);
@@ -53,11 +56,22 @@ public class KtoTourismPlaceClient implements TourismPlaceFeedClient {
 	);
 
 	private final KtoTourismPlaceProperties properties;
+	private final KtoPlaceDescriptionCache descriptionCache;
+	private final KtoPlacePhotoCache photoCache;
+	private final KtoAwardPhotoClient awardPhotoClient;
 	private final RestClient restClient;
 	private final ExecutorService detailExecutor;
 
-	public KtoTourismPlaceClient(KtoTourismPlaceProperties properties) {
+	public KtoTourismPlaceClient(
+		KtoTourismPlaceProperties properties,
+		KtoPlaceDescriptionCache descriptionCache,
+		KtoPlacePhotoCache photoCache,
+		KtoAwardPhotoClient awardPhotoClient
+	) {
 		this.properties = properties;
+		this.descriptionCache = descriptionCache;
+		this.photoCache = photoCache;
+		this.awardPhotoClient = awardPhotoClient;
 		HttpClient httpClient = HttpClient.newBuilder()
 			.connectTimeout(CONNECT_TIMEOUT)
 			.build();
@@ -138,12 +152,57 @@ public class KtoTourismPlaceClient implements TourismPlaceFeedClient {
 	}
 
 	private TourismPlaceFeedItem loadDetailSafely(TourismPlaceFeedItem place) {
+		TourismPlaceFeedItem described = loadDescriptionSafely(place);
+		List<String> detailPhotos = loadPhotosSafely(place);
+		String awardPhoto = awardPhotoClient.findBest(place.name()).orElse(null);
+		return withPhotos(described, awardPhoto, detailPhotos);
+	}
+
+	private TourismPlaceFeedItem loadDescriptionSafely(TourismPlaceFeedItem place) {
+		var cachedDescription = descriptionCache.find(place);
+		if (cachedDescription.isPresent()) {
+			return withDescription(place, cachedDescription.get());
+		}
 		try {
-			return withDetail(place, get(buildDetailUri(place.externalPlaceId())));
+			TourismPlaceFeedItem enriched = withDetail(place, get(buildDetailUri(place.externalPlaceId())));
+			descriptionCache.put(place, enriched.description());
+			return enriched;
 		}
 		catch (KtoTourismPlaceException exception) {
+			log.warn("KTO detailCommon2 failed for contentId={}", place.externalPlaceId(), exception);
 			return place;
 		}
+	}
+
+	private List<String> loadPhotosSafely(TourismPlaceFeedItem place) {
+		var cachedPhotos = photoCache.find(place);
+		if (cachedPhotos.isPresent()) {
+			return cachedPhotos.get();
+		}
+		try {
+			List<String> photos = parseDetailImages(get(buildImageUri(place.externalPlaceId())));
+			photoCache.put(place, photos);
+			return photos;
+		}
+		catch (KtoTourismPlaceException exception) {
+			log.warn("KTO detailImage2 failed for contentId={}", place.externalPlaceId(), exception);
+			return List.of();
+		}
+	}
+
+	private static TourismPlaceFeedItem withDescription(TourismPlaceFeedItem place, String description) {
+		return new TourismPlaceFeedItem(
+			place.externalPlaceId(),
+			place.name(),
+			place.address(),
+			place.lat(),
+			place.lng(),
+			place.thumbnailUrl(),
+			place.category(),
+			description,
+			place.photos(),
+			place.sourceModifiedAt()
+		);
 	}
 
 	private JsonNode get(URI uri) {
@@ -179,6 +238,16 @@ public class KtoTourismPlaceClient implements TourismPlaceFeedClient {
 			.queryParam("defaultYN", "Y")
 			.queryParam("firstImageYN", "Y")
 			.queryParam("overviewYN", "Y")
+			.build(true)
+			.toUri();
+	}
+
+	private URI buildImageUri(String contentId) {
+		return commonUri("/detailImage2")
+			.queryParam("contentId", contentId)
+			.queryParam("imageYN", "Y")
+			.queryParam("numOfRows", 3)
+			.queryParam("pageNo", 1)
 			.build(true)
 			.toUri();
 	}
@@ -271,6 +340,53 @@ public class KtoTourismPlaceClient implements TourismPlaceFeedClient {
 			photos,
 			newer(place.sourceModifiedAt(), modifiedAt(text(detail, "modifiedtime")))
 		);
+	}
+
+	static List<String> parseDetailImages(JsonNode response) {
+		JsonNode body = successfulBody(response);
+		JsonNode items = body.path("items").path("item");
+		if (!items.isArray()) {
+			return List.of();
+		}
+		LinkedHashSet<String> photos = new LinkedHashSet<>();
+		for (JsonNode item : items) {
+			String license = text(item, "cpyrhtDivCd");
+			if (!("Type1".equalsIgnoreCase(license) || "Type3".equalsIgnoreCase(license))) {
+				continue;
+			}
+			String image = firstNonBlank(text(item, "originimgurl"), text(item, "smallimageurl"));
+			if (image != null) {
+				photos.add(image);
+			}
+			if (photos.size() == 3) {
+				break;
+			}
+		}
+		return List.copyOf(photos);
+	}
+
+	static TourismPlaceFeedItem withPhotos(
+		TourismPlaceFeedItem place,
+		String awardPhoto,
+		List<String> detailPhotos
+	) {
+		LinkedHashSet<String> photos = new LinkedHashSet<>();
+		addPhoto(photos, awardPhoto);
+		addPhoto(photos, place.thumbnailUrl());
+		place.photos().forEach(photo -> addPhoto(photos, photo));
+		detailPhotos.forEach(photo -> addPhoto(photos, photo));
+		List<String> selected = photos.stream().limit(3).toList();
+		String thumbnail = selected.isEmpty() ? place.thumbnailUrl() : selected.getFirst();
+		return new TourismPlaceFeedItem(
+			place.externalPlaceId(), place.name(), place.address(), place.lat(), place.lng(),
+			thumbnail, place.category(), place.description(), selected, place.sourceModifiedAt()
+		);
+	}
+
+	private static void addPhoto(LinkedHashSet<String> photos, String photo) {
+		if (photo != null && !photo.isBlank()) {
+			photos.add(photo);
+		}
 	}
 
 	static PlaceIntroRaw parseIntro(JsonNode response, String contentTypeId) {

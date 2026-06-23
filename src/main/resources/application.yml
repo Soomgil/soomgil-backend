@@ -79,6 +79,7 @@ soomgil:
       api-version: ${GMS_GEMINI_API_VERSION:v1beta}
   kto:
     base-url: ${KTO_API_BASE_URL:https://apis.data.go.kr/B551011/KorService2}
+    award-base-url: ${KTO_AWARD_API_BASE_URL:https://apis.data.go.kr/B551011/PhokoAwrdService}
     api-key: ${KTO_API_KEY:}
   mapbox:
     base-url: ${MAPBOX_API_BASE_URL:https://api.mapbox.com}

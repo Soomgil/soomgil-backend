@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
 public class KtoTourismPlaceProperties {
 
 	private String baseUrl = "https://apis.data.go.kr/B551011/KorService2";
+	private String awardBaseUrl = "https://apis.data.go.kr/B551011/PhokoAwrdService";
 	private String apiKey = "";
 
 	public String getBaseUrl() {
@@ -16,6 +17,14 @@ public class KtoTourismPlaceProperties {
 
 	public void setBaseUrl(String baseUrl) {
 		this.baseUrl = baseUrl;
+	}
+
+	public String getAwardBaseUrl() {
+		return awardBaseUrl;
+	}
+
+	public void setAwardBaseUrl(String awardBaseUrl) {
+		this.awardBaseUrl = awardBaseUrl;
 	}
 
 	public String getApiKey() {

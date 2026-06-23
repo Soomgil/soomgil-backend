@@ -24,7 +24,7 @@ public class PlaceAccessibilityCacheBackend {
 		this.normalizer = normalizer;
 	}
 
-	@Cacheable(value = "placeAccessibility", key = "#provider + ':' + #externalPlaceId")
+	@Cacheable(value = "placeAccessibility", key = "'v2:' + #provider + ':' + #externalPlaceId")
 	public PlaceAccessibilityInfo load(String provider, String externalPlaceId, String contentTypeId) {
 		return normalizer.normalize(client.fetchIntro(externalPlaceId, contentTypeId));
 	}
