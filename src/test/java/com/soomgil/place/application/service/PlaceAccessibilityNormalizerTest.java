@@ -30,6 +30,7 @@ class PlaceAccessibilityNormalizerTest {
 			AccessibilityFlag.DISABLED_TOILET,
 			AccessibilityFlag.STROLLER
 		);
+		assertThat(result.unavailableFlags()).containsExactly(AccessibilityFlag.PET);
 	}
 
 	@Test
@@ -40,6 +41,7 @@ class PlaceAccessibilityNormalizerTest {
 		assertThat(result.closedDays()).isNull();
 		assertThat(result.parkingType()).isEqualTo(ParkingType.UNKNOWN);
 		assertThat(result.flags()).isEmpty();
+		assertThat(result.unavailableFlags()).isEmpty();
 	}
 
 	@Test
@@ -54,5 +56,11 @@ class PlaceAccessibilityNormalizerTest {
 		));
 
 		assertThat(result.flags()).isEmpty();
+		assertThat(result.unavailableFlags()).containsExactlyInAnyOrder(
+			AccessibilityFlag.WHEELCHAIR,
+			AccessibilityFlag.DISABLED_TOILET,
+			AccessibilityFlag.STROLLER,
+			AccessibilityFlag.PET
+		);
 	}
 }

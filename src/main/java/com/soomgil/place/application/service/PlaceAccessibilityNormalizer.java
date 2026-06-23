@@ -23,7 +23,8 @@ public class PlaceAccessibilityNormalizer {
 		String closedDays = cleanText(raw.restDate());
 		ParkingType parkingType = classifyParking(raw.parking());
 		Set<AccessibilityFlag> flags = extractFlags(raw);
-		return new PlaceAccessibilityInfo(openingHours, closedDays, parkingType, flags);
+		Set<AccessibilityFlag> unavailableFlags = extractUnavailableFlags(raw);
+		return new PlaceAccessibilityInfo(openingHours, closedDays, parkingType, flags, unavailableFlags);
 	}
 
 	private String cleanText(String value) {
@@ -88,6 +89,29 @@ public class PlaceAccessibilityNormalizer {
 		return flags;
 	}
 
+	private Set<AccessibilityFlag> extractUnavailableFlags(PlaceIntroRaw raw) {
+		Set<AccessibilityFlag> flags = new LinkedHashSet<>();
+		String disability = raw.disability();
+		if (disability != null && !disability.isBlank()) {
+			if (hasDeniedLine(disability, "휠체어", "wheelchair")) {
+				flags.add(AccessibilityFlag.WHEELCHAIR);
+			}
+			if (hasDeniedLine(disability, "장애인 화장실", "장애인용 화장실", "장애인화장실", "장애인용변기", "장애인용 변기")) {
+				flags.add(AccessibilityFlag.DISABLED_TOILET);
+			}
+			if (hasDeniedLine(disability, "노약자", "어르신", "경로", "elderly", "senior")) {
+				flags.add(AccessibilityFlag.ELDERLY);
+			}
+		}
+		if (isDenied(raw.chkBabyCarriage())) {
+			flags.add(AccessibilityFlag.STROLLER);
+		}
+		if (isDenied(raw.chkPet())) {
+			flags.add(AccessibilityFlag.PET);
+		}
+		return flags;
+	}
+
 	private boolean isAllowed(String value) {
 		if (value == null || value.isBlank()) {
 			return false;
@@ -105,7 +129,19 @@ public class PlaceAccessibilityNormalizer {
 		});
 	}
 
+	private boolean hasDeniedLine(String value, String... keywords) {
+		return value.lines().anyMatch(line -> {
+			String lower = line.toLowerCase();
+			boolean matches = java.util.Arrays.stream(keywords)
+				.anyMatch(keyword -> lower.contains(keyword.toLowerCase()));
+			return matches && isDenied(line);
+		});
+	}
+
 	private boolean isDenied(String value) {
+		if (value == null || value.isBlank()) {
+			return false;
+		}
 		String lower = value.toLowerCase();
 		return value.contains("불가능")
 			|| value.contains("없음")
