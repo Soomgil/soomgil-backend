@@ -16,6 +16,8 @@ import com.soomgil.place.api.dto.PlaceProvider;
 import com.soomgil.place.api.dto.PlaceSourceStatus;
 import com.soomgil.place.api.dto.PlaceSummary;
 import com.soomgil.preference.api.dto.PagedSavedPlace;
+import com.soomgil.preference.api.dto.MyPreferenceSummary;
+import com.soomgil.preference.api.dto.MyPreferenceCategory;
 import com.soomgil.preference.api.dto.SavedPlace;
 import com.soomgil.preference.api.dto.SwipeFeedItem;
 import com.soomgil.preference.api.dto.SwipeFeedPlace;
@@ -30,8 +32,10 @@ import com.soomgil.preference.application.command.handler.SavePlaceCommandHandle
 import com.soomgil.preference.application.command.handler.UnsavePlaceCommandHandler;
 import com.soomgil.preference.application.command.handler.UpsertSwipeReactionCommandHandler;
 import com.soomgil.preference.application.query.dto.ListSavedPlacesQuery;
+import com.soomgil.preference.application.query.dto.ListMyPreferencesQuery;
 import com.soomgil.preference.application.query.dto.SwipeFeedQuery;
 import com.soomgil.preference.application.query.handler.ListSavedPlacesQueryHandler;
+import com.soomgil.preference.application.query.handler.ListMyPreferencesQueryHandler;
 import com.soomgil.preference.application.query.handler.SwipeFeedQueryHandler;
 import java.net.URI;
 import java.time.OffsetDateTime;
@@ -54,6 +58,7 @@ class SwipeControllerTest {
 	private RecordingSavePlaceCommandHandler saveHandler;
 	private RecordingUnsavePlaceCommandHandler unsaveHandler;
 	private RecordingListSavedPlacesQueryHandler listSavedPlacesHandler;
+	private RecordingListMyPreferencesQueryHandler listMyPreferencesHandler;
 	private ObjectMapper objectMapper;
 	private MockMvc mockMvc;
 	private SwipeTagPreparationService tagPreparationService;
@@ -65,6 +70,7 @@ class SwipeControllerTest {
 		saveHandler = new RecordingSavePlaceCommandHandler();
 		unsaveHandler = new RecordingUnsavePlaceCommandHandler();
 		listSavedPlacesHandler = new RecordingListSavedPlacesQueryHandler();
+		listMyPreferencesHandler = new RecordingListMyPreferencesQueryHandler();
 		objectMapper = Jackson2ObjectMapperBuilder.json()
 			.featuresToDisable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
 			.build();
@@ -75,6 +81,7 @@ class SwipeControllerTest {
 				saveHandler,
 				unsaveHandler,
 				listSavedPlacesHandler,
+				listMyPreferencesHandler,
 				tagPreparationService
 			))
 			.setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
@@ -141,6 +148,19 @@ class SwipeControllerTest {
 
 		assertThat(listSavedPlacesHandler.lastQuery.page()).isEqualTo(1);
 		assertThat(listSavedPlacesHandler.lastQuery.size()).isEqualTo(5);
+	}
+
+	@Test
+	void listMyPreferencesDelegatesToQueryHandler() throws Exception {
+		mockMvc.perform(get("/api/v1/me/preferences"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.topCategories[0].category").value("자연/경관"))
+			.andExpect(jsonPath("$.topCategories[0].groupCode").value("nature_scene"))
+			.andExpect(jsonPath("$.topCategories[0].percentage").value(78))
+			.andExpect(jsonPath("$.travelStyle").value("자연/경관와 역사/문화을(를) 함께 즐기는 여행을 선호해요."))
+			.andExpect(jsonPath("$.preferredTags[0]").value("자연"));
+
+		assertThat(listMyPreferencesHandler.invoked).isTrue();
 	}
 
 	@Test
@@ -259,6 +279,24 @@ class SwipeControllerTest {
 		public PagedSavedPlace handle(ListSavedPlacesQuery query) {
 			lastQuery = query;
 			return new PagedSavedPlace(List.of(savedPlace()), new PageMeta(query.page(), query.size(), 1L, 1, List.of()));
+		}
+	}
+
+	private static final class RecordingListMyPreferencesQueryHandler implements ListMyPreferencesQueryHandler {
+
+		private boolean invoked;
+
+		@Override
+		public MyPreferenceSummary handle(ListMyPreferencesQuery query) {
+			invoked = true;
+			return new MyPreferenceSummary(
+				List.of(
+					new MyPreferenceCategory("자연/경관", "nature_scene", 78),
+					new MyPreferenceCategory("역사/문화", "history_culture", 65)
+				),
+				"자연/경관와 역사/문화을(를) 함께 즐기는 여행을 선호해요.",
+				List.of("자연", "산책", "역사", "전통건축")
+			);
 		}
 	}
 }

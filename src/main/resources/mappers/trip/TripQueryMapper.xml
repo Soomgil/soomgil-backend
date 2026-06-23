@@ -177,19 +177,30 @@
     LIMIT 1
   </select>
   <select id="findNearestTrip" resultType="com.soomgil.trip.infrastructure.persistence.row.NearestTripRow">
-    SELECT
-      CAST(t.id AS text) AS id,
-      t.title,
-      t.display_destination AS displayDestination,
-      MIN(d.date) AS startDate,
-      (SELECT count(*) FROM trip.trip_members m2 WHERE m2.trip_id = t.id AND m2.status = 'ACTIVE') AS memberCount,
-      NULL AS coverImageUrl
-    FROM trip.trips t
-    JOIN trip.trip_members m ON m.trip_id = t.id AND m.user_id = CAST(#{userId} AS uuid) AND m.status = 'ACTIVE'
-    JOIN itinerary.itinerary_days d ON d.trip_id = t.id AND d.date >= CURRENT_DATE
-    WHERE t.status = 'ACTIVE'
-    GROUP BY t.id, t.title, t.display_destination
-    ORDER BY startDate ASC
+    WITH candidates AS (
+      SELECT
+        CAST(t.id AS text) AS id,
+        t.title,
+        t.display_destination AS displayDestination,
+        COALESCE(
+          (SELECT MIN(d.date) FROM itinerary.itinerary_days d
+            WHERE d.trip_id = t.id AND d.date >= CURRENT_DATE),
+          (SELECT MAX(d.date) FROM itinerary.itinerary_days d
+            WHERE d.trip_id = t.id AND d.date &lt; CURRENT_DATE)
+        ) AS startDate,
+        (SELECT count(*) FROM trip.trip_members m2 WHERE m2.trip_id = t.id AND m2.status = 'ACTIVE') AS memberCount,
+        NULL AS coverImageUrl,
+        t.created_at AS created_at
+      FROM trip.trips t
+      JOIN trip.trip_members m ON m.trip_id = t.id AND m.user_id = CAST(#{userId} AS uuid) AND m.status = 'ACTIVE'
+      WHERE t.status = 'ACTIVE'
+    )
+    SELECT id, title, displayDestination, startDate, memberCount, coverImageUrl
+    FROM candidates
+    ORDER BY
+      (startDate IS NOT NULL AND startDate >= CURRENT_DATE) DESC,
+      startDate ASC NULLS LAST,
+      created_at DESC
     LIMIT 1
   </select>
 </mapper>
