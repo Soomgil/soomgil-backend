@@ -10,7 +10,6 @@ import com.soomgil.place.application.query.handler.PopularPlacesQueryHandler;
 import com.soomgil.preference.infrastructure.persistence.mapper.PreferenceSavedPlaceMapper;
 import java.net.URI;
 import java.util.List;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,7 +24,6 @@ public class PreferencePopularPlacesQueryHandler implements PopularPlacesQueryHa
 
 	@Override
 	@Transactional(readOnly = true)
-	@Cacheable(value = "popularPlaces", key = "#query.limit()")
 	public PagedPlaceSummary handle(PopularPlacesQuery query) {
 		List<PlaceSummary> items = mapper.listPopularPlaces(query.limit())
 			.stream()

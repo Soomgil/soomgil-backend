@@ -1,6 +1,5 @@
 package com.soomgil.user.domain.model;
 
-import java.net.URI;
 import java.util.UUID;
 
 /**
@@ -16,6 +15,6 @@ import java.util.UUID;
 public record UserSummaryRecord(
 	UUID userId,
 	String displayName,
-	URI profileImageUrl
+	String profileImageUrl
 ) {
 }

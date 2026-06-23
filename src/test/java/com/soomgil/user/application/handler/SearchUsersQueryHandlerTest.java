@@ -29,7 +29,7 @@ class SearchUsersQueryHandlerTest {
 		UUID userId2 = UUID.randomUUID();
 		when(mapper.search("민", 20, 0)).thenReturn(List.of(
 			new UserSummaryRecord(userId1, "민지", null),
-			new UserSummaryRecord(userId2, "민준", URI.create("https://cdn.example.com/u2.png"))
+			new UserSummaryRecord(userId2, "민준", "https://cdn.example.com/u2.png")
 		));
 		when(mapper.count("민")).thenReturn(2L);
 
