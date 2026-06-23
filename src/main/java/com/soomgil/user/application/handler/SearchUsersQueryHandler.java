@@ -7,6 +7,7 @@ import com.soomgil.user.api.dto.UserSummary;
 import com.soomgil.user.application.query.SearchUsersQuery;
 import com.soomgil.user.domain.model.UserSummaryRecord;
 import com.soomgil.user.infrastructure.persistence.UserSearchMapper;
+import java.net.URI;
 import java.util.List;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -42,7 +43,7 @@ public class SearchUsersQueryHandler implements QueryHandler<SearchUsersQuery, P
 		long total = userSearchMapper.count(q);
 
 		List<UserSummary> items = rows.stream()
-			.map(r -> new UserSummary(r.userId(), r.displayName(), r.profileImageUrl()))
+			.map(r -> new UserSummary(r.userId(), r.displayName(), toUri(r.profileImageUrl())))
 			.toList();
 
 		int totalPages = size == 0 ? 0 : (int) Math.ceil((double) total / size);
@@ -56,5 +57,9 @@ public class SearchUsersQueryHandler implements QueryHandler<SearchUsersQuery, P
 			return DEFAULT_SIZE;
 		}
 		return Math.min(size, MAX_SIZE);
+	}
+
+	private URI toUri(String value) {
+		return value == null || value.isBlank() ? null : URI.create(value);
 	}
 }
