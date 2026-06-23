@@ -60,6 +60,47 @@ class KtoTourismPlaceClientTest {
 	}
 
 	@Test
+	void extractsOnlyPublicTypeOneAndThreeDetailImages() throws Exception {
+		var body = objectMapper.readTree("""
+			{"response":{"header":{"resultCode":"0000"},"body":{"items":{"item":[
+			  {"originimgurl":"https://img.example/type1.jpg","cpyrhtDivCd":"Type1"},
+			  {"originimgurl":"https://img.example/type2.jpg","cpyrhtDivCd":"Type2"},
+			  {"originimgurl":"https://img.example/type3.jpg","cpyrhtDivCd":"Type3"},
+			  {"originimgurl":"https://img.example/type1.jpg","cpyrhtDivCd":"Type1"}
+			]}}}}
+			""");
+
+		assertThat(KtoTourismPlaceClient.parseDetailImages(body))
+			.containsExactly("https://img.example/type1.jpg", "https://img.example/type3.jpg");
+	}
+
+	@Test
+	void putsMatchingAwardFirstAndLimitsGalleryToThreeUniquePhotos() {
+		TourismPlaceFeedItem place = new TourismPlaceFeedItem(
+			"126508", "경복궁", "서울 종로구", 37.5796, 126.9770,
+			"https://img.example/cover.jpg", "관광지", "조선의 궁궐",
+			List.of("https://img.example/cover.jpg"), null
+		);
+
+		TourismPlaceFeedItem enriched = KtoTourismPlaceClient.withPhotos(
+			place,
+			"https://img.example/award.jpg",
+			List.of(
+				"https://img.example/detail-1.jpg",
+				"https://img.example/detail-2.jpg",
+				"https://img.example/detail-3.jpg"
+			)
+		);
+
+		assertThat(enriched.thumbnailUrl()).isEqualTo("https://img.example/award.jpg");
+		assertThat(enriched.photos()).containsExactly(
+			"https://img.example/award.jpg",
+			"https://img.example/cover.jpg",
+			"https://img.example/detail-1.jpg"
+		);
+	}
+
+	@Test
 	void rejectsFailedKtoResponseInsteadOfReturningAnEmptyFeed() throws Exception {
 		var body = objectMapper.readTree("""
 			{"response":{"header":{"resultCode":"30","resultMsg":"SERVICE KEY IS NOT REGISTERED"}}}
