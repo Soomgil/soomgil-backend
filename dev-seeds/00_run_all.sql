@@ -43,6 +43,9 @@
 --   Preference tags:       2b000000-0000-4000-8000-0000000000NN
 -- ============================================================
 
+\echo '→ Enabling temporary timestamp defaults for development seeds ...'
+\i 98_enable_timestamp_defaults.sql
+
 \echo '→ Loading 01_auth.sql ...'
 \i 01_auth.sql
 
@@ -126,5 +129,8 @@ SELECT NOT EXISTS (
 
 \echo '→ Loading 12_local_user_enrichment.sql ...'
 \i 12_local_user_enrichment.sql
+
+\echo '→ Restoring timestamp defaults ...'
+\i 99_disable_timestamp_defaults.sql
 
 \echo '✓ All dummy data loaded.'
