@@ -169,31 +169,32 @@ def unsplash_photo_pool() -> list[dict[str, str]]:
         return _unsplash_pool
     photos: dict[str, dict[str, str]] = {}
     for query in UNSPLASH_QUERIES:
-        url = "https://unsplash.com/napi/search/photos?" + urlencode({
-            "query": query,
-            "per_page": "30",
-            "page": "1",
-        })
-        request = Request(url, headers={"User-Agent": USER_AGENT, "Accept": "application/json"})
-        try:
-            with urlopen(request, timeout=30) as response:
-                payload = json.load(response)
-        except Exception:
-            continue
-        for item in payload.get("results", []):
-            photo_id = item.get("id")
-            raw_url = (item.get("urls") or {}).get("raw")
-            if not photo_id or not raw_url:
+        for page in range(1, 4):
+            url = "https://unsplash.com/napi/search/photos?" + urlencode({
+                "query": query,
+                "per_page": "30",
+                "page": str(page),
+            })
+            request = Request(url, headers={"User-Agent": USER_AGENT, "Accept": "application/json"})
+            try:
+                with urlopen(request, timeout=30) as response:
+                    payload = json.load(response)
+            except Exception:
                 continue
-            separator = "&" if "?" in raw_url else "?"
-            photos[photo_id] = {
-                "url": raw_url + separator + "w=1400&h=900&fit=crop&auto=format&q=82",
-                "mime_type": "image/jpeg",
-                "source_page": f"https://unsplash.com/photos/{photo_id}",
-                "license": "Unsplash License",
-                "artist": (item.get("user") or {}).get("name", "Unsplash contributor"),
-            }
-        time.sleep(0.15)
+            for item in payload.get("results", []):
+                photo_id = item.get("id")
+                raw_url = (item.get("urls") or {}).get("raw")
+                if not photo_id or not raw_url:
+                    continue
+                separator = "&" if "?" in raw_url else "?"
+                photos[photo_id] = {
+                    "url": raw_url + separator + "w=1400&h=900&fit=crop&auto=format&q=82",
+                    "mime_type": "image/jpeg",
+                    "source_page": f"https://unsplash.com/photos/{photo_id}",
+                    "license": "Unsplash License",
+                    "artist": (item.get("user") or {}).get("name", "Unsplash contributor"),
+                }
+            time.sleep(0.15)
     if not photos:
         photos["fallback"] = {
             "url": "https://images.unsplash.com/photo-1470252649378-9c29740c9fa8?w=1400&h=900&fit=crop&q=82",
@@ -206,7 +207,7 @@ def unsplash_photo_pool() -> list[dict[str, str]]:
     return _unsplash_pool
 
 
-def resolve_source(asset: dict[str, Any]) -> dict[str, str]:
+def resolve_source(asset: dict[str, Any], used_source_pages: Optional[set[str]] = None) -> dict[str, str]:
     if asset["kind"] == "profile":
         seed = hashlib.sha256(asset["object_key"].encode()).hexdigest()[:20]
         return {
@@ -218,7 +219,17 @@ def resolve_source(asset: dict[str, Any]) -> dict[str, str]:
         }
     pool = unsplash_photo_pool()
     digest = hashlib.sha256((asset["search_term"] + asset["object_key"]).encode()).digest()
-    return pool[int.from_bytes(digest[:4], "big") % len(pool)]
+    start = int.from_bytes(digest[:4], "big") % len(pool)
+    source = dict(pool[start])
+    if used_source_pages:
+        for offset in range(len(pool)):
+            candidate = pool[(start + offset) % len(pool)]
+            if candidate["source_page"] not in used_source_pages:
+                source = dict(candidate)
+                break
+    if asset["object_key"].rsplit("/", 1)[-1].startswith("portrait"):
+        source["url"] = source["url"].replace("w=1400&h=900", "w=900&h=1350")
+    return source
 
 
 def download(url: str, expected_mime: str) -> tuple[bytes, str]:
@@ -325,9 +336,16 @@ def main() -> None:
         print("No new demo assets to sync.")
         return
 
+    target_keys = {asset["object_key"] for asset in assets}
+    used_source_pages = {
+        row["source_page"]
+        for row in existing_manifest
+        if row["object_key"] not in target_keys and row.get("source_page")
+    }
     print(f"Resolving image sources for {len(assets)} objects ...")
     for index, asset in enumerate(assets, start=1):
-        asset["_source"] = resolve_source(asset)
+        asset["_source"] = resolve_source(asset, used_source_pages)
+        used_source_pages.add(asset["_source"]["source_page"])
         if index % 50 == 0 or index == len(assets):
             print(f"  {index}/{len(assets)} sources resolved")
 
