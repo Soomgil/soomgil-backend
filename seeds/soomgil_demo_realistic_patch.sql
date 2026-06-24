@@ -375,6 +375,26 @@ WHERE rm.record_entry_id = r.id
        OR r.id IN (SELECT md5('demo-bulk-record:' || i.id)::uuid FROM itinerary.itinerary_items i));
 
 -- All demo URLs point to real objects uploaded by sync-demo-media.py.
+UPDATE auth.user_profiles p
+SET profile_image_url = 'https://daobk0bynum21.cloudfront.net/demo/profiles/' || p.user_id || '.png',
+    updated_at = now()
+WHERE p.user_id::text LIKE 'a0000000-%';
+
+UPDATE media.media_files m
+SET bucket = 'soomgil-media-dev-337872593610-ap-northeast-2-an',
+    object_key = 'demo/profiles/' || m.linked_resource_id || '.png',
+    public_url = 'https://daobk0bynum21.cloudfront.net/demo/profiles/' || m.linked_resource_id || '.png',
+    mime_type = 'image/png'
+WHERE m.linked_resource_type = 'auth.users'
+  AND m.linked_resource_id::text LIKE 'a0000000-%';
+
+UPDATE media.media_files m
+SET bucket = 'soomgil-media-dev-337872593610-ap-northeast-2-an',
+    object_key = 'demo/trips/' || m.linked_resource_id || '/' || m.id || '.jpg',
+    public_url = 'https://daobk0bynum21.cloudfront.net/demo/trips/' || m.linked_resource_id || '/' || m.id || '.jpg'
+WHERE m.linked_resource_type = 'trip.trips'
+  AND m.linked_resource_id::text LIKE 'c0000000-%';
+
 UPDATE tourism_source.attractions
 SET first_image1 = 'https://daobk0bynum21.cloudfront.net/demo/places/' || content_id || '/cover.jpg',
     first_image2 = 'https://daobk0bynum21.cloudfront.net/demo/places/' || content_id || '/detail.jpg'
@@ -395,17 +415,84 @@ SET bucket = 'soomgil-media-dev-337872593610-ap-northeast-2-an',
     public_url = 'https://daobk0bynum21.cloudfront.net/' || object_key
 WHERE object_key LIKE 'demo/%';
 
+WITH posts_without_media AS (
+  SELECT p.*
+  FROM community.posts p
+  WHERE p.deleted_at IS NULL
+    AND p.cover_media_file_id IS NULL
+    AND NOT EXISTS (SELECT 1 FROM community.post_media pm WHERE pm.post_id = p.id)
+)
+INSERT INTO media.media_files
+  (id, owner_user_id, storage_provider, bucket, object_key, public_url, mime_type,
+   byte_size, width, height, linked_resource_type, linked_resource_id, status, created_at)
+SELECT md5('demo-legacy-community-cover:' || p.id)::uuid,
+       p.published_by_user_id,
+       'S3_COMPATIBLE',
+       'soomgil-media-dev-337872593610-ap-northeast-2-an',
+       'demo/legacy-community/' || p.id || '/cover.jpg',
+       'https://daobk0bynum21.cloudfront.net/demo/legacy-community/' || p.id || '/cover.jpg',
+       'image/jpeg', 420000, 1400, 900, 'COMMUNITY_POST', p.id, 'ACTIVE', p.published_at
+FROM posts_without_media p
+ON CONFLICT (id) DO UPDATE SET
+  object_key = EXCLUDED.object_key,
+  public_url = EXCLUDED.public_url,
+  bucket = EXCLUDED.bucket;
+
+WITH posts_without_media AS (
+  SELECT p.*
+  FROM community.posts p
+  WHERE p.deleted_at IS NULL
+    AND p.cover_media_file_id IS NULL
+    AND NOT EXISTS (SELECT 1 FROM community.post_media pm WHERE pm.post_id = p.id)
+)
+INSERT INTO community.post_media
+  (id, post_id, media_file_id, sort_order, caption, created_at)
+SELECT md5('demo-legacy-community-post-media:' || p.id)::uuid,
+       p.id,
+       md5('demo-legacy-community-cover:' || p.id)::uuid,
+       0,
+       p.title,
+       p.published_at
+FROM posts_without_media p
+ON CONFLICT (id) DO NOTHING;
+
+UPDATE community.posts p
+SET cover_media_file_id = (
+      SELECT pm.media_file_id
+      FROM community.post_media pm
+      WHERE pm.post_id = p.id
+      ORDER BY pm.sort_order, pm.created_at
+      LIMIT 1
+    ),
+    updated_at = now()
+WHERE p.cover_media_file_id IS NULL
+  AND EXISTS (SELECT 1 FROM community.post_media pm WHERE pm.post_id = p.id);
+
 UPDATE itinerary.itinerary_items i
 SET thumbnail_url = a.first_image1, updated_at = now()
 FROM tourism_source.attractions a
 WHERE i.place_provider = 'KTO' AND i.external_place_id = a.content_id::text
   AND (a.content_id BETWEEN 10001 AND 10040 OR a.content_id BETWEEN 20001 AND 20028);
 
+UPDATE itinerary.itinerary_items i
+SET thumbnail_url = 'https://daobk0bynum21.cloudfront.net/demo/legacy-places/' ||
+      md5(COALESCE(i.place_provider, 'CUSTOM') || ':' || COALESCE(i.external_place_id, i.id::text)) ||
+      '/cover.jpg',
+    updated_at = now()
+WHERE i.thumbnail_url LIKE 'https://cdn.soomgil.test/%'
+   OR (i.thumbnail_url IS NULL AND i.trip_id::text LIKE 'c0000000-%');
+
 UPDATE community.post_snapshot_items i
 SET thumbnail_url = a.first_image1
 FROM tourism_source.attractions a
 WHERE i.place_provider = 'KTO' AND i.external_place_id = a.content_id::text
   AND (a.content_id BETWEEN 10001 AND 10040 OR a.content_id BETWEEN 20001 AND 20028);
+
+UPDATE community.post_snapshot_items i
+SET thumbnail_url = 'https://daobk0bynum21.cloudfront.net/demo/legacy-places/' ||
+      md5(COALESCE(i.place_provider, 'CUSTOM') || ':' || COALESCE(i.external_place_id, i.id::text)) ||
+      '/cover.jpg'
+WHERE i.thumbnail_url LIKE 'https://cdn.soomgil.test/%';
 
 -- Refresh the immutable-looking post payload after replacing itinerary and profile images.
 UPDATE community.posts p
