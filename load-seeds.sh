@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Loads the repository-owned Seoul + Daejeon demo dataset.
+# Loads the complete repository-owned dashboard demo dataset.
 #
 # Prerequisites:
 #   1. Postgres container `backend-postgres-1` is running (docker compose up -d postgres)
@@ -22,8 +22,8 @@ fi
 DB_USER="${DB_USERNAME:-soomgil}"
 DB_NAME="${DB_NAME:-soomgil}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SEED_FILE="${SEED_FILE:-${SCRIPT_DIR}/seeds/soomgil_demo_seoul_daejeon.sql}"
-REALISTIC_PATCH_FILE="${REALISTIC_PATCH_FILE:-${SCRIPT_DIR}/seeds/soomgil_demo_realistic_patch.sql}"
+DUMP_FILE="${DUMP_FILE:-${SCRIPT_DIR}/seeds/generated/soomgil_demo_dashboard_dump.sql}"
+BUILD_DUMP_FILE="${SCRIPT_DIR}/seeds/build_demo_dashboard_dump.sh"
 VERIFY_FILE="${VERIFY_FILE:-${SCRIPT_DIR}/seeds/verify_demo_data.sql}"
 
 if ! docker ps --format '{{.Names}}' | grep -q "^${CONTAINER}$"; then
@@ -32,13 +32,15 @@ if ! docker ps --format '{{.Names}}' | grep -q "^${CONTAINER}$"; then
   exit 1
 fi
 
-if [[ ! -f "${SEED_FILE}" ]]; then
-  echo "ERROR: seed file not found: ${SEED_FILE}"
+if [[ ! -x "${BUILD_DUMP_FILE}" ]]; then
+  echo "ERROR: dump builder is not executable: ${BUILD_DUMP_FILE}"
   exit 1
 fi
 
-if [[ ! -f "${REALISTIC_PATCH_FILE}" ]]; then
-  echo "ERROR: realistic seed patch not found: ${REALISTIC_PATCH_FILE}"
+"${BUILD_DUMP_FILE}"
+
+if [[ ! -f "${DUMP_FILE}" ]]; then
+  echo "ERROR: demo dump not found: ${DUMP_FILE}"
   exit 1
 fi
 
@@ -47,13 +49,9 @@ if [[ ! -f "${VERIFY_FILE}" ]]; then
   exit 1
 fi
 
-echo "Applying ${SEED_FILE} ..."
+echo "Applying ${DUMP_FILE} ..."
 docker exec -i "${CONTAINER}" psql -U "${DB_USER}" -d "${DB_NAME}" \
-  -v ON_ERROR_STOP=1 < "${SEED_FILE}"
-
-echo "Applying ${REALISTIC_PATCH_FILE} ..."
-docker exec -i "${CONTAINER}" psql -U "${DB_USER}" -d "${DB_NAME}" \
-  -v ON_ERROR_STOP=1 < "${REALISTIC_PATCH_FILE}"
+  -v ON_ERROR_STOP=1 < "${DUMP_FILE}"
 
 echo "Verifying realistic demo invariants ..."
 docker exec -i "${CONTAINER}" psql -U "${DB_USER}" -d "${DB_NAME}" \

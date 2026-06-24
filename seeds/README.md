@@ -1,11 +1,11 @@
-# 서울·대전 데모 데이터
+# 대시보드 데모 데이터
 
 `soomgil_demo_seoul_daejeon.sql`은 Flyway V1~V38 적용 후 넣는 로컬 전용 데이터입니다.
 운영 마이그레이션에는 포함되지 않으며 기존 데이터를 삭제하지 않습니다.
 
-`load-seeds.sh`는 실행 중인 루트 또는 백엔드 PostgreSQL 컨테이너를 자동으로 찾아
-기본 데이터 다음에 `soomgil_demo_realistic_patch.sql`을 적용하고
-`verify_demo_data.sql`로 사용자 테스트 품질 조건을 검사합니다.
+`load-seeds.sh`는 서울 기본 시드와 제주·부산·경주·여행 기록 시드를 합쳐
+`generated/soomgil_demo_dashboard_dump.sql`을 다시 만든 후 적용합니다. 마지막에는
+실제 KTO API 응답 스냅샷을 덮어쓰고 `verify_demo_data.sql`로 품질 조건을 검사합니다.
 
 포함 범위:
 
@@ -14,7 +14,7 @@
 - 스와이프 반응, 저장 장소, 사용자별 취향 가중치
 - 원본·파생 여행 80여 개와 일차별 일정, 경로, 메모, 체크리스트, 채팅
 - 완료 여행 기록 225개와 실제 S3 미디어, 테스트 계정용 세로 기록 사진 5장
-- 테스트 계정의 진행 중 여행 3개·보관 여행 1개, 일차·미정별 여행지와 작성 글 2개
+- 테스트 계정의 진행 중 여행 3개·보관 여행 1개, 실제 KTO 장소와 작성 글 2개
 - 서로 다른 제목·요약의 커뮤니티 게시물 59개
 - 게시물마다 다른 좋아요 수 3,297개
 - 내용이 모두 다른 댓글·대댓글 320개
@@ -27,6 +27,13 @@
 
 ```bash
 bash load-seeds.sh
+```
+
+생성된 dump만 직접 적용할 수도 있습니다.
+
+```bash
+docker exec -i soomgil-postgres-1 psql -U soomgil -d soomgil \
+  -v ON_ERROR_STOP=1 < seeds/generated/soomgil_demo_dashboard_dump.sql
 ```
 
 ## S3 이미지 동기화

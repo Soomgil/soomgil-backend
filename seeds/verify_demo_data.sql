@@ -25,6 +25,10 @@ DECLARE
   oversized_demo_trip_count integer;
   demo_authored_post_count integer;
   missing_post_cover_count integer;
+  non_kto_demo_place_count integer;
+  invalid_kto_content_id_count integer;
+  visible_demo_place_count integer;
+  visible_demo_record_photo_count integer;
 BEGIN
   SELECT count(*), count(DISTINCT bio)
   INTO profile_count, distinct_bio_count
@@ -198,6 +202,41 @@ BEGIN
     AND p.moderation_status = 'VISIBLE'
     AND p.cover_media_file_id IS NULL;
 
+  WITH demo_user AS (
+    SELECT user_id FROM auth.user_email_addresses
+    WHERE normalized_email = 'demo01@soomgil.local'
+  ), visible_trips AS (
+    SELECT t.id
+    FROM trip.trips t
+    JOIN trip.trip_members tm ON tm.trip_id = t.id AND tm.status = 'ACTIVE'
+    JOIN demo_user du ON du.user_id = tm.user_id
+    WHERE t.status != 'DELETED'
+  )
+  SELECT count(*),
+         count(*) FILTER (WHERE i.place_provider IS DISTINCT FROM 'KTO'),
+         count(*) FILTER (WHERE i.external_place_id !~ '^[0-9]+$')
+  INTO visible_demo_place_count, non_kto_demo_place_count, invalid_kto_content_id_count
+  FROM itinerary.itinerary_items i
+  JOIN visible_trips vt ON vt.id = i.trip_id
+  WHERE i.deleted_at IS NULL;
+
+  WITH demo_user AS (
+    SELECT user_id FROM auth.user_email_addresses
+    WHERE normalized_email = 'demo01@soomgil.local'
+  ), visible_trips AS (
+    SELECT t.id
+    FROM trip.trips t
+    JOIN trip.trip_members tm ON tm.trip_id = t.id AND tm.status = 'ACTIVE'
+    JOIN demo_user du ON du.user_id = tm.user_id
+    WHERE t.status != 'DELETED'
+  )
+  SELECT count(*) INTO visible_demo_record_photo_count
+  FROM record.trip_record_entries r
+  JOIN visible_trips vt ON vt.id = r.trip_id
+  JOIN record.trip_record_media rm ON rm.record_entry_id = r.id
+  JOIN media.media_files m ON m.id = rm.media_file_id
+  WHERE r.status = 'ACTIVE' AND m.status = 'ACTIVE';
+
   IF profile_count <> 120 OR distinct_bio_count <> 120 THEN
     RAISE EXCEPTION 'Expected 120 distinct demo profiles, found % profiles and % bios',
       profile_count, distinct_bio_count;
@@ -245,6 +284,14 @@ BEGIN
   END IF;
   IF missing_post_cover_count <> 0 THEN
     RAISE EXCEPTION 'Found % public demo posts without cover media', missing_post_cover_count;
+  END IF;
+  IF visible_demo_place_count <> 36 OR non_kto_demo_place_count <> 0 OR invalid_kto_content_id_count <> 0 THEN
+    RAISE EXCEPTION 'Expected 36 numeric KTO places for demo01, found % places, % non-KTO and % invalid content IDs',
+      visible_demo_place_count, non_kto_demo_place_count, invalid_kto_content_id_count;
+  END IF;
+  IF visible_demo_record_photo_count < 11 THEN
+    RAISE EXCEPTION 'Expected at least 11 restored record photos for demo01 trips, found %',
+      visible_demo_record_photo_count;
   END IF;
 END $$;
 
