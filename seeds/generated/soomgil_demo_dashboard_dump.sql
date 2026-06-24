@@ -299,10 +299,11 @@ WHERE r.id::text IS NOT NULL AND r.place_tag_enrichment_id IS NOT NULL
                     AND e.external_place_id=r.external_place_id AND e.occurred_at=r.last_reacted_at);
 
 INSERT INTO preference.user_saved_places (id,user_id,provider,external_place_id,created_at)
-SELECT md5('demo-save:' || u || ':' || a.content_id)::uuid,md5('demo-user:' || u)::uuid,'KTO',a.content_id::text,
-       now() - make_interval(days => ((u + a.content_id) % 45))
-FROM generate_series(1,20) u CROSS JOIN tourism_source.attractions a
-WHERE a.content_id BETWEEN 10001 AND 20014 AND (u * 7 + a.content_id) % 6 = 0
+SELECT md5('demo-save:' || r.user_id || ':' || r.provider || ':' || r.external_place_id)::uuid,
+       r.user_id,r.provider,r.external_place_id,r.last_reacted_at
+FROM preference.user_place_reactions r
+WHERE r.user_id IN (SELECT md5('demo-user:' || u)::uuid FROM generate_series(1,20) u)
+  AND r.reaction = 'SUPER_LIKE'
 ON CONFLICT (user_id,provider,external_place_id) DO NOTHING;
 
 INSERT INTO preference.user_preference_tag_weights
@@ -943,11 +944,12 @@ AND (u*11+a.content_id)%5<>0
 ON CONFLICT(user_id,provider,external_place_id) DO NOTHING;
 
 INSERT INTO preference.user_saved_places(id,user_id,provider,external_place_id,created_at)
-SELECT md5('demo-save:'||u||':'||a.content_id)::uuid,md5('demo-user:'||u)::uuid,'KTO',a.content_id::text,
- now()-make_interval(days=>((u+a.content_id)%90))
-FROM generate_series(21,120)u CROSS JOIN tourism_source.attractions a
-WHERE (a.content_id BETWEEN 10001 AND 10040 OR a.content_id BETWEEN 20001 AND 20028)
-AND (u*7+a.content_id)%7=0 ON CONFLICT(user_id,provider,external_place_id) DO NOTHING;
+SELECT md5('demo-save:'||r.user_id||':'||r.provider||':'||r.external_place_id)::uuid,
+ r.user_id,r.provider,r.external_place_id,r.last_reacted_at
+FROM preference.user_place_reactions r
+WHERE r.user_id IN (SELECT md5('demo-user:'||u)::uuid FROM generate_series(21,120)u)
+AND r.reaction='SUPER_LIKE'
+ON CONFLICT(user_id,provider,external_place_id) DO NOTHING;
 
 INSERT INTO social.user_follows(follower_user_id,following_user_id,status,created_at,updated_at)
 SELECT md5('demo-user:'||a)::uuid,md5('demo-user:'||b)::uuid,'ACTIVE',
@@ -3746,7 +3748,30 @@ WHERE pm.post_id = p.id
   AND (p.id IN (SELECT md5('demo-bulk-post:' || g)::uuid FROM generate_series(1, 50) g)
        OR p.id IN (SELECT md5('demo-post:' || k)::uuid FROM (VALUES
          ('palace-post'), ('night-post'), ('seongsu-post'), ('science-post'), ('bread-post'),
-         ('green-post'), ('modern-post'), ('family-post'), ('autumn-post')) v(k)));
+       ('green-post'), ('modern-post'), ('family-post'), ('autumn-post')) v(k)));
+
+-- My Page exposes this collection as SUPER_LIKE places. Keep saved rows and
+-- reactions aligned even when this patch is applied over an older demo dump.
+DELETE FROM preference.user_saved_places s
+WHERE s.user_id IN (SELECT md5('demo-user:' || n)::uuid FROM generate_series(1, 120) n)
+  AND NOT EXISTS (
+    SELECT 1
+    FROM preference.user_place_reactions r
+    WHERE r.user_id = s.user_id
+      AND r.provider = s.provider
+      AND r.external_place_id = s.external_place_id
+      AND r.reaction = 'SUPER_LIKE'
+  );
+
+INSERT INTO preference.user_saved_places
+  (id, user_id, provider, external_place_id, created_at, deleted_at)
+SELECT md5('demo-save:' || r.user_id || ':' || r.provider || ':' || r.external_place_id)::uuid,
+       r.user_id, r.provider, r.external_place_id, r.last_reacted_at, NULL
+FROM preference.user_place_reactions r
+WHERE r.user_id IN (SELECT md5('demo-user:' || n)::uuid FROM generate_series(1, 120) n)
+  AND r.reaction = 'SUPER_LIKE'
+ON CONFLICT (user_id, provider, external_place_id) DO UPDATE
+SET deleted_at = NULL;
 
 COMMIT;
 

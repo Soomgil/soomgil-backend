@@ -29,6 +29,7 @@ DECLARE
   invalid_kto_content_id_count integer;
   visible_demo_place_count integer;
   visible_demo_record_photo_count integer;
+  invalid_demo_saved_place_count integer;
 BEGIN
   SELECT count(*), count(DISTINCT bio)
   INTO profile_count, distinct_bio_count
@@ -237,6 +238,19 @@ BEGIN
   JOIN media.media_files m ON m.id = rm.media_file_id
   WHERE r.status = 'ACTIVE' AND m.status = 'ACTIVE';
 
+  SELECT count(*) INTO invalid_demo_saved_place_count
+  FROM preference.user_saved_places s
+  WHERE s.user_id IN (SELECT md5('demo-user:' || n)::uuid FROM generate_series(1, 120) n)
+    AND s.deleted_at IS NULL
+    AND NOT EXISTS (
+      SELECT 1
+      FROM preference.user_place_reactions r
+      WHERE r.user_id = s.user_id
+        AND r.provider = s.provider
+        AND r.external_place_id = s.external_place_id
+        AND r.reaction = 'SUPER_LIKE'
+    );
+
   IF profile_count <> 120 OR distinct_bio_count <> 120 THEN
     RAISE EXCEPTION 'Expected 120 distinct demo profiles, found % profiles and % bios',
       profile_count, distinct_bio_count;
@@ -292,6 +306,10 @@ BEGIN
   IF visible_demo_record_photo_count < 11 THEN
     RAISE EXCEPTION 'Expected at least 11 restored record photos for demo01 trips, found %',
       visible_demo_record_photo_count;
+  END IF;
+  IF invalid_demo_saved_place_count <> 0 THEN
+    RAISE EXCEPTION 'Found % active demo saved places without a SUPER_LIKE reaction',
+      invalid_demo_saved_place_count;
   END IF;
 END $$;
 
