@@ -182,16 +182,18 @@ INSERT INTO itinerary.itinerary_items
    external_place_id, place_name, address, lat, lng, thumbnail_url, source_status,
    created_at, updated_at)
 SELECT md5('demo-dashboard-unscheduled-place:' || p.external_place_id)::uuid,
-       p.trip_id, d.id, p.sort_order, 'PLACE', 'KAKAO', p.external_place_id,
+       p.trip_id, d.id, p.sort_order, 'PLACE', 'KTO', p.external_place_id,
        p.place_name, p.address, p.lat, p.lng,
        'https://daobk0bynum21.cloudfront.net/demo/legacy-places/' ||
-         md5('KAKAO:' || p.external_place_id) || '/cover.jpg',
+         md5('KTO:' || p.external_place_id) || '/cover.jpg',
        'AVAILABLE', now(), now()
 FROM places p
 JOIN unscheduled_days d ON d.trip_id = p.trip_id
 ON CONFLICT (id) DO UPDATE SET
   itinerary_day_id = EXCLUDED.itinerary_day_id,
   sort_order = EXCLUDED.sort_order,
+  place_provider = EXCLUDED.place_provider,
+  external_place_id = EXCLUDED.external_place_id,
   place_name = EXCLUDED.place_name,
   address = EXCLUDED.address,
   lat = EXCLUDED.lat,
@@ -200,6 +202,16 @@ ON CONFLICT (id) DO UPDATE SET
   source_status = 'AVAILABLE',
   deleted_at = NULL,
   updated_at = now();
+
+-- Normalize legacy demo place references to the only supported place provider.
+UPDATE itinerary.itinerary_items
+SET place_provider = 'KTO',
+    updated_at = now()
+WHERE place_provider = 'KAKAO';
+
+UPDATE community.post_snapshot_items
+SET place_provider = 'KTO'
+WHERE place_provider = 'KAKAO';
 
 -- Attribute two complete Seoul stories to demo01 without inflating the global post count.
 WITH demo_user AS (
