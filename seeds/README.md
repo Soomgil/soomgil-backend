@@ -5,7 +5,8 @@
 
 `load-seeds.sh`는 서울 기본 시드와 제주·부산·경주·여행 기록 시드를 합쳐
 `generated/soomgil_demo_dashboard_dump.sql`을 다시 만든 후 적용합니다. 마지막에는
-실제 KTO API 응답 스냅샷을 덮어쓰고 `verify_demo_data.sql`로 품질 조건을 검사합니다.
+실제 KTO API 응답 스냅샷과 `soomgil_jeju_place_tags.sql`의 제주 AI 태그를 적용한 뒤
+`verify_demo_data.sql`로 품질 조건을 검사합니다.
 
 포함 범위:
 
@@ -20,6 +21,7 @@
 - 내용이 모두 다른 댓글·대댓글 320개
 - 게시물 스냅샷에서 복제된 리트립 여행 24개
 - 알림과 운영 감사 로그
+- 제주 KTO 장소 2,300여 곳의 Gemini 2.5 Flash Lite 태그 결과
 
 ## 적용
 
@@ -34,6 +36,8 @@ bash load-seeds.sh
 ```bash
 docker exec -i soomgil-postgres-1 psql -U soomgil -d soomgil \
   -v ON_ERROR_STOP=1 < seeds/generated/soomgil_demo_dashboard_dump.sql
+docker exec -i soomgil-postgres-1 psql -U soomgil -d soomgil \
+  -v ON_ERROR_STOP=1 < seeds/soomgil_jeju_place_tags.sql
 ```
 
 ## S3 이미지 동기화

@@ -23,6 +23,7 @@ DB_USER="${DB_USERNAME:-soomgil}"
 DB_NAME="${DB_NAME:-soomgil}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DUMP_FILE="${DUMP_FILE:-${SCRIPT_DIR}/seeds/generated/soomgil_demo_dashboard_dump.sql}"
+JEJU_TAG_DUMP_FILE="${JEJU_TAG_DUMP_FILE:-${SCRIPT_DIR}/seeds/soomgil_jeju_place_tags.sql}"
 BUILD_DUMP_FILE="${SCRIPT_DIR}/seeds/build_demo_dashboard_dump.sh"
 VERIFY_FILE="${VERIFY_FILE:-${SCRIPT_DIR}/seeds/verify_demo_data.sql}"
 
@@ -49,9 +50,18 @@ if [[ ! -f "${VERIFY_FILE}" ]]; then
   exit 1
 fi
 
+if [[ ! -f "${JEJU_TAG_DUMP_FILE}" ]]; then
+  echo "ERROR: Jeju tag dump not found: ${JEJU_TAG_DUMP_FILE}"
+  exit 1
+fi
+
 echo "Applying ${DUMP_FILE} ..."
 docker exec -i "${CONTAINER}" psql -U "${DB_USER}" -d "${DB_NAME}" \
   -v ON_ERROR_STOP=1 < "${DUMP_FILE}"
+
+echo "Applying ${JEJU_TAG_DUMP_FILE} ..."
+docker exec -i "${CONTAINER}" psql -U "${DB_USER}" -d "${DB_NAME}" \
+  -v ON_ERROR_STOP=1 < "${JEJU_TAG_DUMP_FILE}"
 
 echo "Verifying realistic demo invariants ..."
 docker exec -i "${CONTAINER}" psql -U "${DB_USER}" -d "${DB_NAME}" \
