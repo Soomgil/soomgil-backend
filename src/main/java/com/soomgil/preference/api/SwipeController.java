@@ -1,6 +1,7 @@
 package com.soomgil.preference.api;
 
 import com.soomgil.place.api.dto.PlaceProvider;
+import com.soomgil.preference.api.dto.MyPreferenceSummary;
 import com.soomgil.preference.api.dto.PagedSavedPlace;
 import com.soomgil.preference.api.dto.SavedPlace;
 import com.soomgil.preference.api.dto.SwipeFeedResponse;
@@ -14,8 +15,10 @@ import com.soomgil.preference.application.command.handler.SavePlaceCommandHandle
 import com.soomgil.preference.application.command.handler.UnsavePlaceCommandHandler;
 import com.soomgil.preference.application.command.handler.UpsertSwipeReactionCommandHandler;
 import com.soomgil.preference.application.query.dto.ListSavedPlacesQuery;
+import com.soomgil.preference.application.query.dto.ListMyPreferencesQuery;
 import com.soomgil.preference.application.query.dto.SwipeFeedQuery;
 import com.soomgil.preference.application.query.handler.ListSavedPlacesQueryHandler;
+import com.soomgil.preference.application.query.handler.ListMyPreferencesQueryHandler;
 import com.soomgil.preference.application.query.handler.SwipeFeedQueryHandler;
 import com.soomgil.preference.application.service.SwipeTagPreparationService;
 import jakarta.validation.Valid;
@@ -42,6 +45,7 @@ public class SwipeController {
 	private final SavePlaceCommandHandler savePlaceCommandHandler;
 	private final UnsavePlaceCommandHandler unsavePlaceCommandHandler;
 	private final ListSavedPlacesQueryHandler listSavedPlacesQueryHandler;
+	private final ListMyPreferencesQueryHandler listMyPreferencesQueryHandler;
 	private final SwipeTagPreparationService swipeTagPreparationService;
 
 	public SwipeController(
@@ -50,6 +54,7 @@ public class SwipeController {
 		SavePlaceCommandHandler savePlaceCommandHandler,
 		UnsavePlaceCommandHandler unsavePlaceCommandHandler,
 		ListSavedPlacesQueryHandler listSavedPlacesQueryHandler,
+		ListMyPreferencesQueryHandler listMyPreferencesQueryHandler,
 		SwipeTagPreparationService swipeTagPreparationService
 	) {
 		this.swipeFeedQueryHandler = swipeFeedQueryHandler;
@@ -57,6 +62,7 @@ public class SwipeController {
 		this.savePlaceCommandHandler = savePlaceCommandHandler;
 		this.unsavePlaceCommandHandler = unsavePlaceCommandHandler;
 		this.listSavedPlacesQueryHandler = listSavedPlacesQueryHandler;
+		this.listMyPreferencesQueryHandler = listMyPreferencesQueryHandler;
 		this.swipeTagPreparationService = swipeTagPreparationService;
 	}
 
@@ -105,6 +111,11 @@ public class SwipeController {
 		@RequestParam(required = false) List<String> sort
 	) {
 		return listSavedPlacesQueryHandler.handle(new ListSavedPlacesQuery(page, size));
+	}
+
+	@GetMapping("/me/preferences")
+	public MyPreferenceSummary listMyPreferences() {
+		return listMyPreferencesQueryHandler.handle(new ListMyPreferencesQuery());
 	}
 
 	@PutMapping("/places/{provider}/{externalPlaceId}/save")

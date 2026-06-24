@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+	PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+	"https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.soomgil.preference.infrastructure.persistence.mapper.PreferenceUserPreferenceMapper">
+
+	<resultMap id="UserPreferenceTagScoreRowMap"
+		type="com.soomgil.preference.infrastructure.persistence.row.UserPreferenceTagScoreRow">
+		<constructor>
+			<arg column="tag_id" javaType="java.lang.String"/>
+			<arg column="tag_code" javaType="java.lang.String"/>
+			<arg column="display_name" javaType="java.lang.String"/>
+			<arg column="group_code" javaType="java.lang.String"/>
+			<arg column="group_display_name" javaType="java.lang.String"/>
+			<arg column="preference_score" javaType="java.math.BigDecimal"/>
+			<arg column="like_count" javaType="java.lang.Integer"/>
+			<arg column="super_like_count" javaType="java.lang.Integer"/>
+			<arg column="nope_count" javaType="java.lang.Integer"/>
+		</constructor>
+	</resultMap>
+
+	<select id="findUserPreferenceScores" resultMap="UserPreferenceTagScoreRowMap">
+		SELECT
+			CAST(w.tag_id AS text) AS tag_id,
+			t.code AS tag_code,
+			t.display_name AS display_name,
+			t.group_code AS group_code,
+			gt.display_name AS group_display_name,
+			w.preference_score AS preference_score,
+			w.like_count AS like_count,
+			w.super_like_count AS super_like_count,
+			w.nope_count AS nope_count
+		FROM preference.user_preference_tag_weights w
+		JOIN preference.preference_tags t ON t.id = w.tag_id
+		LEFT JOIN preference.preference_tags gt
+			ON gt.code = t.group_code
+			AND gt.tag_type = 'GROUP'
+		WHERE w.user_id = CAST(#{userId} AS uuid)
+			AND t.tag_type = 'TAG'
+			AND t.is_active = true
+		ORDER BY w.preference_score DESC, t.sort_order ASC
+	</select>
+
+	<select id="hasAnyReaction" resultType="boolean">
+		SELECT EXISTS(
+			SELECT 1
+			FROM preference.user_preference_tag_weights
+			WHERE user_id = CAST(#{userId} AS uuid)
+				AND (like_count > 0 OR super_like_count > 0 OR nope_count > 0)
+		)
+	</select>
+</mapper>
