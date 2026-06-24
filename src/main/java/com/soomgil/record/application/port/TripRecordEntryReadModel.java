@@ -13,6 +13,8 @@ public record TripRecordEntryReadModel(
 	UUID itineraryDayId,
 	UUID itineraryItemId,
 	UUID uploadedByUserId,
+	String uploadedByDisplayName,
+	String uploadedByProfileImageUrl,
 	String title,
 	String caption,
 	String locationName,

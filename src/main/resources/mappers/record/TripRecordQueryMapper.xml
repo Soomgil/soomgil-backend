@@ -10,6 +10,8 @@
     e.itinerary_day_id,
     e.itinerary_item_id,
     e.uploaded_by_user_id,
+    p.display_name AS uploaded_by_display_name,
+    p.profile_image_url AS uploaded_by_profile_image_url,
     e.title,
     e.caption,
     e.location_name,
@@ -26,6 +28,7 @@
       <include refid="entryColumns" />
     FROM record.trip_record_entries e
     JOIN trip.trips t ON t.id = e.trip_id
+    LEFT JOIN auth.user_profiles p ON p.user_id = e.uploaded_by_user_id
     WHERE e.trip_id = #{tripId}
       AND e.status = 'ACTIVE'
     ORDER BY e.taken_at DESC NULLS LAST, e.created_at DESC, e.id DESC
@@ -45,6 +48,7 @@
       <include refid="entryColumns" />
     FROM record.trip_record_entries e
     JOIN trip.trips t ON t.id = e.trip_id
+    LEFT JOIN auth.user_profiles p ON p.user_id = e.uploaded_by_user_id
     WHERE e.trip_id = #{tripId}
       AND e.id = #{recordId}
       AND e.status = 'ACTIVE'
@@ -70,14 +74,25 @@
     ORDER BY rm.sort_order ASC, rm.created_at ASC
   </select>
 
+  <select id="findDays" resultType="com.soomgil.record.application.port.TripRecordDayReadModel">
+    SELECT id, day_number, date
+    FROM itinerary.itinerary_days
+    WHERE trip_id = #{tripId}
+      AND group_type = 'DAY'
+    ORDER BY day_number ASC, sort_order ASC, id ASC
+  </select>
+
   <select id="findPhotos" resultType="com.soomgil.record.application.port.TripRecordPhotoReadModel">
     SELECT
       e.trip_id,
       t.title AS trip_title,
       e.id AS record_id,
       e.itinerary_day_id,
+      d.day_number,
       e.itinerary_item_id,
       e.uploaded_by_user_id,
+      p.display_name AS uploaded_by_display_name,
+      p.profile_image_url AS uploaded_by_profile_image_url,
       m.id AS media_file_id,
       m.object_key,
       m.public_url,
@@ -91,6 +106,8 @@
       e.created_at
     FROM record.trip_record_entries e
     JOIN trip.trips t ON t.id = e.trip_id
+    LEFT JOIN itinerary.itinerary_days d ON d.id = e.itinerary_day_id
+    LEFT JOIN auth.user_profiles p ON p.user_id = e.uploaded_by_user_id
     JOIN record.trip_record_media rm ON rm.record_entry_id = e.id
     JOIN media.media_files m ON m.id = rm.media_file_id
     WHERE e.trip_id = #{tripId}
@@ -119,8 +136,11 @@
       t.title AS trip_title,
       e.id AS record_id,
       e.itinerary_day_id,
+      d.day_number,
       e.itinerary_item_id,
       e.uploaded_by_user_id,
+      p.display_name AS uploaded_by_display_name,
+      p.profile_image_url AS uploaded_by_profile_image_url,
       m.id AS media_file_id,
       m.object_key,
       m.public_url,
@@ -134,6 +154,8 @@
       e.created_at
     FROM record.trip_record_entries e
     JOIN trip.trips t ON t.id = e.trip_id
+    LEFT JOIN itinerary.itinerary_days d ON d.id = e.itinerary_day_id
+    LEFT JOIN auth.user_profiles p ON p.user_id = e.uploaded_by_user_id
     JOIN record.trip_record_media rm ON rm.record_entry_id = e.id
     JOIN media.media_files m ON m.id = rm.media_file_id
     WHERE t.status != 'DELETED'
