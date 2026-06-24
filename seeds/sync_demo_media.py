@@ -29,6 +29,7 @@ except ImportError as exc:
 
 ROOT = Path(__file__).resolve().parents[1]
 ENV_FILE = ROOT / ".env"
+ORCHESTRATION_ENV_FILE = ROOT.parent / ".env"
 MANIFEST_FILE = ROOT / "seeds" / "generated" / "demo-media-manifest.csv"
 USER_AGENT = "SoomgilDemoSeeder/1.0 (https://github.com/Soomgil/soomgil-backend)"
 MAX_DOWNLOAD_BYTES = 12 * 1024 * 1024
@@ -71,13 +72,25 @@ COPY (
            p.display_name search_term,
            0 variant
     FROM auth.user_profiles p
-    WHERE p.user_id IN (SELECT md5('demo-user:' || n)::uuid FROM generate_series(1, 120) n)
+    WHERE p.profile_image_url LIKE
+      'https://daobk0bynum21.cloudfront.net/demo/profiles/%'
 
     UNION ALL
 
     SELECT 'place', 'demo/places/' || a.content_id || '/cover.jpg', a.title || ' 대한민국 여행', 0
     FROM tourism_source.attractions a
     WHERE a.content_id BETWEEN 10001 AND 10040 OR a.content_id BETWEEN 20001 AND 20028
+
+    UNION ALL
+
+    SELECT 'place',
+           replace(i.thumbnail_url, 'https://daobk0bynum21.cloudfront.net/', ''),
+           min(i.place_name) || ' 대한민국 여행',
+           abs(hashtext(i.thumbnail_url)) % 5
+    FROM itinerary.itinerary_items i
+    WHERE i.thumbnail_url LIKE
+      'https://daobk0bynum21.cloudfront.net/demo/legacy-places/%'
+    GROUP BY i.thumbnail_url
 
     UNION ALL
 
@@ -93,6 +106,18 @@ COPY (
     JOIN record.trip_record_entries r ON m.linked_resource_type = 'TRIP_RECORD'
       AND m.linked_resource_id = r.id
     WHERE m.object_key LIKE 'demo/%'
+
+    UNION ALL
+
+    SELECT 'record', m.object_key,
+           COALESCE(r.location_name, t.display_destination, '대한민국 여행'),
+           abs(hashtext(m.object_key)) % 5
+    FROM media.media_files m
+    JOIN trip.trips t ON m.linked_resource_type = 'trip.trips'
+      AND m.linked_resource_id = t.id
+    LEFT JOIN record.trip_record_media rm ON rm.media_file_id = m.id
+    LEFT JOIN record.trip_record_entries r ON r.id = rm.record_entry_id
+    WHERE m.object_key LIKE 'demo/trips/%'
 
     UNION ALL
 
@@ -262,15 +287,27 @@ def write_manifest(rows: list[dict[str, Any]]) -> None:
         writer.writerows(sorted(rows, key=lambda row: row["object_key"]))
 
 
+def read_manifest() -> list[dict[str, str]]:
+    if not MANIFEST_FILE.exists():
+        return []
+    with MANIFEST_FILE.open(newline="", encoding="utf-8") as handle:
+        return list(csv.DictReader(handle))
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--container", default="backend-postgres-1")
+    parser.add_argument("--container", default="soomgil-postgres-1")
     parser.add_argument("--workers", type=int, default=8)
     parser.add_argument("--limit", type=int)
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--new-only", action="store_true")
     args = parser.parse_args()
 
-    config = {**load_env(ENV_FILE), **os.environ}
+    config = {
+        **load_env(ORCHESTRATION_ENV_FILE),
+        **load_env(ENV_FILE),
+        **os.environ,
+    }
     bucket = required(config, "S3_BUCKET")
     region = required(config, "S3_REGION")
     access_key = required(config, "S3_ACCESS_KEY")
@@ -278,10 +315,15 @@ def main() -> None:
     db_user = config.get("DB_USERNAME", "soomgil")
     db_name = config.get("DB_NAME", "soomgil")
     assets = query_assets(args.container, db_user, db_name)
+    existing_manifest = read_manifest()
+    if args.new_only:
+        existing_keys = {row["object_key"] for row in existing_manifest}
+        assets = [asset for asset in assets if asset["object_key"] not in existing_keys]
     if args.limit:
         assets = assets[: args.limit]
     if not assets:
-        raise SystemExit("No demo assets found. Load the SQL seeds first.")
+        print("No new demo assets to sync.")
+        return
 
     print(f"Resolving image sources for {len(assets)} objects ...")
     for index, asset in enumerate(assets, start=1):
@@ -310,7 +352,9 @@ def main() -> None:
             if index % 25 == 0 or index == len(assets):
                 print(f"  {index}/{len(assets)} processed ({len(failures)} failed)")
 
-    write_manifest(completed)
+    completed_by_key = {row["object_key"]: row for row in existing_manifest}
+    completed_by_key.update({row["object_key"]: row for row in completed})
+    write_manifest(list(completed_by_key.values()))
     print(f"Manifest: {MANIFEST_FILE}")
     if failures:
         for key, error in failures[:20]:

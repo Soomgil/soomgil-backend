@@ -3,7 +3,8 @@
 `soomgil_demo_seoul_daejeon.sql`은 Flyway V1~V38 적용 후 넣는 로컬 전용 데이터입니다.
 운영 마이그레이션에는 포함되지 않으며 기존 데이터를 삭제하지 않습니다.
 
-`load-seeds.sh`는 기본 데이터 다음에 `soomgil_demo_realistic_patch.sql`을 적용하고
+`load-seeds.sh`는 실행 중인 루트 또는 백엔드 PostgreSQL 컨테이너를 자동으로 찾아
+기본 데이터 다음에 `soomgil_demo_realistic_patch.sql`을 적용하고
 `verify_demo_data.sql`로 사용자 테스트 품질 조건을 검사합니다.
 
 포함 범위:
@@ -35,7 +36,7 @@ bash load-seeds.sh
 ```bash
 python3 -m venv /tmp/soomgil-demo-media-venv
 /tmp/soomgil-demo-media-venv/bin/pip install -r seeds/requirements.txt
-/tmp/soomgil-demo-media-venv/bin/python seeds/sync_demo_media.py
+/tmp/soomgil-demo-media-venv/bin/python seeds/sync_demo_media.py --new-only
 ```
 
 동기화기는 DB에서 필요한 객체 목록을 읽고 549개 파일을 업로드한 뒤 각 객체를

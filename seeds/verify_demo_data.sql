@@ -13,6 +13,10 @@ DECLARE
   like_count integer;
   distinct_like_counts integer;
   stale_url_count integer;
+  empty_demo_trip_count integer;
+  missing_demo_thumbnail_count integer;
+  missing_record_photo_count integer;
+  missing_post_cover_count integer;
 BEGIN
   SELECT count(*), count(DISTINCT bio)
   INTO profile_count, distinct_bio_count
@@ -64,8 +68,12 @@ BEGIN
     SELECT profile_image_url url
     FROM auth.user_profiles
     WHERE user_id IN (SELECT md5('demo-user:' || n)::uuid FROM generate_series(1, 120) n)
+       OR user_id::text LIKE 'a0000000-%'
     UNION ALL
-    SELECT public_url FROM media.media_files WHERE object_key LIKE 'demo/%'
+    SELECT public_url FROM media.media_files
+    WHERE object_key LIKE 'demo/%'
+       OR id::text LIKE 'b0000000-%'
+       OR id::text LIKE 'b1000000-%'
     UNION ALL
     SELECT first_image1 FROM tourism_source.attractions
     WHERE content_id BETWEEN 10001 AND 10040 OR content_id BETWEEN 20001 AND 20028
@@ -74,7 +82,36 @@ BEGIN
     UNION ALL
     SELECT thumbnail_url FROM community.post_snapshot_items
   ) urls
-  WHERE url IS NOT NULL AND url NOT LIKE 'https://daobk0bynum21.cloudfront.net/%';
+  WHERE url LIKE 'https://cdn.soomgil.test/%';
+
+  SELECT count(*) INTO empty_demo_trip_count
+  FROM trip.trips t
+  WHERE t.id::text LIKE 'c0000000-%'
+    AND t.deleted_at IS NULL
+    AND NOT EXISTS (
+      SELECT 1 FROM itinerary.itinerary_items i
+      WHERE i.trip_id = t.id AND i.deleted_at IS NULL
+    );
+
+  SELECT count(*) INTO missing_record_photo_count
+  FROM record.trip_record_media rm
+  JOIN record.trip_record_entries r ON r.id = rm.record_entry_id
+  JOIN media.media_files m ON m.id = rm.media_file_id
+  WHERE r.status = 'ACTIVE'
+    AND (m.public_url IS NULL OR m.public_url LIKE 'https://cdn.soomgil.test/%');
+
+  SELECT count(*) INTO missing_demo_thumbnail_count
+  FROM itinerary.itinerary_items i
+  WHERE i.trip_id::text LIKE 'c0000000-%'
+    AND i.deleted_at IS NULL
+    AND i.thumbnail_url IS NULL;
+
+  SELECT count(*) INTO missing_post_cover_count
+  FROM community.posts p
+  WHERE p.deleted_at IS NULL
+    AND p.visibility = 'PUBLIC'
+    AND p.moderation_status = 'VISIBLE'
+    AND p.cover_media_file_id IS NULL;
 
   IF profile_count <> 120 OR distinct_bio_count <> 120 THEN
     RAISE EXCEPTION 'Expected 120 distinct demo profiles, found % profiles and % bios',
@@ -93,7 +130,19 @@ BEGIN
       like_count, distinct_like_counts;
   END IF;
   IF stale_url_count <> 0 THEN
-    RAISE EXCEPTION 'Found % demo image URLs outside CloudFront', stale_url_count;
+    RAISE EXCEPTION 'Found % stale cdn.soomgil.test demo image URLs', stale_url_count;
+  END IF;
+  IF empty_demo_trip_count <> 0 THEN
+    RAISE EXCEPTION 'Found % demo trips without itinerary places', empty_demo_trip_count;
+  END IF;
+  IF missing_demo_thumbnail_count <> 0 THEN
+    RAISE EXCEPTION 'Found % demo itinerary places without thumbnails', missing_demo_thumbnail_count;
+  END IF;
+  IF missing_record_photo_count <> 0 THEN
+    RAISE EXCEPTION 'Found % record photos without a usable CloudFront URL', missing_record_photo_count;
+  END IF;
+  IF missing_post_cover_count <> 0 THEN
+    RAISE EXCEPTION 'Found % public demo posts without cover media', missing_post_cover_count;
   END IF;
 END $$;
 

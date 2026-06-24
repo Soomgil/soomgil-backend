@@ -12,7 +12,13 @@
 # Re-running is safe — deterministic keys and ON CONFLICT clauses prevent duplicates.
 set -euo pipefail
 
-CONTAINER="${CONTAINER:-backend-postgres-1}"
+if [[ -n "${CONTAINER:-}" ]]; then
+  CONTAINER="${CONTAINER}"
+elif docker ps --format '{{.Names}}' | grep -q '^soomgil-postgres-1$'; then
+  CONTAINER="soomgil-postgres-1"
+else
+  CONTAINER="backend-postgres-1"
+fi
 DB_USER="${DB_USERNAME:-soomgil}"
 DB_NAME="${DB_NAME:-soomgil}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
