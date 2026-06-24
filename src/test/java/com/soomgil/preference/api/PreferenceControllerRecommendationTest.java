@@ -96,7 +96,8 @@ class PreferenceControllerRecommendationTest {
 					)),
 					1,
 					0.0,
-					"여행 멤버의 취향과 잘 맞아요"
+					"여행 멤버의 취향과 잘 맞아요",
+					85
 				)),
 				new PageMeta(query.page(), query.size(), 1L, 1, List.of())
 			);

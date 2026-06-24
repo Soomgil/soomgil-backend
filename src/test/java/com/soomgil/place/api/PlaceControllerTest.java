@@ -153,6 +153,7 @@ class PlaceControllerTest {
 				35.1587,
 				129.1604,
 				URI.create("https://cdn.soomgil.example.com/places/126508.jpg"),
+				List.of(URI.create("https://cdn.soomgil.example.com/places/126508.jpg")),
 				"ATTRACTION",
 				PlaceSourceStatus.AVAILABLE,
 				"A representative Busan seaside attraction.",

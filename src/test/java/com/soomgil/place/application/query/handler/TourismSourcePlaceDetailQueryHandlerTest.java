@@ -8,10 +8,14 @@ import com.soomgil.place.api.dto.PlaceSourceStatus;
 import com.soomgil.place.application.query.dto.PlaceDetailItem;
 import com.soomgil.place.application.query.dto.PlaceDetailQuery;
 import com.soomgil.place.infrastructure.persistence.mapper.TourismSourcePlaceDetailMapper;
+import com.soomgil.place.infrastructure.persistence.mapper.TourismSourcePlaceImageMapper;
 import com.soomgil.place.infrastructure.persistence.repository.TourismSourcePlaceDetailRepository;
+import com.soomgil.place.infrastructure.persistence.repository.TourismSourcePlaceImageRepository;
 import com.soomgil.place.infrastructure.persistence.row.TourismSourcePlaceDetailRow;
+import com.soomgil.place.infrastructure.persistence.row.TourismSourcePlaceImageRow;
 import java.net.URI;
 import java.time.OffsetDateTime;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -35,6 +39,10 @@ class TourismSourcePlaceDetailQueryHandlerTest {
 			35.1587,
 			129.1604,
 			URI.create("https://cdn.soomgil.example.com/places/126508.jpg"),
+			List.of(
+				URI.create("https://cdn.soomgil.example.com/places/126508.jpg"),
+				URI.create("https://cdn.soomgil.example.com/places/126508-2.jpg")
+			),
 			"ATTRACTION",
 			PlaceSourceStatus.AVAILABLE,
 			"A representative Busan seaside attraction.",
@@ -55,6 +63,10 @@ class TourismSourcePlaceDetailQueryHandlerTest {
 		assertThat(result.lat()).isEqualTo(35.1587);
 		assertThat(result.lng()).isEqualTo(129.1604);
 		assertThat(result.thumbnailUrl()).isEqualTo(URI.create("https://cdn.soomgil.example.com/places/126508.jpg"));
+		assertThat(result.photos()).containsExactly(
+			URI.create("https://cdn.soomgil.example.com/places/126508.jpg"),
+			URI.create("https://cdn.soomgil.example.com/places/126508-2.jpg")
+		);
 		assertThat(result.category()).isEqualTo("ATTRACTION");
 		assertThat(result.sourceStatus()).isEqualTo(PlaceSourceStatus.AVAILABLE);
 		assertThat(result.description()).isEqualTo("A representative Busan seaside attraction.");
@@ -69,7 +81,10 @@ class TourismSourcePlaceDetailQueryHandlerTest {
 		private PlaceDetailItem item;
 
 		private RecordingTourismSourcePlaceDetailRepository() {
-			super(new NoopTourismSourcePlaceDetailMapper());
+			super(
+				new NoopTourismSourcePlaceDetailMapper(),
+				new TourismSourcePlaceImageRepository(new NoopTourismSourcePlaceImageMapper())
+			);
 		}
 
 		@Override
@@ -83,6 +98,19 @@ class TourismSourcePlaceDetailQueryHandlerTest {
 
 		@Override
 		public TourismSourcePlaceDetailRow findByContentId(String contentId) {
+			return null;
+		}
+	}
+
+	private static final class NoopTourismSourcePlaceImageMapper implements TourismSourcePlaceImageMapper {
+
+		@Override
+		public List<TourismSourcePlaceImageRow> findNormalImages(String contentId) {
+			return List.of();
+		}
+
+		@Override
+		public TourismSourcePlaceImageRow findAwardImage(String contentId) {
 			return null;
 		}
 	}
