@@ -40,6 +40,8 @@ public class TripSearchService {
 			TripStatus.valueOf(row.status()),
 			row.ownerUserId().equals(userId) ? TripAccessRole.OWNER : TripAccessRole.MEMBER,
 			row.itineraryVersion(),
+			row.startDate(),
+			row.endDate(),
 			row.createdAt() == null ? java.time.OffsetDateTime.now() : row.createdAt().atOffset(java.time.ZoneOffset.UTC)
 		);
 	}

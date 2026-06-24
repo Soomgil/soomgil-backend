@@ -2,6 +2,7 @@ package com.soomgil.trip.application.port;
 
 import com.soomgil.trip.domain.model.TripStatus;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.UUID;
 
 /**
@@ -16,6 +17,8 @@ public record TripReadModel(
 	String displayDestination,
 	TripStatus status,
 	long itineraryVersion,
+	LocalDate startDate,
+	LocalDate endDate,
 	Instant createdAt,
 	UUID retrippedFromPostId
 ) {

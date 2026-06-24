@@ -42,6 +42,8 @@ public class MyBatisTripCommandRepository implements TripCommandRepository {
 			trip.itineraryVersion(),
 			null,
 			null,
+			null,
+			null,
 			trip.createdAt(),
 			trip.createdAt(),
 			null
@@ -72,7 +74,7 @@ public class MyBatisTripCommandRepository implements TripCommandRepository {
 	) {
 		mapper.insertTrip(new TripRow(
 			trip.id(), trip.ownerUserId(), trip.title(), trip.displayDestination(), trip.status().name(),
-			trip.itineraryVersion(), sourcePostId, snapshotVersion, trip.createdAt(), trip.createdAt(), null
+			trip.itineraryVersion(), null, null, sourcePostId, snapshotVersion, trip.createdAt(), trip.createdAt(), null
 		));
 		mapper.insertTripMember(new TripMemberRow(
 			initialMember.id(), initialMember.tripId(), initialMember.userId(), initialMember.role().name(),

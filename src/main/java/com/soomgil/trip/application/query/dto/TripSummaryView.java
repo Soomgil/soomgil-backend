@@ -3,6 +3,7 @@ package com.soomgil.trip.application.query.dto;
 import com.soomgil.trip.domain.model.TripAccessRole;
 import com.soomgil.trip.domain.model.TripStatus;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.UUID;
 
 /**
@@ -17,6 +18,8 @@ public record TripSummaryView(
 	TripStatus status,
 	TripAccessRole myRole,
 	long itineraryVersion,
+	LocalDate startDate,
+	LocalDate endDate,
 	Instant createdAt
 ) {
 }

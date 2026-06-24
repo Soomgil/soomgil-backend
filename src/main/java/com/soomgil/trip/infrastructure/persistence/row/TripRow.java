@@ -1,6 +1,7 @@
 package com.soomgil.trip.infrastructure.persistence.row;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.UUID;
 
 /**
@@ -16,6 +17,8 @@ public record TripRow(
 	String displayDestination,
 	String status,
 	long itineraryVersion,
+	LocalDate startDate,
+	LocalDate endDate,
 	UUID retrippedFromPostId,
 	Integer retrippedFromSnapshotVersion,
 	Instant createdAt,

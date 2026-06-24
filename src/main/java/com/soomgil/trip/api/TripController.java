@@ -298,6 +298,8 @@ public class TripController extends ApiControllerSupport {
 			TripStatus.valueOf(view.status().name()),
 			TripAccessRole.valueOf(view.myRole().name()),
 			view.itineraryVersion(),
+			view.startDate(),
+			view.endDate(),
 			OffsetDateTime.ofInstant(view.createdAt(), ZoneOffset.UTC)
 		);
 	}
@@ -385,4 +387,3 @@ public class TripController extends ApiControllerSupport {
 		return status == null ? null : com.soomgil.trip.domain.model.InviteStatus.valueOf(status.name());
 	}
 }
-

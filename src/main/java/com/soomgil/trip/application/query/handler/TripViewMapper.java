@@ -24,6 +24,8 @@ final class TripViewMapper {
 			trip.status(),
 			accessRole(trip.ownerUserId(), userId),
 			trip.itineraryVersion(),
+			trip.startDate(),
+			trip.endDate(),
 			trip.createdAt()
 		);
 	}
