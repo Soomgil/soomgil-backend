@@ -7,20 +7,29 @@ import com.soomgil.preference.application.command.dto.SavePlaceTagCandidateComma
 import com.soomgil.preference.application.service.PlaceTagExtractor;
 import com.soomgil.preference.infrastructure.persistence.row.SelectablePreferenceTagRow;
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.http.MediaType;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
+/**
+ * KTO 장소 텍스트와 사진을 Gemini로 분류해 preference 태그 후보를 생성한다.
+ *
+ * <p>외부 이미지 원본은 GMS gateway 요청 제한에 맞게 축소·압축하며,
+ * 디코딩 또는 압축에 실패한 이미지는 제외하고 나머지 입력으로 분석을 계속한다.
+ */
 @Component
 public class SpringAiPlaceTagExtractor implements PlaceTagExtractor {
 
+	private static final int MAX_IMAGES = 1;
+	private static final int MAX_TOTAL_IMAGE_BYTES = 80 * 1024;
+	private static final int MAX_SOURCE_IMAGE_BYTES = 5 * 1024 * 1024;
 	private static final String SYSTEM_PROMPT = """
 		당신은 한국 여행 장소의 취향 태그 분류기입니다.
 		제공된 장소 텍스트와 사진을 함께 보고 허용된 태그 코드만 선택하세요.
@@ -29,10 +38,12 @@ public class SpringAiPlaceTagExtractor implements PlaceTagExtractor {
 		""";
 	private final ObjectProvider<ChatModel> chatModelProvider;
 	private final RestClient restClient;
+	private final GeminiImagePreprocessor imagePreprocessor;
 
 	public SpringAiPlaceTagExtractor(ObjectProvider<ChatModel> chatModelProvider) {
 		this.chatModelProvider = chatModelProvider;
 		this.restClient = RestClient.builder().build();
+		this.imagePreprocessor = new GeminiImagePreprocessor();
 	}
 
 	@Override
@@ -55,13 +66,12 @@ public class SpringAiPlaceTagExtractor implements PlaceTagExtractor {
 			설명: %s
 			허용 태그: %s
 			""".formatted(place.name(), place.category(), place.address(), place.description(), dictionary);
-		List<ImageInput> images = place.photos().stream().limit(3)
-			.map(this::downloadImage).filter(java.util.Objects::nonNull).toList();
+		List<GeminiImagePreprocessor.PreparedImage> images = downloadImages(place.photos());
 		ExtractionResponse response = ChatClient.create(model).prompt()
 			.system(SYSTEM_PROMPT)
 			.user(user -> {
 				user.text(prompt);
-				images.forEach(image -> user.media(image.mediaType(), image.resource()));
+				images.forEach(image -> user.media(image.mediaType(), new ByteArrayResource(image.bytes())));
 			})
 			.call()
 			.entity(ExtractionResponse.class);
@@ -82,25 +92,35 @@ public class SpringAiPlaceTagExtractor implements PlaceTagExtractor {
 		return value.max(BigDecimal.ZERO).min(BigDecimal.ONE).setScale(4, java.math.RoundingMode.HALF_UP);
 	}
 
-	private ImageInput downloadImage(String value) {
+	private List<GeminiImagePreprocessor.PreparedImage> downloadImages(List<String> urls) {
+		List<GeminiImagePreprocessor.PreparedImage> images = new ArrayList<>();
+		int totalBytes = 0;
+		for (String url : urls) {
+			if (images.size() >= MAX_IMAGES) {
+				break;
+			}
+			GeminiImagePreprocessor.PreparedImage image = downloadImage(url);
+			if (image == null || totalBytes + image.bytes().length > MAX_TOTAL_IMAGE_BYTES) {
+				continue;
+			}
+			images.add(image);
+			totalBytes += image.bytes().length;
+		}
+		return List.copyOf(images);
+	}
+
+	private GeminiImagePreprocessor.PreparedImage downloadImage(String value) {
 		try {
 			var response = restClient.get().uri(value).retrieve().toEntity(byte[].class);
 			byte[] body = response.getBody();
-			if (body == null || body.length == 0 || body.length > 5 * 1024 * 1024) {
+			if (body == null || body.length == 0 || body.length > MAX_SOURCE_IMAGE_BYTES) {
 				return null;
 			}
-			MediaType mediaType = response.getHeaders().getContentType();
-			if (mediaType == null || !"image".equals(mediaType.getType())) {
-				mediaType = MediaType.IMAGE_JPEG;
-			}
-			return new ImageInput(mediaType, new ByteArrayResource(body));
+			return imagePreprocessor.prepare(body).orElse(null);
 		}
 		catch (RuntimeException exception) {
 			return null;
 		}
-	}
-
-	private record ImageInput(MediaType mediaType, ByteArrayResource resource) {
 	}
 
 	public record ExtractionResponse(List<ExtractedTag> tags) {
