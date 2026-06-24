@@ -630,6 +630,25 @@ SELECT record_id,
 FROM portrait_targets
 ON CONFLICT (record_entry_id, media_file_id) DO UPDATE SET caption = EXCLUDED.caption;
 
+WITH ranked_portraits AS (
+  SELECT rm.record_entry_id,
+         rm.media_file_id,
+         row_number() OVER (ORDER BY m.object_key, rm.media_file_id) AS rn
+  FROM record.trip_record_media rm
+  JOIN record.trip_record_entries r ON r.id = rm.record_entry_id
+  JOIN media.media_files m ON m.id = rm.media_file_id
+  JOIN auth.user_email_addresses e ON e.user_id = r.uploaded_by_user_id
+  WHERE e.normalized_email = 'demo01@soomgil.local'
+    AND m.object_key LIKE 'demo/records/%/portrait%.jpg'
+    AND m.height > m.width
+    AND m.status = 'ACTIVE'
+)
+DELETE FROM record.trip_record_media rm
+USING ranked_portraits rp
+WHERE rp.record_entry_id = rm.record_entry_id
+  AND rp.media_file_id = rm.media_file_id
+  AND rp.rn > 5;
+
 -- Move one repeated landscape record photo to a fresh object key for cache-safe replacement.
 UPDATE media.media_files
 SET object_key = 'demo/records/babfeef3-afc7-faa3-2a4a-7b4d8f494a52/cover-v2.jpg',
