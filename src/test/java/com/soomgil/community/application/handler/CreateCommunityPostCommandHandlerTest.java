@@ -58,7 +58,7 @@ class CreateCommunityPostCommandHandlerTest {
 		UUID tripId = UUID.randomUUID();
 		UUID postId = UUID.randomUUID();
 
-		CommunityPostSnapshot snapshot = new CommunityPostSnapshot(List.of(), List.of(), null);
+		CommunityPostSnapshot snapshot = new CommunityPostSnapshot(List.of(), List.of(), List.of(), List.of(), null);
 		when(tripSnapshotChecker.fetchSnapshot(eq(tripId), eq(1L), eq(publisherId))).thenReturn(snapshot);
 		when(snapshotCodec.encode(snapshot)).thenReturn("{\"days\":[]}");
 		when(postMapper.findById(any(UUID.class)))
@@ -88,7 +88,7 @@ class CreateCommunityPostCommandHandlerTest {
 		UUID postId = UUID.randomUUID();
 
 		when(tripSnapshotChecker.fetchSnapshot(eq(tripId), eq(1L), eq(publisherId)))
-			.thenReturn(new CommunityPostSnapshot(List.of(), List.of(), null));
+			.thenReturn(new CommunityPostSnapshot(List.of(), List.of(), List.of(), List.of(), null));
 		when(snapshotCodec.encode(any())).thenReturn("{\"days\":[]}");
 		when(shareTokenService.issue())
 			.thenReturn(new ShareTokenService.IssuedShareToken("raw-token", "hashed-token"));
@@ -132,7 +132,7 @@ class CreateCommunityPostCommandHandlerTest {
 		UUID hashtagId = UUID.randomUUID();
 
 		when(tripSnapshotChecker.fetchSnapshot(any(), eq(1L), any()))
-			.thenReturn(new CommunityPostSnapshot(List.of(), List.of(), null));
+			.thenReturn(new CommunityPostSnapshot(List.of(), List.of(), List.of(), List.of(), null));
 		when(snapshotCodec.encode(any())).thenReturn("{\"days\":[]}");
 		when(hashtagMapper.findByNormalizedName(eq("부산맛집")))
 			.thenReturn(Optional.of(new HashtagRecord(hashtagId, "부산맛집", "부산맛집", 0, Instant.now(), Instant.now())));
@@ -168,7 +168,7 @@ class CreateCommunityPostCommandHandlerTest {
 			PostVisibility.PUBLIC, "title", "summary",
 			List.of(), 0, 0, 0, 0, false,
 			ModerationStatus.VISIBLE, OffsetDateTime.now(), 1,
-			new CommunityPostSnapshot(List.of(), List.of(), null),
+			new CommunityPostSnapshot(List.of(), List.of(), List.of(), List.of(), null),
 			List.of(), null, null, null, null
 		);
 	}

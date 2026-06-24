@@ -2,6 +2,8 @@ package com.soomgil.community.api.dto;
 
 import com.soomgil.itinerary.api.dto.ItineraryDay;
 import com.soomgil.itinerary.api.dto.RouteSegment;
+import com.soomgil.planning.api.dto.Checklist;
+import com.soomgil.planning.api.dto.Note;
 import com.soomgil.user.api.dto.UserSummary;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -14,6 +16,8 @@ import java.util.List;
  *
  * @param days 일자별 일정 목록
  * @param routes 구간별 경로 세그먼트 목록
+ * @param notes 여행방/일차 메모 목록
+ * @param checklists 여행방/일차 TODO 목록
  * @param authorDisplay snapshot에 표시되는 발행자 정보
  */
 public record CommunityPostSnapshot(
@@ -22,6 +26,16 @@ public record CommunityPostSnapshot(
 	@Valid
 	List<RouteSegment> routes,
 	@Valid
+	List<Note> notes,
+	@Valid
+	List<Checklist> checklists,
+	@Valid
 	UserSummary authorDisplay
 ) {
+	public CommunityPostSnapshot {
+		days = days == null ? List.of() : List.copyOf(days);
+		routes = routes == null ? List.of() : List.copyOf(routes);
+		notes = notes == null ? List.of() : List.copyOf(notes);
+		checklists = checklists == null ? List.of() : List.copyOf(checklists);
+	}
 }

@@ -92,7 +92,7 @@ public class CommunityPostAssembler {
 
 		CommunityPostSnapshot snapshot = includeSnapshot
 			? snapshotCodec.decode(post.snapshotJson())
-			: new CommunityPostSnapshot(List.of(), List.of(), null);
+			: new CommunityPostSnapshot(List.of(), List.of(), List.of(), List.of(), null);
 
 		return new CommunityPostDetail(
 			post.id(),

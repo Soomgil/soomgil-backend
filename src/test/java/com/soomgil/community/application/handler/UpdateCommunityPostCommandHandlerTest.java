@@ -138,7 +138,7 @@ class UpdateCommunityPostCommandHandlerTest {
 			PostVisibility.PUBLIC, "title", "summary",
 			List.of(), 0, 0, 0, 0, false,
 			ModerationStatus.VISIBLE, OffsetDateTime.now(), 1,
-			new CommunityPostSnapshot(List.of(), List.of(), null),
+			new CommunityPostSnapshot(List.of(), List.of(), List.of(), List.of(), null),
 			List.of(), null, null, null, null
 		);
 	}

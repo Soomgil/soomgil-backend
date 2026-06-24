@@ -1,5 +1,6 @@
 package com.soomgil.itinerary.api.dto;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import com.soomgil.place.api.dto.PlaceRef;
 import com.soomgil.place.api.dto.PlaceSourceStatus;
 import jakarta.validation.Valid;
@@ -18,6 +19,7 @@ public record ItineraryItem(
 	@NotNull
 	ItineraryItemType itemType,
 	@Valid
+	@JsonAlias("placeRef")
 	PlaceRef place,
 	@NotBlank
 	String placeName,

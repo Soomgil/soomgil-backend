@@ -18,6 +18,12 @@ import com.soomgil.itinerary.domain.model.GeometryFormat;
 import com.soomgil.itinerary.domain.model.ItineraryDayGroupType;
 import com.soomgil.itinerary.domain.model.ItineraryItemType;
 import com.soomgil.itinerary.domain.model.RouteMode;
+import com.soomgil.planning.api.dto.Checklist;
+import com.soomgil.planning.api.dto.Note;
+import com.soomgil.planning.api.dto.PlanningScopeType;
+import com.soomgil.planning.infrastructure.persistence.mapper.ChecklistItemMapper;
+import com.soomgil.planning.infrastructure.persistence.mapper.ChecklistMapper;
+import com.soomgil.planning.infrastructure.persistence.mapper.NoteMapper;
 import com.soomgil.trip.api.dto.TripAccessRole;
 import com.soomgil.trip.api.dto.TripDetail;
 import com.soomgil.trip.api.dto.TripMemberRole;
@@ -46,6 +52,9 @@ public class RetripCommunityPostService {
 	private final PostRetripMapper retripMapper;
 	private final TripCommandRepository tripRepository;
 	private final ItineraryCommandRepository itineraryRepository;
+	private final NoteMapper noteMapper;
+	private final ChecklistMapper checklistMapper;
+	private final ChecklistItemMapper checklistItemMapper;
 	private final CommunityPostSnapshotCodec snapshotCodec;
 	private final ObjectMapper objectMapper;
 	private final FindDisplayNameQueryHandler displayNameHandler;
@@ -55,6 +64,9 @@ public class RetripCommunityPostService {
 		PostRetripMapper retripMapper,
 		TripCommandRepository tripRepository,
 		ItineraryCommandRepository itineraryRepository,
+		NoteMapper noteMapper,
+		ChecklistMapper checklistMapper,
+		ChecklistItemMapper checklistItemMapper,
 		CommunityPostSnapshotCodec snapshotCodec,
 		ObjectMapper objectMapper,
 		FindDisplayNameQueryHandler displayNameHandler
@@ -63,6 +75,9 @@ public class RetripCommunityPostService {
 		this.retripMapper = Objects.requireNonNull(retripMapper, "retripMapper must not be null");
 		this.tripRepository = Objects.requireNonNull(tripRepository, "tripRepository must not be null");
 		this.itineraryRepository = Objects.requireNonNull(itineraryRepository, "itineraryRepository must not be null");
+		this.noteMapper = Objects.requireNonNull(noteMapper, "noteMapper must not be null");
+		this.checklistMapper = Objects.requireNonNull(checklistMapper, "checklistMapper must not be null");
+		this.checklistItemMapper = Objects.requireNonNull(checklistItemMapper, "checklistItemMapper must not be null");
 		this.snapshotCodec = Objects.requireNonNull(snapshotCodec, "snapshotCodec must not be null");
 		this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper must not be null");
 		this.displayNameHandler = Objects.requireNonNull(displayNameHandler, "displayNameHandler must not be null");
@@ -108,8 +123,10 @@ public class RetripCommunityPostService {
 
 	private boolean copyItinerary(CommunityPostSnapshot snapshot, UUID tripId, UUID userId, Instant now) {
 		Map<UUID, UUID> itemIds = new HashMap<>();
+		Map<UUID, UUID> dayIds = new HashMap<>();
 		for (var day : snapshot.days()) {
 			UUID dayId = UUID.randomUUID();
+			dayIds.put(day.id(), dayId);
 			itineraryRepository.insertDay(new ItineraryDayCreate(
 				dayId, tripId, ItineraryDayGroupType.valueOf(day.groupType().name()), day.dayNumber(),
 				day.date(), day.title(), day.sortOrder(), now, now
@@ -140,7 +157,51 @@ public class RetripCommunityPostService {
 				userId, userId, now, now
 			));
 		}
-		return !snapshot.days().isEmpty() || !snapshot.routes().isEmpty();
+		copyNotes(snapshot.notes(), dayIds, tripId, userId, now);
+		copyChecklists(snapshot.checklists(), dayIds, tripId, userId, now);
+		return !snapshot.days().isEmpty()
+			|| !snapshot.routes().isEmpty()
+			|| !snapshot.notes().isEmpty()
+			|| !snapshot.checklists().isEmpty();
+	}
+
+	private void copyNotes(List<Note> notes, Map<UUID, UUID> dayIds, UUID tripId, UUID userId, Instant now) {
+		for (Note note : notes) {
+			UUID itineraryDayId = remapDayId(note.scopeType(), note.itineraryDayId(), dayIds);
+			noteMapper.insert(UUID.randomUUID(), tripId, note.scopeType(), itineraryDayId, note.content(), userId, now);
+		}
+	}
+
+	private void copyChecklists(
+		List<Checklist> checklists,
+		Map<UUID, UUID> dayIds,
+		UUID tripId,
+		UUID userId,
+		Instant now
+	) {
+		for (Checklist checklist : checklists) {
+			UUID itineraryDayId = remapDayId(checklist.scopeType(), checklist.itineraryDayId(), dayIds);
+			UUID checklistId = UUID.randomUUID();
+			checklistMapper.insert(
+				checklistId, tripId, checklist.scopeType(), itineraryDayId, checklist.title(), userId, now
+			);
+			for (var item : checklist.items()) {
+				checklistItemMapper.insert(
+					UUID.randomUUID(), checklistId, item.sortOrder(), item.content(), userId, now
+				);
+			}
+		}
+	}
+
+	private UUID remapDayId(PlanningScopeType scopeType, UUID sourceDayId, Map<UUID, UUID> dayIds) {
+		if (scopeType == PlanningScopeType.TRIP) {
+			return null;
+		}
+		UUID newDayId = dayIds.get(sourceDayId);
+		if (newDayId == null) {
+			throw new IllegalStateException("Retrip planning data references a missing snapshot day.");
+		}
+		return newDayId;
 	}
 
 	private String json(Map<String, Object> geometry) {

@@ -19,8 +19,16 @@ import com.soomgil.itinerary.application.query.handler.FindItineraryHandler;
 import com.soomgil.place.api.dto.PlaceProvider;
 import com.soomgil.place.api.dto.PlaceRef;
 import com.soomgil.place.api.dto.PlaceSourceStatus;
+import com.soomgil.planning.api.dto.Note;
+import com.soomgil.planning.api.dto.PlanningScopeType;
+import com.soomgil.planning.application.handler.GetNoteQueryHandler;
+import com.soomgil.planning.application.handler.ListChecklistsQueryHandler;
+import com.soomgil.planning.application.query.GetNoteQuery;
+import com.soomgil.planning.application.query.ListChecklistsQuery;
 import com.soomgil.trip.application.query.handler.TripAccessGuard;
 import com.soomgil.user.api.dto.UserSummary;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
@@ -31,15 +39,21 @@ public class TripItinerarySnapshotChecker implements TripSnapshotChecker {
 
 	private final TripAccessGuard accessGuard;
 	private final FindItineraryHandler itineraryHandler;
+	private final GetNoteQueryHandler noteQueryHandler;
+	private final ListChecklistsQueryHandler checklistsQueryHandler;
 	private final FindDisplayNameQueryHandler displayNameHandler;
 
 	public TripItinerarySnapshotChecker(
 		TripAccessGuard accessGuard,
 		FindItineraryHandler itineraryHandler,
+		GetNoteQueryHandler noteQueryHandler,
+		ListChecklistsQueryHandler checklistsQueryHandler,
 		FindDisplayNameQueryHandler displayNameHandler
 	) {
 		this.accessGuard = Objects.requireNonNull(accessGuard, "accessGuard must not be null");
 		this.itineraryHandler = Objects.requireNonNull(itineraryHandler, "itineraryHandler must not be null");
+		this.noteQueryHandler = Objects.requireNonNull(noteQueryHandler, "noteQueryHandler must not be null");
+		this.checklistsQueryHandler = Objects.requireNonNull(checklistsQueryHandler, "checklistsQueryHandler must not be null");
 		this.displayNameHandler = Objects.requireNonNull(displayNameHandler, "displayNameHandler must not be null");
 	}
 
@@ -54,12 +68,27 @@ public class TripItinerarySnapshotChecker implements TripSnapshotChecker {
 		return new CommunityPostSnapshot(
 			itinerary.days().stream().map(this::toDay).toList(),
 			itinerary.routes().stream().map(this::toRoute).toList(),
+			findNotes(sourceTripId, itinerary.days(), publisherUserId),
+			checklistsQueryHandler.handle(new ListChecklistsQuery(sourceTripId, null, null, publisherUserId)),
 			new UserSummary(
 				publisherUserId,
 				displayNameHandler.handle(publisher),
 				displayNameHandler.findProfileImageUrl(publisher)
 			)
 		);
+	}
+
+	private List<Note> findNotes(UUID sourceTripId, List<ItineraryDayDetailView> days, UUID publisherUserId) {
+		List<Note> notes = new ArrayList<>();
+		noteQueryHandler.findOptional(new GetNoteQuery(
+			sourceTripId, PlanningScopeType.TRIP, null, publisherUserId
+		)).ifPresent(notes::add);
+		for (ItineraryDayDetailView day : days) {
+			noteQueryHandler.findOptional(new GetNoteQuery(
+				sourceTripId, PlanningScopeType.DAY, day.id(), publisherUserId
+			)).ifPresent(notes::add);
+		}
+		return notes;
 	}
 
 	private ItineraryDay toDay(ItineraryDayDetailView day) {
