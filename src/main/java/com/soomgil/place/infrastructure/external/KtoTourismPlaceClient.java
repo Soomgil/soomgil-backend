@@ -235,9 +235,6 @@ public class KtoTourismPlaceClient implements TourismPlaceFeedClient {
 	private URI buildDetailUri(String contentId) {
 		return commonUri("/detailCommon2")
 			.queryParam("contentId", contentId)
-			.queryParam("defaultYN", "Y")
-			.queryParam("firstImageYN", "Y")
-			.queryParam("overviewYN", "Y")
 			.build(true)
 			.toUri();
 	}
