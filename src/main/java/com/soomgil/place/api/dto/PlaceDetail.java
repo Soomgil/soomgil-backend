@@ -5,6 +5,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.net.URI;
 import java.time.OffsetDateTime;
+import java.util.List;
 
 public record PlaceDetail(
 	@NotNull
@@ -18,6 +19,7 @@ public record PlaceDetail(
 	Double lat,
 	Double lng,
 	URI thumbnailUrl,
+	List<URI> photos,
 	String category,
 	@NotNull
 	PlaceSourceStatus sourceStatus,

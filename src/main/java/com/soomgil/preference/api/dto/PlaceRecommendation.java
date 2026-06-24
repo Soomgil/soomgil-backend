@@ -15,6 +15,7 @@ public record PlaceRecommendation(
 	List<UserSummary> matchedMembers,
 	Integer rank,
 	Double distanceMeters,
-	String recommendationReason
+	String recommendationReason,
+	Integer matchPercentage
 ) {
 }

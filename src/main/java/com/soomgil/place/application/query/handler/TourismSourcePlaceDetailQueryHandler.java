@@ -30,6 +30,7 @@ public class TourismSourcePlaceDetailQueryHandler implements PlaceDetailQueryHan
 			item.lat(),
 			item.lng(),
 			item.thumbnailUrl(),
+			item.photos(),
 			item.category(),
 			item.sourceStatus(),
 			item.description(),

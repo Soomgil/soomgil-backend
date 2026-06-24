@@ -25,6 +25,7 @@ import com.soomgil.trip.application.query.handler.ListTripMembersHandler;
 import com.soomgil.trip.domain.model.TripMemberStatus;
 import com.soomgil.user.api.dto.UserSummary;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.net.URI;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
@@ -145,7 +146,7 @@ public class PreferenceListPlaceRecommendationsQueryHandler
 			.sorted(comparator(tab))
 			.toList();
 
-		return page(scored, query, tab);
+		return page(scored, query, tab, members.size());
 	}
 
 	private ScoredRecommendation score(
@@ -266,7 +267,8 @@ public class PreferenceListPlaceRecommendationsQueryHandler
 	private PagedPlaceRecommendation page(
 		List<ScoredRecommendation> scored,
 		ListPlaceRecommendationsQuery query,
-		RecommendationTab tab
+		RecommendationTab tab,
+		int memberCount
 	) {
 		long offset = (long) query.page() * query.size();
 		int fromIndex = (int) Math.min(offset, scored.size());
@@ -282,7 +284,8 @@ public class PreferenceListPlaceRecommendationsQueryHandler
 				matched,
 				index + 1,
 				item.distanceMeters(),
-				recommendationReason(tab, matched.size())
+				recommendationReason(tab, matched.size()),
+				matchPercentage(item.groupScore(), memberCount)
 			));
 		}
 
@@ -326,6 +329,22 @@ public class PreferenceListPlaceRecommendationsQueryHandler
 			return matchedMemberCount + "명의 취향과 잘 맞아요";
 		}
 		return "여행 멤버의 취향을 반영했어요";
+	}
+
+	private Integer matchPercentage(BigDecimal groupScore, int memberCount) {
+		if (memberCount <= 0 || groupScore == null) {
+			return null;
+		}
+		BigDecimal average = groupScore.divide(
+			BigDecimal.valueOf(memberCount),
+			6,
+			RoundingMode.HALF_UP
+		);
+		int percentage = average
+			.multiply(BigDecimal.valueOf(100))
+			.setScale(0, RoundingMode.HALF_UP)
+			.intValue();
+		return Math.max(0, Math.min(100, percentage));
 	}
 
 	private Double distanceMeters(Double centerLat, Double centerLng, Double lat, Double lng) {

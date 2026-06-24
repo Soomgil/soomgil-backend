@@ -6,6 +6,7 @@ import com.soomgil.place.api.dto.PlaceProvider;
 import com.soomgil.place.api.dto.PlaceSourceStatus;
 import com.soomgil.place.application.query.dto.PlaceDetailItem;
 import com.soomgil.place.application.query.dto.PlaceDetailQuery;
+import com.soomgil.place.application.query.dto.PlaceImageCandidateQuery;
 import com.soomgil.place.infrastructure.persistence.mapper.TourismSourcePlaceDetailMapper;
 import com.soomgil.place.infrastructure.persistence.row.TourismSourcePlaceDetailRow;
 import java.net.URI;
@@ -18,9 +19,14 @@ import org.springframework.stereotype.Repository;
 public class TourismSourcePlaceDetailRepository {
 
 	private final TourismSourcePlaceDetailMapper mapper;
+	private final TourismSourcePlaceImageRepository imageRepository;
 
-	public TourismSourcePlaceDetailRepository(TourismSourcePlaceDetailMapper mapper) {
+	public TourismSourcePlaceDetailRepository(
+		TourismSourcePlaceDetailMapper mapper,
+		TourismSourcePlaceImageRepository imageRepository
+	) {
 		this.mapper = mapper;
+		this.imageRepository = imageRepository;
 	}
 
 	/**
@@ -46,6 +52,11 @@ public class TourismSourcePlaceDetailRepository {
 			row.latitude(),
 			row.longitude(),
 			toUri(row.thumbnailUrl()),
+			imageRepository.findCandidates(new PlaceImageCandidateQuery(query.provider(), query.externalPlaceId()))
+				.stream()
+				.map(candidate -> candidate.publicUrl())
+				.distinct()
+				.toList(),
 			row.category(),
 			PlaceSourceStatus.AVAILABLE,
 			row.overview(),
