@@ -33,6 +33,16 @@ class RecommendationScorerTest {
 	}
 
 	@Test
+	void calculatesGroupConsensusScoreAsGeometricMeanOfMemberScores() {
+		BigDecimal consensusScore = scorer.calculateGroupConsensusScore(List.of(
+			new BigDecimal("1.000000"),
+			new BigDecimal("0.100000")
+		));
+
+		assertThat(consensusScore).isEqualByComparingTo("0.316228");
+	}
+
+	@Test
 	void matchesMembersWhenTheirScoreMeetsTheConfiguredThreshold() {
 		assertThat(scorer.isMatchedMember(new BigDecimal("0.149999"))).isFalse();
 		assertThat(scorer.isMatchedMember(new BigDecimal("0.150000"))).isTrue();

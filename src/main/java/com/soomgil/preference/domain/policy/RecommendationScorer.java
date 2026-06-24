@@ -5,7 +5,7 @@ import java.math.RoundingMode;
 import java.util.List;
 
 /**
- * 멤버별 장소 점수, 그룹 합계, matched member 여부를 계산한다.
+ * 멤버별 장소 점수, 그룹 합의 점수, matched member 여부를 계산한다.
  *
  * <p>멤버별 점수는 태그 선호도의 가중평균이라 {@code 0..1} 범위다.
  * matched threshold는 멤버별 장소 점수에 직접 적용한다.
@@ -54,6 +54,30 @@ public class RecommendationScorer {
 			score = score.add(memberScore);
 		}
 		return score.setScale(SCORE_SCALE, RoundingMode.HALF_UP);
+	}
+
+	public BigDecimal calculateGroupAverageScore(List<BigDecimal> memberScores) {
+		if (memberScores == null || memberScores.isEmpty()) {
+			return BigDecimal.ZERO.setScale(SCORE_SCALE, RoundingMode.HALF_UP);
+		}
+		return calculateGroupScore(memberScores)
+			.divide(BigDecimal.valueOf(memberScores.size()), SCORE_SCALE, RoundingMode.HALF_UP);
+	}
+
+	public BigDecimal calculateGroupConsensusScore(List<BigDecimal> memberScores) {
+		if (memberScores == null || memberScores.isEmpty()) {
+			return BigDecimal.ZERO.setScale(SCORE_SCALE, RoundingMode.HALF_UP);
+		}
+		double logSum = 0;
+		for (BigDecimal memberScore : memberScores) {
+			validateRate(memberScore, "memberScore");
+			if (memberScore.compareTo(BigDecimal.ZERO) == 0) {
+				return BigDecimal.ZERO.setScale(SCORE_SCALE, RoundingMode.HALF_UP);
+			}
+			logSum += Math.log(memberScore.doubleValue());
+		}
+		return BigDecimal.valueOf(Math.exp(logSum / memberScores.size()))
+			.setScale(SCORE_SCALE, RoundingMode.HALF_UP);
 	}
 
 	public boolean isMatchedMember(BigDecimal memberScore) {

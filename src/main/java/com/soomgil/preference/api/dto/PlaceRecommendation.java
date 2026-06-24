@@ -13,6 +13,8 @@ public record PlaceRecommendation(
 	@Valid
 	@NotNull
 	List<UserSummary> matchedMembers,
+	int matchedMemberCount,
+	int totalMemberCount,
 	Integer rank,
 	Double distanceMeters,
 	String recommendationReason,

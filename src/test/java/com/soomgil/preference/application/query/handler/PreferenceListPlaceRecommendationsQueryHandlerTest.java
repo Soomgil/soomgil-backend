@@ -117,6 +117,31 @@ class PreferenceListPlaceRecommendationsQueryHandlerTest {
 	}
 
 	@Test
+	void basicTabPrefersPlacesThatFitEveryMemberOverOneMemberDominatedPlaces() {
+		when(placeCandidatesHandler.handle(any())).thenReturn(List.of(
+			place("solo", "Solo Favorite"),
+			place("balanced", "Balanced Pick")
+		));
+		when(recommendationMapper.findScoreSources(any(), any())).thenReturn(List.of(
+			source("solo", "quiet", "1.00", "1.00", MEMBER_A_ID, "1.00", null),
+			source("solo", "quiet", "1.00", "1.00", MEMBER_B_ID, "0.10", null),
+			source("balanced", "quiet", "1.00", "1.00", MEMBER_A_ID, "0.60", null),
+			source("balanced", "quiet", "1.00", "1.00", MEMBER_B_ID, "0.60", null)
+		));
+
+		var result = handler.handle(query(RecommendationTab.BASIC));
+
+		assertThat(result.items()).extracting(item -> item.place().externalPlaceId())
+			.containsExactly("balanced", "solo");
+		assertThat(result.items().getFirst().matchedMemberCount()).isEqualTo(2);
+		assertThat(result.items().getFirst().totalMemberCount()).isEqualTo(2);
+		assertThat(result.items().getFirst().recommendationReason())
+			.isEqualTo("모든 여행 멤버의 취향과 잘 맞아요");
+		assertThat(result.items().getFirst().matchPercentage()).isEqualTo(60);
+		assertThat(result.items().get(1).matchPercentage()).isEqualTo(32);
+	}
+
+	@Test
 	void superLikeTabShowsOnlySuperLikedPlacesAndRanksByMemberCount() {
 		when(placeCandidatesHandler.handle(any())).thenReturn(List.of(
 			place("cafe", "Quiet Cafe"),

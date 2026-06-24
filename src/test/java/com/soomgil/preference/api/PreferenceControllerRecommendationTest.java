@@ -47,6 +47,8 @@ class PreferenceControllerRecommendationTest {
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.items[0].place.externalPlaceId").value("cafe"))
 			.andExpect(jsonPath("$.items[0].matchedMembers[0].displayName").value("여행 멤버"))
+			.andExpect(jsonPath("$.items[0].matchedMemberCount").value(1))
+			.andExpect(jsonPath("$.items[0].totalMemberCount").value(2))
 			.andExpect(jsonPath("$.items[0].score").doesNotExist())
 			.andExpect(jsonPath("$.page.page").value(1));
 
@@ -94,6 +96,8 @@ class PreferenceControllerRecommendationTest {
 						"여행 멤버",
 						null
 					)),
+					1,
+					2,
 					1,
 					0.0,
 					"여행 멤버의 취향과 잘 맞아요",
