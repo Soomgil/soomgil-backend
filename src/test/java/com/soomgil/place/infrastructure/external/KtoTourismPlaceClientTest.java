@@ -46,6 +46,25 @@ class KtoTourismPlaceClientTest {
 	}
 
 	@Test
+	void convertsKtoDetailResponseIntoStandaloneSavedPlaceData() throws Exception {
+		var detailBody = objectMapper.readTree("""
+			{"response":{"header":{"resultCode":"0000"},"body":{"items":{"item":[{
+			  "contentid":"3089161","title":"호텔컬리넌 제주","addr1":"제주특별자치도 제주시",
+			  "mapx":"126.531","mapy":"33.499","contenttypeid":"32",
+			  "firstimage":"https://img.example/jeju.jpg","overview":"제주 여행 숙소"
+			}]}}}}
+			""");
+
+		TourismPlaceFeedItem place = KtoTourismPlaceClient.parseDetailPlace(detailBody).orElseThrow();
+
+		assertThat(place.externalPlaceId()).isEqualTo("3089161");
+		assertThat(place.name()).isEqualTo("호텔컬리넌 제주");
+		assertThat(place.address()).isEqualTo("제주특별자치도 제주시");
+		assertThat(place.thumbnailUrl()).isEqualTo("https://img.example/jeju.jpg");
+		assertThat(place.category()).isEqualTo("숙박");
+	}
+
+	@Test
 	void usesKtoThumbnailOnlyWhenTheOriginalImageIsMissing() throws Exception {
 		var listBody = objectMapper.readTree("""
 			{"response":{"header":{"resultCode":"0000"},"body":{"items":{"item":[{

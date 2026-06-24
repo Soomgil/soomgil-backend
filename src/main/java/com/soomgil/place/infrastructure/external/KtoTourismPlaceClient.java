@@ -22,7 +22,9 @@ import java.util.concurrent.Executors;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -61,6 +63,7 @@ public class KtoTourismPlaceClient implements TourismPlaceFeedClient {
 	private final KtoAwardPhotoClient awardPhotoClient;
 	private final RestClient restClient;
 	private final ExecutorService detailExecutor;
+	private final Map<String, TourismPlaceFeedItem> detailPlaceCache = new ConcurrentHashMap<>();
 
 	public KtoTourismPlaceClient(
 		KtoTourismPlaceProperties properties,
@@ -115,6 +118,36 @@ public class KtoTourismPlaceClient implements TourismPlaceFeedClient {
 			detailExecutor
 		);
 		return mergeIntro(introTask.join(), barrierFreeTask.join());
+	}
+
+	@Override
+	public Optional<TourismPlaceFeedItem> fetchOne(String externalPlaceId) {
+		validateConfiguration();
+		if (externalPlaceId == null || externalPlaceId.isBlank()) {
+			return Optional.empty();
+		}
+		TourismPlaceFeedItem cached = detailPlaceCache.get(externalPlaceId);
+		if (cached != null) {
+			return Optional.of(cached);
+		}
+		try {
+			Optional<TourismPlaceFeedItem> parsed = parseDetailPlace(get(buildDetailUri(externalPlaceId)));
+			if (parsed.isEmpty()) {
+				return Optional.empty();
+			}
+			TourismPlaceFeedItem place = parsed.get();
+			TourismPlaceFeedItem enriched = withPhotos(
+				place,
+				awardPhotoClient.findBest(place.name()).orElse(null),
+				loadPhotosSafely(place)
+			);
+			detailPlaceCache.put(externalPlaceId, enriched);
+			return Optional.of(enriched);
+		}
+		catch (KtoTourismPlaceException exception) {
+			log.warn("KTO saved place detail failed for contentId={}", externalPlaceId, exception);
+			return Optional.empty();
+		}
 	}
 
 	private PlaceIntroRaw fetchIntroSafely(String contentId, String contentTypeId) {
@@ -337,6 +370,14 @@ public class KtoTourismPlaceClient implements TourismPlaceFeedClient {
 			photos,
 			newer(place.sourceModifiedAt(), modifiedAt(text(detail, "modifiedtime")))
 		);
+	}
+
+	static Optional<TourismPlaceFeedItem> parseDetailPlace(JsonNode response) {
+		List<TourismPlaceFeedItem> places = parseList(response);
+		if (places.isEmpty()) {
+			return Optional.empty();
+		}
+		return Optional.of(withDetail(places.getFirst(), response));
 	}
 
 	static List<String> parseDetailImages(JsonNode response) {
