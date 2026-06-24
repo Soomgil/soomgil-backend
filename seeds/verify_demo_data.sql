@@ -22,6 +22,7 @@ DECLARE
   demo_empty_trip_count integer;
   demo_empty_day_group_count integer;
   demo_incomplete_unscheduled_count integer;
+  oversized_demo_trip_count integer;
   demo_authored_post_count integer;
   missing_post_cover_count integer;
 BEGIN
@@ -165,6 +166,25 @@ BEGIN
   JOIN demo_user du ON du.user_id = p.published_by_user_id
   WHERE p.deleted_at IS NULL;
 
+  WITH demo_user AS (
+    SELECT user_id FROM auth.user_email_addresses
+    WHERE normalized_email = 'demo01@soomgil.local'
+  ), visible_trips AS (
+    SELECT t.id
+    FROM trip.trips t
+    JOIN trip.trip_members tm ON tm.trip_id = t.id AND tm.status = 'ACTIVE'
+    JOIN demo_user du ON du.user_id = tm.user_id
+    WHERE t.status != 'DELETED'
+  )
+  SELECT count(*) INTO oversized_demo_trip_count
+  FROM (
+    SELECT vt.id
+    FROM visible_trips vt
+    JOIN trip.trip_members tm ON tm.trip_id = vt.id AND tm.status = 'ACTIVE'
+    GROUP BY vt.id
+    HAVING count(*) > 8
+  ) oversized;
+
   SELECT count(*) INTO missing_demo_thumbnail_count
   FROM itinerary.itinerary_items i
   WHERE i.trip_id::text LIKE 'c0000000-%'
@@ -219,6 +239,9 @@ BEGIN
   END IF;
   IF demo_authored_post_count <> 2 THEN
     RAISE EXCEPTION 'Expected demo01 to have 2 authored posts, found %', demo_authored_post_count;
+  END IF;
+  IF oversized_demo_trip_count <> 0 THEN
+    RAISE EXCEPTION 'Found % demo01 trips with more than 8 active members', oversized_demo_trip_count;
   END IF;
   IF missing_post_cover_count <> 0 THEN
     RAISE EXCEPTION 'Found % public demo posts without cover media', missing_post_cover_count;

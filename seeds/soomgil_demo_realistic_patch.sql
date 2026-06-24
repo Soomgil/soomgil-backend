@@ -89,6 +89,25 @@ FROM demo_user du, visible_trips v
 WHERE tm.user_id = du.user_id
   AND tm.trip_id = v.trip_id;
 
+-- Legacy showcase trips keep their original small party plus demo01 only.
+WITH demo_users AS (
+  SELECT md5('demo-user:' || n)::uuid AS user_id
+  FROM generate_series(2, 120) n
+), visible_legacy_trips(trip_id) AS (
+  VALUES
+    ('c0000000-0000-4000-8000-000000000001'::uuid),
+    ('c0000000-0000-4000-8000-000000000002'::uuid),
+    ('c0000000-0000-4000-8000-000000000004'::uuid)
+)
+UPDATE trip.trip_members tm
+SET status = 'REMOVED',
+    left_at = now(),
+    removed_by_user_id = NULL
+FROM demo_users du, visible_legacy_trips vt
+WHERE tm.user_id = du.user_id
+  AND tm.trip_id = vt.trip_id
+  AND tm.status = 'ACTIVE';
+
 WITH visible_trips(trip_id, trip_status) AS (
   VALUES
     ('dee764a6-e8d4-dc6c-7766-b4e13a939ea4'::uuid, 'ACTIVE'),
