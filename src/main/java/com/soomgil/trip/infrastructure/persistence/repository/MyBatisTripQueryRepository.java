@@ -113,6 +113,8 @@ public class MyBatisTripQueryRepository implements TripQueryRepository {
 			row.displayDestination(),
 			TripStatus.valueOf(row.status()),
 			row.itineraryVersion(),
+			row.startDate(),
+			row.endDate(),
 			row.createdAt(),
 			row.retrippedFromPostId()
 		);

@@ -3,6 +3,7 @@ package com.soomgil.trip.api.dto;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.time.OffsetDateTime;
+import java.time.LocalDate;
 import java.util.UUID;
 
 public record TripSummary(
@@ -17,6 +18,8 @@ public record TripSummary(
 	TripAccessRole myRole,
 	@NotNull
 	Long itineraryVersion,
+	LocalDate startDate,
+	LocalDate endDate,
 	@NotNull
 	OffsetDateTime createdAt
 ) {

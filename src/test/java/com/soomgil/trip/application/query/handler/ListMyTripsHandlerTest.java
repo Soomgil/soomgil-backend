@@ -15,6 +15,7 @@ import com.soomgil.trip.domain.model.TripAccessRole;
 import com.soomgil.trip.domain.model.TripMemberStatus;
 import com.soomgil.trip.domain.model.TripStatus;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -46,6 +47,8 @@ class ListMyTripsHandlerTest {
 
 		assertThat(page.items()).hasSize(2);
 		assertThat(page.items().get(0).myRole()).isEqualTo(TripAccessRole.OWNER);
+		assertThat(page.items().get(0).startDate()).isEqualTo(LocalDate.of(2026, 7, 1));
+		assertThat(page.items().get(0).endDate()).isEqualTo(LocalDate.of(2026, 7, 4));
 		assertThat(page.items().get(1).myRole()).isEqualTo(TripAccessRole.MEMBER);
 		assertThat(page.totalElements()).isEqualTo(2);
 		assertThat(page.totalPages()).isEqualTo(1);
@@ -62,6 +65,8 @@ class ListMyTripsHandlerTest {
 			null,
 			TripStatus.ACTIVE,
 			0,
+			LocalDate.of(2026, 7, 1),
+			LocalDate.of(2026, 7, 4),
 			Instant.parse("2026-06-16T00:00:00Z"),
 			null
 		);

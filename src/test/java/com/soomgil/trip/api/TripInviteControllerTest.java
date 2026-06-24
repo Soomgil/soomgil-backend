@@ -154,6 +154,8 @@ class TripInviteControllerTest {
 				"서울",
 				TripStatus.ACTIVE,
 				0,
+				null,
+				null,
 				Instant.parse("2026-06-16T00:00:00Z"),
 				null
 			));

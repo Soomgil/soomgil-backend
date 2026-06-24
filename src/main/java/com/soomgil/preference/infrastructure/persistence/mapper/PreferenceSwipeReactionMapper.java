@@ -32,6 +32,19 @@ public interface PreferenceSwipeReactionMapper {
 
 	void insertEvent(UserSwipeEventInsertRow row);
 
+	void upsertSuperLikeSavedPlace(
+		@Param("id") String id,
+		@Param("userId") String userId,
+		@Param("provider") String provider,
+		@Param("externalPlaceId") String externalPlaceId
+	);
+
+	void removeSavedPlaceForNonSuperLike(
+		@Param("userId") String userId,
+		@Param("provider") String provider,
+		@Param("externalPlaceId") String externalPlaceId
+	);
+
 	List<PlaceTagEvidenceSourceRow> findLatestConfirmedTags(
 		@Param("provider") String provider,
 		@Param("externalPlaceId") String externalPlaceId
