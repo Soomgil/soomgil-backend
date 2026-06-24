@@ -38,8 +38,41 @@ class UpsertSwipeReactionCommandHandlerIntegrationTest {
 
 	@BeforeEach
 	void setUp() {
+		jdbcTemplate.update("DELETE FROM preference.user_saved_places");
 		jdbcTemplate.update("DELETE FROM preference.user_swipe_events");
 		jdbcTemplate.update("DELETE FROM preference.user_place_reactions");
+	}
+
+	@Test
+	void superLikeAutomaticallyAddsAndDowngradeRemovesMyPageSavedPlace() {
+		handler.handle(new UpsertSwipeReactionCommand(
+			PlaceProvider.KTO,
+			"126508",
+			SwipeReaction.SUPER_LIKE,
+			null
+		));
+
+		assertThat(activeSavedPlaceCount()).isEqualTo(1);
+
+		handler.handle(new UpsertSwipeReactionCommand(
+			PlaceProvider.KTO,
+			"126508",
+			SwipeReaction.LIKE,
+			null
+		));
+
+		assertThat(activeSavedPlaceCount()).isZero();
+	}
+
+	private Integer activeSavedPlaceCount() {
+		return jdbcTemplate.queryForObject("""
+			SELECT count(*)
+			FROM preference.user_saved_places
+			WHERE user_id = ?
+			  AND provider = 'KTO'
+			  AND external_place_id = '126508'
+			  AND deleted_at IS NULL
+			""", Integer.class, USER_ID);
 	}
 
 	@Test

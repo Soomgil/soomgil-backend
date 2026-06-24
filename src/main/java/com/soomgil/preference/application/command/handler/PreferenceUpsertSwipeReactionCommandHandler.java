@@ -106,6 +106,7 @@ public class PreferenceUpsertSwipeReactionCommandHandler implements UpsertSwipeR
 			currentEnrichmentId,
 			command.sourceModifiedAt()
 		));
+		synchronizeSavedPlace(userId, placeProvider, command.externalPlaceId(), command.reaction());
 		addCurrentEvidence(userId, reaction, currentEvidence);
 		recalculatePreferenceScores(userId, previousEvidence, currentEvidence);
 
@@ -115,6 +116,24 @@ public class PreferenceUpsertSwipeReactionCommandHandler implements UpsertSwipeR
 			command.reaction() == SwipeReaction.SUPER_LIKE,
 			OffsetDateTime.now()
 		);
+	}
+
+	private void synchronizeSavedPlace(
+		UUID userId,
+		String provider,
+		String externalPlaceId,
+		SwipeReaction reaction
+	) {
+		if (reaction == SwipeReaction.SUPER_LIKE) {
+			mapper.upsertSuperLikeSavedPlace(
+				Ids.newUuid().toString(),
+				userId.toString(),
+				provider,
+				externalPlaceId
+			);
+			return;
+		}
+		mapper.removeSavedPlaceForNonSuperLike(userId.toString(), provider, externalPlaceId);
 	}
 
 	private void removePreviousEvidence(

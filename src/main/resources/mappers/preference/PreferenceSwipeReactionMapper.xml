@@ -125,6 +125,34 @@
 		)
 	</insert>
 
+	<insert id="upsertSuperLikeSavedPlace">
+		INSERT INTO preference.user_saved_places (
+			id,
+			user_id,
+			provider,
+			external_place_id
+		)
+		VALUES (
+			CAST(#{id} AS uuid),
+			CAST(#{userId} AS uuid),
+			#{provider},
+			#{externalPlaceId}
+		)
+		ON CONFLICT (user_id, provider, external_place_id)
+		DO UPDATE SET
+			deleted_at = NULL,
+			created_at = now()
+	</insert>
+
+	<update id="removeSavedPlaceForNonSuperLike">
+		UPDATE preference.user_saved_places
+		SET deleted_at = now()
+		WHERE user_id = CAST(#{userId} AS uuid)
+			AND provider = #{provider}
+			AND external_place_id = #{externalPlaceId}
+			AND deleted_at IS NULL
+	</update>
+
 	<select id="findLatestConfirmedTags" resultMap="PlaceTagEvidenceSourceRowMap">
 		WITH latest_enrichment AS (
 			SELECT id
