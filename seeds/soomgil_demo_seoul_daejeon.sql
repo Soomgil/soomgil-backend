@@ -595,7 +595,12 @@ SELECT md5('demo-post-route:'||p.id||':'||r.id)::uuid,p.id,
        md5('demo-post-item:'||p.id||':'||r.origin_itinerary_item_id)::uuid,
        md5('demo-post-item:'||p.id||':'||r.destination_itinerary_item_id)::uuid,
        r.mode,r.geometry_format,r.geometry,r.distance_meters,r.duration_seconds
-FROM community.posts p JOIN itinerary.trip_routes r ON r.trip_id=p.source_trip_id AND r.deleted_at IS NULL
+FROM community.posts p
+JOIN itinerary.trip_routes r ON r.trip_id=p.source_trip_id AND r.deleted_at IS NULL
+JOIN community.post_snapshot_items origin_item
+  ON origin_item.id = md5('demo-post-item:'||p.id||':'||r.origin_itinerary_item_id)::uuid
+JOIN community.post_snapshot_items destination_item
+  ON destination_item.id = md5('demo-post-item:'||p.id||':'||r.destination_itinerary_item_id)::uuid
 WHERE p.id IN (SELECT md5('demo-post:'||k)::uuid FROM (VALUES ('palace-post'),('night-post'),('seongsu-post'),
  ('science-post'),('bread-post'),('green-post'),('modern-post'),('family-post'),('autumn-post')) x(k))
 ON CONFLICT (id) DO NOTHING;
@@ -1002,6 +1007,7 @@ WITH ranked AS (
  SELECT i.*,row_number()OVER(PARTITION BY i.trip_id ORDER BY d.sort_order,i.sort_order)rn,d.date,
   t.owner_user_id FROM itinerary.itinerary_items i JOIN itinerary.itinerary_days d ON d.id=i.itinerary_day_id
  JOIN trip.trips t ON t.id=i.trip_id WHERE i.trip_id IN(SELECT md5('demo-bulk-trip:'||g)::uuid FROM generate_series(1,50)g)
+ AND d.group_type = 'DAY' AND d.date IS NOT NULL
 )
 INSERT INTO record.trip_record_entries
  (id,trip_id,itinerary_day_id,itinerary_item_id,uploaded_by_user_id,title,caption,location_name,lat,lng,
@@ -1184,6 +1190,7 @@ SELECT 'users' AS dataset, count(*) AS rows FROM auth.users WHERE id IN (SELECT 
 UNION ALL SELECT 'places',count(*) FROM tourism_source.attractions WHERE content_id BETWEEN 10001 AND 10040 OR content_id BETWEEN 20001 AND 20028
 UNION ALL SELECT 'trips',count(*) FROM trip.trips WHERE display_destination LIKE '서울%' OR display_destination LIKE '대전%'
 UNION ALL SELECT 'itinerary_items',count(*) FROM itinerary.itinerary_items WHERE place_provider='KTO' AND
+ external_place_id ~ '^[0-9]+$' AND
  (external_place_id::int BETWEEN 10001 AND 10040 OR external_place_id::int BETWEEN 20001 AND 20028)
 UNION ALL SELECT 'records',count(*) FROM record.trip_record_entries WHERE id IN (
  SELECT md5('demo-record:'||i.id)::uuid FROM itinerary.itinerary_items i UNION ALL
