@@ -16,6 +16,13 @@ DECLARE
   empty_demo_trip_count integer;
   missing_demo_thumbnail_count integer;
   missing_record_photo_count integer;
+  portrait_record_photo_count integer;
+  demo_active_trip_count integer;
+  demo_archived_trip_count integer;
+  demo_empty_trip_count integer;
+  demo_empty_day_group_count integer;
+  demo_incomplete_unscheduled_count integer;
+  demo_authored_post_count integer;
   missing_post_cover_count integer;
 BEGIN
   SELECT count(*), count(DISTINCT bio)
@@ -98,7 +105,65 @@ BEGIN
   JOIN record.trip_record_entries r ON r.id = rm.record_entry_id
   JOIN media.media_files m ON m.id = rm.media_file_id
   WHERE r.status = 'ACTIVE'
+    AND m.object_key LIKE 'demo/%'
     AND (m.public_url IS NULL OR m.public_url LIKE 'https://cdn.soomgil.test/%');
+
+  SELECT count(*) INTO portrait_record_photo_count
+  FROM record.trip_record_media rm
+  JOIN record.trip_record_entries r ON r.id = rm.record_entry_id
+  JOIN media.media_files m ON m.id = rm.media_file_id
+  JOIN auth.user_email_addresses e ON e.user_id = r.uploaded_by_user_id
+  WHERE e.normalized_email = 'demo01@soomgil.local'
+    AND m.object_key LIKE 'demo/records/%/portrait%.jpg'
+    AND m.height > m.width
+    AND m.status = 'ACTIVE';
+
+  WITH demo_user AS (
+    SELECT user_id FROM auth.user_email_addresses
+    WHERE normalized_email = 'demo01@soomgil.local'
+  )
+  SELECT count(*) FILTER (WHERE t.status = 'ACTIVE'),
+         count(*) FILTER (WHERE t.status = 'ARCHIVED'),
+         count(*) FILTER (WHERE NOT EXISTS (
+           SELECT 1 FROM itinerary.itinerary_items i
+           WHERE i.trip_id = t.id AND i.deleted_at IS NULL
+         ))
+  INTO demo_active_trip_count, demo_archived_trip_count, demo_empty_trip_count
+  FROM trip.trips t
+  JOIN trip.trip_members tm ON tm.trip_id = t.id AND tm.status = 'ACTIVE'
+  JOIN demo_user du ON du.user_id = tm.user_id
+  WHERE t.status != 'DELETED';
+
+  WITH demo_user AS (
+    SELECT user_id FROM auth.user_email_addresses
+    WHERE normalized_email = 'demo01@soomgil.local'
+  ), visible_trips AS (
+    SELECT t.id
+    FROM trip.trips t
+    JOIN trip.trip_members tm ON tm.trip_id = t.id AND tm.status = 'ACTIVE'
+    JOIN demo_user du ON du.user_id = tm.user_id
+    WHERE t.status != 'DELETED'
+  )
+  SELECT count(*) FILTER (WHERE item_count = 0),
+         count(*) FILTER (WHERE group_type = 'UNSCHEDULED' AND item_count < 2)
+  INTO demo_empty_day_group_count, demo_incomplete_unscheduled_count
+  FROM (
+    SELECT d.id, d.group_type,
+           count(i.id) FILTER (WHERE i.deleted_at IS NULL) AS item_count
+    FROM itinerary.itinerary_days d
+    JOIN visible_trips vt ON vt.id = d.trip_id
+    LEFT JOIN itinerary.itinerary_items i ON i.itinerary_day_id = d.id
+    GROUP BY d.id, d.group_type
+  ) groups;
+
+  WITH demo_user AS (
+    SELECT user_id FROM auth.user_email_addresses
+    WHERE normalized_email = 'demo01@soomgil.local'
+  )
+  SELECT count(*) INTO demo_authored_post_count
+  FROM community.posts p
+  JOIN demo_user du ON du.user_id = p.published_by_user_id
+  WHERE p.deleted_at IS NULL;
 
   SELECT count(*) INTO missing_demo_thumbnail_count
   FROM itinerary.itinerary_items i
@@ -140,6 +205,20 @@ BEGIN
   END IF;
   IF missing_record_photo_count <> 0 THEN
     RAISE EXCEPTION 'Found % record photos without a usable CloudFront URL', missing_record_photo_count;
+  END IF;
+  IF portrait_record_photo_count <> 5 THEN
+    RAISE EXCEPTION 'Expected 5 portrait record photos for demo01, found %', portrait_record_photo_count;
+  END IF;
+  IF demo_active_trip_count <> 3 OR demo_archived_trip_count <> 1 OR demo_empty_trip_count <> 0 THEN
+    RAISE EXCEPTION 'Expected demo01 to have 3 active and 1 archived non-empty trips, found %, %, % empty',
+      demo_active_trip_count, demo_archived_trip_count, demo_empty_trip_count;
+  END IF;
+  IF demo_empty_day_group_count <> 0 OR demo_incomplete_unscheduled_count <> 0 THEN
+    RAISE EXCEPTION 'Expected every demo01 day group to contain places and every unscheduled group to contain 2, found % empty and % incomplete',
+      demo_empty_day_group_count, demo_incomplete_unscheduled_count;
+  END IF;
+  IF demo_authored_post_count <> 2 THEN
+    RAISE EXCEPTION 'Expected demo01 to have 2 authored posts, found %', demo_authored_post_count;
   END IF;
   IF missing_post_cover_count <> 0 THEN
     RAISE EXCEPTION 'Found % public demo posts without cover media', missing_post_cover_count;

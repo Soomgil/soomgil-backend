@@ -56,6 +56,161 @@ SET display_name = styles.arr[1 + (((n - 21) / 30)::int % 4)] || ' ' ||
 FROM generate_series(21, 120) n CROSS JOIN names CROSS JOIN styles
 WHERE p.user_id = md5('demo-user:' || n)::uuid;
 
+-- Keep demo01's dashboard focused: three active trips and one archived trip.
+WITH demo_user AS (
+  SELECT user_id
+  FROM auth.user_email_addresses
+  WHERE normalized_email = 'demo01@soomgil.local'
+)
+UPDATE trip.trip_members tm
+SET status = 'REMOVED',
+    left_at = now(),
+    removed_by_user_id = NULL
+FROM demo_user du
+WHERE tm.user_id = du.user_id
+  AND tm.status != 'REMOVED';
+
+WITH demo_user AS (
+  SELECT user_id
+  FROM auth.user_email_addresses
+  WHERE normalized_email = 'demo01@soomgil.local'
+), visible_trips(trip_id) AS (
+  VALUES
+    ('dee764a6-e8d4-dc6c-7766-b4e13a939ea4'::uuid),
+    ('c0000000-0000-4000-8000-000000000001'::uuid),
+    ('c0000000-0000-4000-8000-000000000002'::uuid),
+    ('c0000000-0000-4000-8000-000000000004'::uuid)
+)
+UPDATE trip.trip_members tm
+SET status = 'ACTIVE',
+    left_at = NULL,
+    removed_by_user_id = NULL
+FROM demo_user du, visible_trips v
+WHERE tm.user_id = du.user_id
+  AND tm.trip_id = v.trip_id;
+
+WITH visible_trips(trip_id, trip_status) AS (
+  VALUES
+    ('dee764a6-e8d4-dc6c-7766-b4e13a939ea4'::uuid, 'ACTIVE'),
+    ('c0000000-0000-4000-8000-000000000001'::uuid, 'ACTIVE'),
+    ('c0000000-0000-4000-8000-000000000002'::uuid, 'ACTIVE'),
+    ('c0000000-0000-4000-8000-000000000004'::uuid, 'ARCHIVED')
+)
+UPDATE trip.trips t
+SET status = v.trip_status,
+    updated_at = now()
+FROM visible_trips v
+WHERE t.id = v.trip_id;
+
+-- Every visible demo01 trip has populated day groups and two concrete unscheduled options.
+WITH visible_trips(trip_id, next_sort_order) AS (
+  VALUES
+    ('dee764a6-e8d4-dc6c-7766-b4e13a939ea4'::uuid, 3),
+    ('c0000000-0000-4000-8000-000000000001'::uuid, 4),
+    ('c0000000-0000-4000-8000-000000000002'::uuid, 3),
+    ('c0000000-0000-4000-8000-000000000004'::uuid, 3)
+)
+INSERT INTO itinerary.itinerary_days
+  (id, trip_id, group_type, day_number, date, title, sort_order, created_at, updated_at)
+SELECT md5('demo-dashboard-unscheduled-day:' || v.trip_id)::uuid,
+       v.trip_id, 'UNSCHEDULED', NULL, NULL, '미정', v.next_sort_order, now(), now()
+FROM visible_trips v
+WHERE NOT EXISTS (
+  SELECT 1 FROM itinerary.itinerary_days d
+  WHERE d.trip_id = v.trip_id AND d.group_type = 'UNSCHEDULED'
+);
+
+UPDATE itinerary.itinerary_days
+SET title = '미정', updated_at = now()
+WHERE group_type = 'UNSCHEDULED'
+  AND trip_id IN (
+    'dee764a6-e8d4-dc6c-7766-b4e13a939ea4'::uuid,
+    'c0000000-0000-4000-8000-000000000001'::uuid,
+    'c0000000-0000-4000-8000-000000000002'::uuid,
+    'c0000000-0000-4000-8000-000000000004'::uuid
+  );
+
+UPDATE itinerary.itinerary_items i
+SET deleted_at = now(), updated_at = now()
+FROM itinerary.itinerary_days d
+WHERE i.itinerary_day_id = d.id
+  AND i.deleted_at IS NULL
+  AND d.group_type = 'UNSCHEDULED'
+  AND d.trip_id IN (
+    'dee764a6-e8d4-dc6c-7766-b4e13a939ea4'::uuid,
+    'c0000000-0000-4000-8000-000000000001'::uuid,
+    'c0000000-0000-4000-8000-000000000002'::uuid,
+    'c0000000-0000-4000-8000-000000000004'::uuid
+  );
+
+WITH places(trip_id, sort_order, external_place_id, place_name, address, lat, lng) AS (
+  VALUES
+    ('dee764a6-e8d4-dc6c-7766-b4e13a939ea4'::uuid, 0, 'dashboard-seoul-forest', '서울숲', '서울특별시 성동구 뚝섬로 273', 37.5444000, 127.0374000),
+    ('dee764a6-e8d4-dc6c-7766-b4e13a939ea4'::uuid, 1, 'dashboard-seongsu-cafe', '성수동 카페거리', '서울특별시 성동구 성수동2가', 37.5446000, 127.0557000),
+    ('c0000000-0000-4000-8000-000000000001'::uuid, 0, 'dashboard-hyeopjae', '협재해수욕장', '제주특별자치도 제주시 한림읍 협재리', 33.3940000, 126.2397000),
+    ('c0000000-0000-4000-8000-000000000001'::uuid, 1, 'dashboard-camellia', '카멜리아힐', '제주특별자치도 서귀포시 안덕면 병악로 166', 33.2897000, 126.3689000),
+    ('c0000000-0000-4000-8000-000000000002'::uuid, 0, 'dashboard-songdo-cablecar', '송도해상케이블카', '부산광역시 서구 송도해변로 171', 35.0768000, 129.0239000),
+    ('c0000000-0000-4000-8000-000000000002'::uuid, 1, 'dashboard-huinnyeoul', '흰여울문화마을', '부산광역시 영도구 영선동4가 605-3', 35.0787000, 129.0443000),
+    ('c0000000-0000-4000-8000-000000000004'::uuid, 0, 'dashboard-donggung', '동궁과 월지', '경상북도 경주시 원화로 102', 35.8348000, 129.2266000),
+    ('c0000000-0000-4000-8000-000000000004'::uuid, 1, 'dashboard-hwangridan', '황리단길', '경상북도 경주시 포석로 일대', 35.8380000, 129.2090000)
+), unscheduled_days AS (
+  SELECT d.id, d.trip_id
+  FROM itinerary.itinerary_days d
+  WHERE d.group_type = 'UNSCHEDULED'
+)
+INSERT INTO itinerary.itinerary_items
+  (id, trip_id, itinerary_day_id, sort_order, item_type, place_provider,
+   external_place_id, place_name, address, lat, lng, thumbnail_url, source_status,
+   created_at, updated_at)
+SELECT md5('demo-dashboard-unscheduled-place:' || p.external_place_id)::uuid,
+       p.trip_id, d.id, p.sort_order, 'PLACE', 'KAKAO', p.external_place_id,
+       p.place_name, p.address, p.lat, p.lng,
+       'https://daobk0bynum21.cloudfront.net/demo/legacy-places/' ||
+         md5('KAKAO:' || p.external_place_id) || '/cover.jpg',
+       'AVAILABLE', now(), now()
+FROM places p
+JOIN unscheduled_days d ON d.trip_id = p.trip_id
+ON CONFLICT (id) DO UPDATE SET
+  itinerary_day_id = EXCLUDED.itinerary_day_id,
+  sort_order = EXCLUDED.sort_order,
+  place_name = EXCLUDED.place_name,
+  address = EXCLUDED.address,
+  lat = EXCLUDED.lat,
+  lng = EXCLUDED.lng,
+  thumbnail_url = EXCLUDED.thumbnail_url,
+  source_status = 'AVAILABLE',
+  deleted_at = NULL,
+  updated_at = now();
+
+-- Attribute two complete Seoul stories to demo01 without inflating the global post count.
+WITH demo_user AS (
+  SELECT user_id
+  FROM auth.user_email_addresses
+  WHERE normalized_email = 'demo01@soomgil.local'
+)
+UPDATE community.posts p
+SET published_by_user_id = du.user_id,
+    updated_at = now()
+FROM demo_user du
+WHERE p.id IN (
+  md5('demo-post:palace-post')::uuid,
+  md5('demo-post:night-post')::uuid
+);
+
+WITH demo_user AS (
+  SELECT user_id
+  FROM auth.user_email_addresses
+  WHERE normalized_email = 'demo01@soomgil.local'
+)
+UPDATE media.media_files m
+SET owner_user_id = du.user_id
+FROM demo_user du
+WHERE m.linked_resource_type = 'COMMUNITY_POST'
+  AND m.linked_resource_id IN (
+    md5('demo-post:palace-post')::uuid,
+    md5('demo-post:night-post')::uuid
+  );
+
 -- Replace generated bulk titles and summaries with context-aware, individually different writing.
 WITH post_context AS (
   SELECT g, p.id, p.source_trip_id, t.display_destination,
@@ -373,6 +528,82 @@ FROM record.trip_record_entries r
 WHERE rm.record_entry_id = r.id
   AND (r.id IN (SELECT md5('demo-record:' || i.id)::uuid FROM itinerary.itinerary_items i)
        OR r.id IN (SELECT md5('demo-bulk-record:' || i.id)::uuid FROM itinerary.itinerary_items i));
+
+-- Add portrait photos to demo01's Seoul records so the masonry feed exercises mixed ratios.
+WITH demo_user AS (
+  SELECT user_id
+  FROM auth.user_email_addresses
+  WHERE normalized_email = 'demo01@soomgil.local'
+), portrait_targets AS (
+  SELECT DISTINCT ON (r.id) r.id AS record_id, r.uploaded_by_user_id
+  FROM record.trip_record_entries r
+  JOIN record.trip_record_media rm ON rm.record_entry_id = r.id
+  JOIN media.media_files existing ON existing.id = rm.media_file_id
+  JOIN demo_user du ON du.user_id = r.uploaded_by_user_id
+  JOIN trip.trips t ON t.id = r.trip_id
+  WHERE r.status = 'ACTIVE'
+    AND t.display_destination LIKE '서울%'
+    AND existing.public_url IS NOT NULL
+    AND existing.width >= existing.height
+  ORDER BY r.id, existing.created_at
+  LIMIT 5
+)
+INSERT INTO media.media_files
+  (id, owner_user_id, storage_provider, bucket, object_key, public_url, mime_type,
+   byte_size, width, height, linked_resource_type, linked_resource_id, status, created_at)
+SELECT md5('demo-portrait-media:' || record_id)::uuid,
+       uploaded_by_user_id,
+       'S3_COMPATIBLE',
+       'soomgil-media-dev-337872593610-ap-northeast-2-an',
+       'demo/records/' || record_id || '/portrait-v2.jpg',
+       'https://daobk0bynum21.cloudfront.net/demo/records/' || record_id || '/portrait-v2.jpg',
+       'image/jpeg', 420000, 900, 1350, 'TRIP_RECORD', record_id, 'ACTIVE', now()
+FROM portrait_targets
+ON CONFLICT (id) DO UPDATE SET
+  bucket = EXCLUDED.bucket,
+  object_key = EXCLUDED.object_key,
+  public_url = EXCLUDED.public_url,
+  mime_type = EXCLUDED.mime_type,
+  width = EXCLUDED.width,
+  height = EXCLUDED.height,
+  status = 'ACTIVE',
+  deleted_at = NULL,
+  purge_after_at = NULL,
+  purged_at = NULL;
+
+WITH demo_user AS (
+  SELECT user_id
+  FROM auth.user_email_addresses
+  WHERE normalized_email = 'demo01@soomgil.local'
+), portrait_targets AS (
+  SELECT DISTINCT ON (r.id) r.id AS record_id
+  FROM record.trip_record_entries r
+  JOIN record.trip_record_media rm ON rm.record_entry_id = r.id
+  JOIN media.media_files existing ON existing.id = rm.media_file_id
+  JOIN demo_user du ON du.user_id = r.uploaded_by_user_id
+  JOIN trip.trips t ON t.id = r.trip_id
+  WHERE r.status = 'ACTIVE'
+    AND t.display_destination LIKE '서울%'
+    AND existing.public_url IS NOT NULL
+    AND existing.width >= existing.height
+  ORDER BY r.id, existing.created_at
+  LIMIT 5
+)
+INSERT INTO record.trip_record_media
+  (record_entry_id, media_file_id, sort_order, caption, created_at)
+SELECT record_id,
+       md5('demo-portrait-media:' || record_id)::uuid,
+       1,
+       '세로 구도로 남긴 여행 순간',
+       now()
+FROM portrait_targets
+ON CONFLICT (record_entry_id, media_file_id) DO UPDATE SET caption = EXCLUDED.caption;
+
+-- Move one repeated landscape record photo to a fresh object key for cache-safe replacement.
+UPDATE media.media_files
+SET object_key = 'demo/records/babfeef3-afc7-faa3-2a4a-7b4d8f494a52/cover-v2.jpg',
+    public_url = 'https://daobk0bynum21.cloudfront.net/demo/records/babfeef3-afc7-faa3-2a4a-7b4d8f494a52/cover-v2.jpg'
+WHERE id = '2cbad789-f9b3-bbc8-e43a-fef0af5af740';
 
 -- All demo URLs point to real objects uploaded by sync-demo-media.py.
 UPDATE auth.user_profiles p
