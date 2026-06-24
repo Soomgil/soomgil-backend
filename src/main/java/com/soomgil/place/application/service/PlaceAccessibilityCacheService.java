@@ -38,9 +38,18 @@ public class PlaceAccessibilityCacheService {
 		return refs.parallelStream()
 			.collect(Collectors.toMap(
 				PlaceRef::cacheKey,
-				ref -> backend.load(ref.provider(), ref.externalPlaceId(), ref.contentTypeId()),
+				this::loadOrUnknown,
 				(left, right) -> left,
 				LinkedHashMap::new
 			));
+	}
+
+	private PlaceAccessibilityInfo loadOrUnknown(PlaceRef ref) {
+		try {
+			return backend.load(ref.provider(), ref.externalPlaceId(), ref.contentTypeId());
+		}
+		catch (RuntimeException exception) {
+			return PlaceAccessibilityInfo.unknown();
+		}
 	}
 }
