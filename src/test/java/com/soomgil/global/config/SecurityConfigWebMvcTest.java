@@ -56,6 +56,12 @@ class SecurityConfigWebMvcTest {
 			.andExpect(status().isOk());
 	}
 
+	@Test
+	void allowsWebSocketHandshakePathWithoutHttpAuthentication() throws Exception {
+		mockMvc.perform(get("/ws"))
+			.andExpect(status().isOk());
+	}
+
 	@RestController
 	static class AdminTestController {
 
@@ -66,6 +72,11 @@ class SecurityConfigWebMvcTest {
 
 		@GetMapping({"/api/v1/users/{userId}/followers", "/api/v1/users/{userId}/following"})
 		String publicFollowLists() {
+			return "ok";
+		}
+
+		@GetMapping("/ws")
+		String websocketHandshakePath() {
 			return "ok";
 		}
 	}

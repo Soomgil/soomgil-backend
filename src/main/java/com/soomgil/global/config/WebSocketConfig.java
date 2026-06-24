@@ -2,6 +2,7 @@ package com.soomgil.global.config;
 
 import com.soomgil.collaboration.infrastructure.websocket.CollaborationSessionHeaderInterceptor;
 import com.soomgil.collaboration.infrastructure.websocket.TripSubscriptionInterceptor;
+import com.soomgil.collaboration.infrastructure.websocket.WebSocketJwtAuthenticationInterceptor;
 import java.util.Objects;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.messaging.simp.config.ChannelRegistration;
@@ -18,15 +19,21 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
 	private final CorsProperties corsProperties;
+	private final WebSocketJwtAuthenticationInterceptor authenticationInterceptor;
 	private final TripSubscriptionInterceptor subscriptionInterceptor;
 	private final CollaborationSessionHeaderInterceptor sessionHeaderInterceptor;
 
 	public WebSocketConfig(
 		CorsProperties corsProperties,
+		WebSocketJwtAuthenticationInterceptor authenticationInterceptor,
 		TripSubscriptionInterceptor subscriptionInterceptor,
 		CollaborationSessionHeaderInterceptor sessionHeaderInterceptor
 	) {
 		this.corsProperties = Objects.requireNonNull(corsProperties, "corsProperties must not be null");
+		this.authenticationInterceptor = Objects.requireNonNull(
+			authenticationInterceptor,
+			"authenticationInterceptor must not be null"
+		);
 		this.subscriptionInterceptor = Objects.requireNonNull(
 			subscriptionInterceptor,
 			"subscriptionInterceptor must not be null"
@@ -50,7 +57,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
 	@Override
 	public void configureClientInboundChannel(ChannelRegistration registration) {
-		registration.interceptors(subscriptionInterceptor);
+		registration.interceptors(authenticationInterceptor, subscriptionInterceptor);
 	}
 
 	@Override
