@@ -48,7 +48,9 @@ import org.springframework.transaction.annotation.Transactional;
  * active 여행 멤버의 누적 태그 선호도로 viewport 장소 추천을 계산한다.
  *
  * <p>다른 멤버의 원시 선호도 점수는 응답에 포함하지 않고, 기준을 넘긴 멤버의 공개 요약만 반환한다.
- * SUPER_LIKE 탭은 최종 SUPER_LIKE 멤버 수를 우선하고 태그 추천 점수는 동점 처리에 사용한다.
+ * BASIC 탭은 모든 멤버의 점수를 동등하게 곱으로 반영하는 합의 점수로 정렬해 한 멤버의 강한
+ * 선호가 다른 멤버의 낮은 선호를 덮지 않도록 한다. SUPER_LIKE 탭은 최종 SUPER_LIKE 멤버 수를
+ * 우선하고 태그 추천 점수는 동점 처리에 사용한다.
  */
 @Service
 public class PreferenceListPlaceRecommendationsQueryHandler
@@ -183,16 +185,20 @@ public class PreferenceListPlaceRecommendationsQueryHandler
 			.map(memberSummaries::get)
 			.filter(Objects::nonNull)
 			.toList();
-		BigDecimal superLikeTagMatchScore = recommendationScorer.calculateGroupScore(
-			superLikedMemberIds.stream()
+		List<BigDecimal> superLikeMemberScores = superLikedMemberIds.stream()
 				.map(memberScores::get)
 				.filter(Objects::nonNull)
-				.toList()
+				.toList();
+		BigDecimal consensusGroupScore = recommendationScorer.calculateGroupConsensusScore(
+			new ArrayList<>(memberScores.values())
+		);
+		BigDecimal superLikeTagMatchScore = recommendationScorer.calculateGroupConsensusScore(
+			superLikeMemberScores
 		);
 
 		return new ScoredRecommendation(
 			candidate,
-			recommendationScorer.calculateGroupScore(new ArrayList<>(memberScores.values())),
+			consensusGroupScore,
 			superLikedMemberIds.size(),
 			superLikeTagMatchScore,
 			matchedMembers,
@@ -282,10 +288,12 @@ public class PreferenceListPlaceRecommendationsQueryHandler
 			items.add(new PlaceRecommendation(
 				toSummary(item.place()),
 				matched,
+				matched.size(),
+				memberCount,
 				index + 1,
 				item.distanceMeters(),
-				recommendationReason(tab, matched.size()),
-				matchPercentage(item.groupScore(), memberCount)
+				recommendationReason(tab, matched.size(), memberCount),
+				matchPercentage(item.groupScore())
 			));
 		}
 
@@ -321,26 +329,27 @@ public class PreferenceListPlaceRecommendationsQueryHandler
 			.thenComparing(tieBreakers);
 	}
 
-	private String recommendationReason(RecommendationTab tab, int matchedMemberCount) {
+	private String recommendationReason(RecommendationTab tab, int matchedMemberCount, int totalMemberCount) {
 		if (tab == RecommendationTab.SUPER_LIKE) {
-			return matchedMemberCount + "명이 꼭 가고 싶어 해요";
+			if (matchedMemberCount == totalMemberCount && totalMemberCount > 0) {
+				return "모든 여행 멤버가 꼭 가고 싶어 해요";
+			}
+			return matchedMemberCount + "/" + totalMemberCount + "명이 꼭 가고 싶어 해요";
 		}
-		if (matchedMemberCount > 0) {
-			return matchedMemberCount + "명의 취향과 잘 맞아요";
+		if (matchedMemberCount == totalMemberCount && totalMemberCount > 0) {
+			return "모든 여행 멤버의 취향과 잘 맞아요";
+		}
+		if (matchedMemberCount > 0 && totalMemberCount > 0) {
+			return matchedMemberCount + "/" + totalMemberCount + "명의 취향과 잘 맞아요";
 		}
 		return "여행 멤버의 취향을 반영했어요";
 	}
 
-	private Integer matchPercentage(BigDecimal groupScore, int memberCount) {
-		if (memberCount <= 0 || groupScore == null) {
+	private Integer matchPercentage(BigDecimal groupScore) {
+		if (groupScore == null) {
 			return null;
 		}
-		BigDecimal average = groupScore.divide(
-			BigDecimal.valueOf(memberCount),
-			6,
-			RoundingMode.HALF_UP
-		);
-		int percentage = average
+		int percentage = groupScore
 			.multiply(BigDecimal.valueOf(100))
 			.setScale(0, RoundingMode.HALF_UP)
 			.intValue();

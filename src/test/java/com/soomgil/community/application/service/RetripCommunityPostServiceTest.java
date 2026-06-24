@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -23,6 +24,7 @@ import com.soomgil.itinerary.api.dto.ItineraryItemType;
 import com.soomgil.itinerary.api.dto.RouteMode;
 import com.soomgil.itinerary.api.dto.RouteSegment;
 import com.soomgil.itinerary.application.port.ItineraryCommandRepository;
+import com.soomgil.itinerary.application.port.ItineraryDayCreate;
 import com.soomgil.place.api.dto.PlaceSourceStatus;
 import com.soomgil.planning.api.dto.Checklist;
 import com.soomgil.planning.api.dto.ChecklistItem;
@@ -32,13 +34,17 @@ import com.soomgil.planning.infrastructure.persistence.mapper.ChecklistItemMappe
 import com.soomgil.planning.infrastructure.persistence.mapper.ChecklistMapper;
 import com.soomgil.planning.infrastructure.persistence.mapper.NoteMapper;
 import com.soomgil.trip.application.port.TripCommandRepository;
+import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 class RetripCommunityPostServiceTest {
 
@@ -91,22 +97,36 @@ class RetripCommunityPostServiceTest {
 		UUID postId = UUID.randomUUID();
 		UUID userId = UUID.randomUUID();
 		UUID sourceDayId = UUID.randomUUID();
+		UUID sourceDay2Id = UUID.randomUUID();
 		UUID sourceItemAId = UUID.randomUUID();
 		UUID sourceItemBId = UUID.randomUUID();
+		UUID sourceItemCId = UUID.randomUUID();
 		var snapshot = new CommunityPostSnapshot(
-			List.of(new ItineraryDay(
-				sourceDayId, UUID.randomUUID(), ItineraryDayGroupType.DAY, 1, null, "첫째 날", 1,
-				List.of(
-					new ItineraryItem(
-						sourceItemAId, sourceDayId, 1, ItineraryItemType.PLACE, null,
-						"성심당", "대전 중구", 36.327, 127.427, null, PlaceSourceStatus.AVAILABLE
-					),
-					new ItineraryItem(
-						sourceItemBId, sourceDayId, 2, ItineraryItemType.PLACE, null,
-						"한밭수목원", "대전 서구", 36.368, 127.388, null, PlaceSourceStatus.AVAILABLE
+			List.of(
+				new ItineraryDay(
+					sourceDayId, UUID.randomUUID(), ItineraryDayGroupType.DAY, 1, null, "첫째 날", 1,
+					List.of(
+						new ItineraryItem(
+							sourceItemAId, sourceDayId, 1, ItineraryItemType.PLACE, null,
+							"성심당", "대전 중구", 36.327, 127.427, null, PlaceSourceStatus.AVAILABLE
+						),
+						new ItineraryItem(
+							sourceItemBId, sourceDayId, 2, ItineraryItemType.PLACE, null,
+							"한밭수목원", "대전 서구", 36.368, 127.388, null, PlaceSourceStatus.AVAILABLE
+						)
+					)
+				),
+				new ItineraryDay(
+					sourceDay2Id, UUID.randomUUID(), ItineraryDayGroupType.DAY, 2,
+					LocalDate.of(2024, 1, 7), "둘째 날", 2,
+					List.of(
+						new ItineraryItem(
+							sourceItemCId, sourceDay2Id, 1, ItineraryItemType.PLACE, null,
+							"대전시립미술관", "대전 서구", 36.366, 127.385, null, PlaceSourceStatus.AVAILABLE
+						)
 					)
 				)
-			)),
+			),
 			List.of(new RouteSegment(
 				UUID.randomUUID(), sourceItemAId, sourceItemBId, RouteMode.DRIVING, "OSRM",
 				"car", GeometryFormat.GEOJSON, Map.of("type", "LineString", "coordinates", List.of()),
@@ -134,16 +154,21 @@ class RetripCommunityPostServiceTest {
 		RetripCommunityPostService service = new RetripCommunityPostService(
 			postMapper, retripMapper, tripRepository, itineraryRepository,
 			noteMapper, checklistMapper, checklistItemMapper,
-			codec, new ObjectMapper(), displayNameHandler
+			codec, new ObjectMapper(), displayNameHandler,
+			Clock.fixed(Instant.parse("2026-06-25T00:00:00Z"), ZoneId.of("Asia/Seoul"))
 		);
 
 		var result = service.retrip(postId, userId, null);
 
 		assertThat(result.itineraryVersion()).isEqualTo(1L);
-		verify(itineraryRepository).insertDay(any());
-		verify(itineraryRepository, org.mockito.Mockito.times(2)).insertItem(any());
+		ArgumentCaptor<ItineraryDayCreate> dayCaptor = ArgumentCaptor.forClass(ItineraryDayCreate.class);
+		verify(itineraryRepository, times(2)).insertDay(dayCaptor.capture());
+		assertThat(dayCaptor.getAllValues())
+			.extracting(ItineraryDayCreate::date)
+			.containsExactly(LocalDate.of(2026, 6, 25), LocalDate.of(2026, 6, 26));
+		verify(itineraryRepository, times(3)).insertItem(any());
 		verify(itineraryRepository).insertRouteSegment(any());
-		verify(noteMapper, org.mockito.Mockito.times(2)).insert(any(), any(), any(), any(), any(), eq(userId), any());
+		verify(noteMapper, times(2)).insert(any(), any(), any(), any(), any(), eq(userId), any());
 		verify(checklistMapper).insert(any(), any(), eq(PlanningScopeType.DAY), any(), eq("준비물"), eq(userId), any());
 		verify(checklistItemMapper).insert(any(), any(), eq(1), eq("우산 챙기기"), eq(userId), any());
 	}

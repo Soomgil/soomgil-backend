@@ -33,8 +33,11 @@ import com.soomgil.trip.application.port.TripCommandRepository;
 import com.soomgil.trip.domain.model.Trip;
 import com.soomgil.trip.domain.model.TripMember;
 import com.soomgil.user.api.dto.UserSummary;
+import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.List;
@@ -48,6 +51,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class RetripCommunityPostService {
 
+	private static final ZoneId RETRIP_DATE_ZONE = ZoneId.of("Asia/Seoul");
+
 	private final CommunityPostMapper postMapper;
 	private final PostRetripMapper retripMapper;
 	private final TripCommandRepository tripRepository;
@@ -58,6 +63,7 @@ public class RetripCommunityPostService {
 	private final CommunityPostSnapshotCodec snapshotCodec;
 	private final ObjectMapper objectMapper;
 	private final FindDisplayNameQueryHandler displayNameHandler;
+	private final Clock clock;
 
 	public RetripCommunityPostService(
 		CommunityPostMapper postMapper,
@@ -71,6 +77,26 @@ public class RetripCommunityPostService {
 		ObjectMapper objectMapper,
 		FindDisplayNameQueryHandler displayNameHandler
 	) {
+		this(
+			postMapper, retripMapper, tripRepository, itineraryRepository,
+			noteMapper, checklistMapper, checklistItemMapper, snapshotCodec,
+			objectMapper, displayNameHandler, Clock.system(RETRIP_DATE_ZONE)
+		);
+	}
+
+	RetripCommunityPostService(
+		CommunityPostMapper postMapper,
+		PostRetripMapper retripMapper,
+		TripCommandRepository tripRepository,
+		ItineraryCommandRepository itineraryRepository,
+		NoteMapper noteMapper,
+		ChecklistMapper checklistMapper,
+		ChecklistItemMapper checklistItemMapper,
+		CommunityPostSnapshotCodec snapshotCodec,
+		ObjectMapper objectMapper,
+		FindDisplayNameQueryHandler displayNameHandler,
+		Clock clock
+	) {
 		this.postMapper = Objects.requireNonNull(postMapper, "postMapper must not be null");
 		this.retripMapper = Objects.requireNonNull(retripMapper, "retripMapper must not be null");
 		this.tripRepository = Objects.requireNonNull(tripRepository, "tripRepository must not be null");
@@ -81,6 +107,7 @@ public class RetripCommunityPostService {
 		this.snapshotCodec = Objects.requireNonNull(snapshotCodec, "snapshotCodec must not be null");
 		this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper must not be null");
 		this.displayNameHandler = Objects.requireNonNull(displayNameHandler, "displayNameHandler must not be null");
+		this.clock = Objects.requireNonNull(clock, "clock must not be null");
 	}
 
 	@Transactional
@@ -124,12 +151,19 @@ public class RetripCommunityPostService {
 	private boolean copyItinerary(CommunityPostSnapshot snapshot, UUID tripId, UUID userId, Instant now) {
 		Map<UUID, UUID> itemIds = new HashMap<>();
 		Map<UUID, UUID> dayIds = new HashMap<>();
+		LocalDate startDate = LocalDate.now(clock);
+		int scheduledDayOffset = 0;
 		for (var day : snapshot.days()) {
 			UUID dayId = UUID.randomUUID();
 			dayIds.put(day.id(), dayId);
+			ItineraryDayGroupType groupType = ItineraryDayGroupType.valueOf(day.groupType().name());
+			LocalDate date = null;
+			if (groupType == ItineraryDayGroupType.DAY) {
+				date = startDate.plusDays(scheduledDayOffset);
+				scheduledDayOffset += 1;
+			}
 			itineraryRepository.insertDay(new ItineraryDayCreate(
-				dayId, tripId, ItineraryDayGroupType.valueOf(day.groupType().name()), day.dayNumber(),
-				day.date(), day.title(), day.sortOrder(), now, now
+				dayId, tripId, groupType, day.dayNumber(), date, day.title(), day.sortOrder(), now, now
 			));
 			for (var item : day.items()) {
 				UUID itemId = UUID.randomUUID();
