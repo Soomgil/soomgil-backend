@@ -26,6 +26,7 @@ class RecordMediaAccessRepositoryIntegrationTest {
 	private static final UUID EMPTY_TRIP_ID = UUID.fromString("10000000-0000-0000-0000-000000000002");
 	private static final UUID FIRST_RECORD_ID = UUID.fromString("30000000-0000-0000-0000-000000000001");
 	private static final UUID SECOND_RECORD_ID = UUID.fromString("30000000-0000-0000-0000-000000000002");
+	private static final UUID DAY_ID = UUID.fromString("50000000-0000-0000-0000-000000000001");
 	private static final UUID MEDIA_ID = UUID.fromString("40000000-0000-0000-0000-000000000001");
 	private static final UUID SECOND_MEDIA_ID = UUID.fromString("40000000-0000-0000-0000-000000000002");
 
@@ -111,6 +112,28 @@ class RecordMediaAccessRepositoryIntegrationTest {
 	}
 
 	@Test
+	void readsUploaderProfileAndItineraryDayWithEachPhoto() {
+		insertFixtures();
+
+		var photo = queryRepository.findPhotos(TRIP_ID, 0, 10).items().getFirst();
+
+		assertThat(photo.dayNumber()).isEqualTo(2);
+		assertThat(photo.uploadedByDisplayName()).isEqualTo("민경철");
+		assertThat(photo.uploadedByProfileImageUrl()).isEqualTo("https://cdn.example.com/profiles/min.jpg");
+	}
+
+	@Test
+	void listsRecordUploadDaysWithoutLoadingItineraryPlaces() {
+		insertFixtures();
+
+		assertThat(queryRepository.findDays(TRIP_ID)).singleElement().satisfies(day -> {
+			assertThat(day.id()).isEqualTo(DAY_ID);
+			assertThat(day.dayNumber()).isEqualTo(2);
+			assertThat(day.date()).hasToString("2026-06-18");
+		});
+	}
+
+	@Test
 	void storesAndReadsRecordCreateIdempotencyRequest() {
 		insertFixtures();
 		OffsetDateTime now = OffsetDateTime.parse("2026-06-22T00:00:00Z");
@@ -130,6 +153,21 @@ class RecordMediaAccessRepositoryIntegrationTest {
 	private void insertFixtures() {
 		OffsetDateTime now = OffsetDateTime.parse("2026-06-18T00:00:00Z");
 		jdbcTemplate.update(
+			"INSERT INTO auth.users (id, status, status_changed_at, created_at, updated_at) "
+				+ "VALUES (?, 'ACTIVE', ?, ?, ?)",
+			OWNER_ID,
+			now,
+			now,
+			now
+		);
+		jdbcTemplate.update(
+			"INSERT INTO auth.user_profiles (user_id, display_name, profile_image_url, created_at, updated_at) "
+				+ "VALUES (?, '민경철', 'https://cdn.example.com/profiles/min.jpg', ?, ?)",
+			OWNER_ID,
+			now,
+			now
+		);
+		jdbcTemplate.update(
 			"INSERT INTO trip.trips (id, owner_user_id, title, status, itinerary_version, created_at, updated_at) "
 				+ "VALUES (?, ?, 'test', 'ACTIVE', 0, ?, ?)",
 			TRIP_ID,
@@ -138,11 +176,21 @@ class RecordMediaAccessRepositoryIntegrationTest {
 			now
 		);
 		jdbcTemplate.update(
+			"INSERT INTO itinerary.itinerary_days "
+				+ "(id, trip_id, group_type, day_number, date, sort_order, created_at, updated_at) "
+				+ "VALUES (?, ?, 'DAY', 2, '2026-06-18', 1, ?, ?)",
+			DAY_ID,
+			TRIP_ID,
+			now,
+			now
+		);
+		jdbcTemplate.update(
 			"INSERT INTO record.trip_record_entries "
-				+ "(id, trip_id, uploaded_by_user_id, visibility, status, created_at, updated_at) "
-				+ "VALUES (?, ?, ?, 'TRIP_MEMBERS', 'ACTIVE', ?, ?), (?, ?, ?, 'TRIP_MEMBERS', 'ACTIVE', ?, ?)",
+				+ "(id, trip_id, itinerary_day_id, uploaded_by_user_id, visibility, status, created_at, updated_at) "
+				+ "VALUES (?, ?, ?, ?, 'TRIP_MEMBERS', 'ACTIVE', ?, ?), (?, ?, NULL, ?, 'TRIP_MEMBERS', 'ACTIVE', ?, ?)",
 			FIRST_RECORD_ID,
 			TRIP_ID,
+			DAY_ID,
 			OWNER_ID,
 			now,
 			now,

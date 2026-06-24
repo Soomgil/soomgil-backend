@@ -14,6 +14,7 @@ public record TripRecordPhoto(
 	@NotNull
 	UUID recordId,
 	UUID itineraryDayId,
+	Integer dayNumber,
 	UUID itineraryItemId,
 	@Valid
 	@NotNull

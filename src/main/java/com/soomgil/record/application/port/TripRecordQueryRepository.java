@@ -15,6 +15,8 @@ public interface TripRecordQueryRepository {
 
 	List<TripRecordMediaReadModel> findMedia(UUID recordId);
 
+	List<TripRecordDayReadModel> findDays(UUID tripId);
+
 	TripRecordPhotoPage findPhotos(UUID tripId, int page, int size);
 
 	TripRecordPhotoPage findPhotosByUser(UUID userId, int page, int size);

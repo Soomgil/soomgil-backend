@@ -23,6 +23,7 @@ import com.soomgil.record.application.port.RecordMediaAccessRepository;
 import com.soomgil.record.application.port.TripRecordCommandRepository;
 import com.soomgil.record.application.port.TripRecordCreateRequestReadModel;
 import com.soomgil.record.application.port.TripRecordEntryCreate;
+import com.soomgil.record.application.port.TripRecordDayReadModel;
 import com.soomgil.record.application.port.TripRecordEntryReadModel;
 import com.soomgil.record.application.port.TripRecordEntryUpdate;
 import com.soomgil.record.application.port.TripRecordMediaReadModel;
@@ -40,6 +41,7 @@ import com.soomgil.trip.domain.model.TripStatus;
 import java.net.URI;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -132,7 +134,29 @@ class TripRecordServiceTest {
 
 		assertThat(result.items()).hasSize(1);
 		assertThat(result.items().getFirst().tripId()).isEqualTo(TRIP_ID);
+		assertThat(result.items().getFirst().dayNumber()).isEqualTo(2);
+		assertThat(result.items().getFirst().uploadedBy().displayName()).isEqualTo("민경철");
+		assertThat(result.items().getFirst().uploadedBy().profileImageUrl())
+			.isEqualTo(URI.create("https://cdn.example.com/profiles/min.jpg"));
 		assertThat(result.page().totalElements()).isEqualTo(1);
+	}
+
+	@Test
+	void listsOnlyTheLightweightDaysNeededForRecordUpload() {
+		when(queryRepository.findDays(TRIP_ID)).thenReturn(List.of(
+			new TripRecordDayReadModel(
+				UUID.fromString("50000000-0000-0000-0000-000000000001"),
+				2,
+				LocalDate.parse("2026-06-21")
+			)
+		));
+
+		var result = service.listDays(TRIP_ID, USER_ID);
+
+		assertThat(result).singleElement().satisfies(day -> {
+			assertThat(day.dayNumber()).isEqualTo(2);
+			assertThat(day.date()).isEqualTo(LocalDate.parse("2026-06-21"));
+		});
 	}
 
 	@Test
@@ -324,6 +348,8 @@ class TripRecordServiceTest {
 			null,
 			null,
 			uploadedByUserId,
+			"민경철",
+			"https://cdn.example.com/profiles/min.jpg",
 			"제목",
 			"본문",
 			"서울",
@@ -358,8 +384,11 @@ class TripRecordServiceTest {
 			"부산 여행",
 			RECORD_ID,
 			null,
+			2,
 			null,
 			USER_ID,
+			"민경철",
+			"https://cdn.example.com/profiles/min.jpg",
 			MEDIA_ID,
 			"media/user/trip-record/a.jpg",
 			"https://example.com/a.jpg",
@@ -380,8 +409,11 @@ class TripRecordServiceTest {
 			"부산 여행",
 			RECORD_ID,
 			null,
+			2,
 			null,
 			USER_ID,
+			"민경철",
+			"https://cdn.example.com/profiles/min.jpg",
 			MEDIA_ID,
 			"media/user/trip-record/a.jpg",
 			null,

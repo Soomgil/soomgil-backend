@@ -1,6 +1,7 @@
 package com.soomgil.record.infrastructure.persistence.mapper;
 
 import com.soomgil.record.application.port.TripRecordEntryReadModel;
+import com.soomgil.record.application.port.TripRecordDayReadModel;
 import com.soomgil.record.application.port.TripRecordMediaReadModel;
 import com.soomgil.record.application.port.TripRecordPhotoReadModel;
 import com.soomgil.record.application.port.TripRecordPhotoSummaryReadModel;
@@ -23,6 +24,8 @@ public interface TripRecordQueryMapper {
 	TripRecordEntryReadModel findEntry(@Param("tripId") UUID tripId, @Param("recordId") UUID recordId);
 
 	List<TripRecordMediaReadModel> findMedia(@Param("recordId") UUID recordId);
+
+	List<TripRecordDayReadModel> findDays(@Param("tripId") UUID tripId);
 
 	List<TripRecordPhotoReadModel> findPhotos(@Param("tripId") UUID tripId, @Param("limit") int limit, @Param("offset") int offset);
 

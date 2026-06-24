@@ -1,6 +1,7 @@
 package com.soomgil.record.infrastructure.persistence.repository;
 
 import com.soomgil.record.application.port.TripRecordEntryReadModel;
+import com.soomgil.record.application.port.TripRecordDayReadModel;
 import com.soomgil.record.application.port.TripRecordMediaReadModel;
 import com.soomgil.record.application.port.TripRecordPage;
 import com.soomgil.record.application.port.TripRecordPhotoPage;
@@ -39,6 +40,11 @@ public class MyBatisTripRecordQueryRepository implements TripRecordQueryReposito
 	@Override
 	public List<TripRecordMediaReadModel> findMedia(UUID recordId) {
 		return mapper.findMedia(recordId);
+	}
+
+	@Override
+	public List<TripRecordDayReadModel> findDays(UUID tripId) {
+		return mapper.findDays(tripId);
 	}
 
 	@Override

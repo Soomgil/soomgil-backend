@@ -5,6 +5,7 @@ import com.soomgil.record.api.dto.CreateTripRecordRequest;
 import com.soomgil.record.api.dto.PagedTripRecordEntry;
 import com.soomgil.record.api.dto.PagedTripRecordPhoto;
 import com.soomgil.record.api.dto.TripRecordEntry;
+import com.soomgil.record.api.dto.TripRecordDay;
 import com.soomgil.record.api.dto.UpdateTripRecordRequest;
 import com.soomgil.record.application.handler.TripRecordService;
 import com.soomgil.common.id.Ids;
@@ -69,6 +70,14 @@ public class TripRecordController extends ApiControllerSupport {
 		Principal principal
 	) {
 		return tripRecordService.getRecord(tripId, currentUserId(principal), recordId);
+	}
+
+	@GetMapping("/days")
+	public List<TripRecordDay> listRecordDays(
+		@PathVariable UUID tripId,
+		Principal principal
+	) {
+		return tripRecordService.listDays(tripId, currentUserId(principal));
 	}
 
 	@PatchMapping("/{recordId}")

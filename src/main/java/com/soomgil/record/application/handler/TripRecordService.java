@@ -15,6 +15,7 @@ import com.soomgil.record.api.dto.PagedTripRecordEntry;
 import com.soomgil.record.api.dto.PagedTripRecordPhoto;
 import com.soomgil.record.api.dto.RecordVisibility;
 import com.soomgil.record.api.dto.TripRecordEntry;
+import com.soomgil.record.api.dto.TripRecordDay;
 import com.soomgil.record.api.dto.TripRecordPhoto;
 import com.soomgil.record.api.dto.TripRecordPhotoReadUrl;
 import com.soomgil.record.api.dto.TripRecordPhotoSummary;
@@ -185,6 +186,14 @@ public class TripRecordService {
 		return toEntry(findEntry(tripId, recordId));
 	}
 
+	@Transactional(readOnly = true)
+	public List<TripRecordDay> listDays(UUID tripId, UUID userId) {
+		tripAccessGuard.requireActiveMember(tripId, userId);
+		return queryRepository.findDays(tripId).stream()
+			.map(day -> new TripRecordDay(day.id(), day.dayNumber(), day.date()))
+			.toList();
+	}
+
 	@Transactional
 	public TripRecordEntry updateRecord(UUID tripId, UUID userId, UUID recordId, UpdateTripRecordRequest request) {
 		tripAccessGuard.requireActiveMember(tripId, userId);
@@ -330,7 +339,11 @@ public class TripRecordService {
 			entry.tripId(),
 			entry.itineraryDayId(),
 			entry.itineraryItemId(),
-			userSummary(entry.uploadedByUserId()),
+			userSummary(
+				entry.uploadedByUserId(),
+				entry.uploadedByDisplayName(),
+				entry.uploadedByProfileImageUrl()
+			),
 			entry.title(),
 			entry.caption(),
 			entry.locationName(),
@@ -350,9 +363,14 @@ public class TripRecordService {
 			photo.tripTitle(),
 			photo.recordId(),
 			photo.itineraryDayId(),
+			photo.dayNumber(),
 			photo.itineraryItemId(),
 			toMediaFile(photo),
-			userSummary(photo.uploadedByUserId()),
+			userSummary(
+				photo.uploadedByUserId(),
+				photo.uploadedByDisplayName(),
+				photo.uploadedByProfileImageUrl()
+			),
 			photo.takenAt(),
 			photo.createdAt()
 		);
@@ -419,8 +437,12 @@ public class TripRecordService {
 	private record ResolvedMediaUrl(URI url, OffsetDateTime expiresAt) {
 	}
 
-	private UserSummary userSummary(UUID userId) {
-		return new UserSummary(userId, "사용자", null);
+	private UserSummary userSummary(UUID userId, String displayName, String profileImageUrl) {
+		return new UserSummary(
+			userId,
+			displayName == null || displayName.isBlank() ? "사용자" : displayName,
+			profileImageUrl == null ? null : URI.create(profileImageUrl)
+		);
 	}
 
 	private void requireUploader(TripRecordEntryReadModel entry, UUID userId) {
