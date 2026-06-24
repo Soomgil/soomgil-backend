@@ -1,11 +1,17 @@
 package com.soomgil.place.application.port;
 
+import java.util.Optional;
+
 /**
  * 관광공사 원격 API에서 스와이프 장소 후보를 조회하는 port.
  */
 public interface TourismPlaceFeedClient {
 
 	TourismPlaceFeedResult fetch(TourismPlaceFeedRequest request);
+
+	default Optional<TourismPlaceFeedItem> fetchOne(String externalPlaceId) {
+		return Optional.empty();
+	}
 
 	/**
 	 * KTO detailIntro 응답에서 접근성/운영시간/주차 등의 raw 텍스트를 조회한다.

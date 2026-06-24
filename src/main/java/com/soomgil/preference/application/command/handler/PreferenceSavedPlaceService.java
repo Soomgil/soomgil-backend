@@ -9,6 +9,8 @@ import com.soomgil.global.security.CurrentUserProvider;
 import com.soomgil.place.api.dto.PlaceProvider;
 import com.soomgil.place.api.dto.PlaceSourceStatus;
 import com.soomgil.place.api.dto.PlaceSummary;
+import com.soomgil.place.application.port.TourismPlaceFeedClient;
+import com.soomgil.place.application.port.TourismPlaceFeedItem;
 import com.soomgil.preference.api.dto.PagedSavedPlace;
 import com.soomgil.preference.api.dto.SavedPlace;
 import com.soomgil.preference.application.command.dto.SavePlaceCommand;
@@ -19,6 +21,7 @@ import com.soomgil.preference.infrastructure.persistence.row.SavedPlaceInsertRow
 import com.soomgil.preference.infrastructure.persistence.row.SavedPlaceRow;
 import java.net.URI;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
@@ -35,13 +38,16 @@ public class PreferenceSavedPlaceService {
 
 	private final ObjectProvider<CurrentUserProvider> currentUserProvider;
 	private final PreferenceSavedPlaceMapper mapper;
+	private final TourismPlaceFeedClient tourismPlaceFeedClient;
 
 	public PreferenceSavedPlaceService(
 		ObjectProvider<CurrentUserProvider> currentUserProvider,
-		PreferenceSavedPlaceMapper mapper
+		PreferenceSavedPlaceMapper mapper,
+		TourismPlaceFeedClient tourismPlaceFeedClient
 	) {
 		this.currentUserProvider = currentUserProvider;
 		this.mapper = mapper;
+		this.tourismPlaceFeedClient = tourismPlaceFeedClient;
 	}
 
 	@Transactional
@@ -116,21 +122,38 @@ public class PreferenceSavedPlaceService {
 	}
 
 	private SavedPlace toSavedPlace(SavedPlaceRow row) {
+		Optional<TourismPlaceFeedItem> remotePlace = shouldHydrate(row)
+			? tourismPlaceFeedClient.fetchOne(row.externalPlaceId())
+			: Optional.empty();
 		return new SavedPlace(
 			UUID.fromString(row.id()),
 			new PlaceSummary(
 				PlaceProvider.valueOf(row.provider()),
 				row.externalPlaceId(),
-				row.name(),
-				row.address(),
-				row.lat(),
-				row.lng(),
-				toUri(row.thumbnailUrl()),
-				row.category(),
+				firstNonBlank(row.name(), remotePlace.map(TourismPlaceFeedItem::name).orElse(null), "관광지 " + row.externalPlaceId()),
+				firstNonBlank(row.address(), remotePlace.map(TourismPlaceFeedItem::address).orElse(null)),
+				row.lat() != null ? row.lat() : remotePlace.map(TourismPlaceFeedItem::lat).orElse(null),
+				row.lng() != null ? row.lng() : remotePlace.map(TourismPlaceFeedItem::lng).orElse(null),
+				toUri(firstNonBlank(row.thumbnailUrl(), remotePlace.map(TourismPlaceFeedItem::thumbnailUrl).orElse(null))),
+				firstNonBlank(row.category(), remotePlace.map(TourismPlaceFeedItem::category).orElse(null)),
 				PlaceSourceStatus.AVAILABLE
 			),
 			row.createdAt()
 		);
+	}
+
+	private boolean shouldHydrate(SavedPlaceRow row) {
+		return "KTO".equals(row.provider())
+			&& (row.name() == null || row.name().isBlank() || row.thumbnailUrl() == null || row.thumbnailUrl().isBlank());
+	}
+
+	private String firstNonBlank(String... values) {
+		for (String value : values) {
+			if (value != null && !value.isBlank()) {
+				return value;
+			}
+		}
+		return null;
 	}
 
 	private URI toUri(String value) {
