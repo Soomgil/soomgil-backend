@@ -155,10 +155,15 @@ public class RetripCommunityPostService {
 		Map<UUID, UUID> dayIds = new HashMap<>();
 		LocalDate startDate = LocalDate.now(clock);
 		int scheduledDayOffset = 0;
+		boolean hasUnscheduledDay = false;
+		boolean insertedDefaultUnscheduledDay = false;
 		for (var day : snapshot.days()) {
 			UUID dayId = UUID.randomUUID();
 			dayIds.put(day.id(), dayId);
 			ItineraryDayGroupType groupType = ItineraryDayGroupType.valueOf(day.groupType().name());
+			if (groupType == ItineraryDayGroupType.UNSCHEDULED) {
+				hasUnscheduledDay = true;
+			}
 			LocalDate date = null;
 			if (groupType == ItineraryDayGroupType.DAY) {
 				date = startDate.plusDays(scheduledDayOffset);
@@ -179,6 +184,13 @@ public class RetripCommunityPostService {
 				));
 			}
 		}
+		if (!hasUnscheduledDay) {
+			itineraryRepository.insertDay(new ItineraryDayCreate(
+				UUID.randomUUID(), tripId, ItineraryDayGroupType.UNSCHEDULED, null,
+				null, "일차 미정", 0, now, now
+			));
+			insertedDefaultUnscheduledDay = true;
+		}
 		for (var route : snapshot.routes()) {
 			UUID originId = itemIds.get(route.originItineraryItemId());
 			UUID destinationId = itemIds.get(route.destinationItineraryItemId());
@@ -195,7 +207,8 @@ public class RetripCommunityPostService {
 		}
 		copyNotes(snapshot.notes(), dayIds, tripId, userId, now);
 		copyChecklists(snapshot.checklists(), dayIds, tripId, userId, now);
-		return !snapshot.days().isEmpty()
+		return insertedDefaultUnscheduledDay
+			|| !snapshot.days().isEmpty()
 			|| !snapshot.routes().isEmpty()
 			|| !snapshot.notes().isEmpty()
 			|| !snapshot.checklists().isEmpty();

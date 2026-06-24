@@ -68,6 +68,8 @@ class RetripCommunityPostServiceTest {
 			Instant.now(), null, snapshotJson
 		)));
 		when(displayNameHandler.handle(any())).thenReturn("민경철");
+		when(itineraryRepository.incrementItineraryVersion(any(), eq(0L), any()))
+			.thenReturn(OptionalLong.of(1L));
 
 		RetripCommunityPostService service = new RetripCommunityPostService(
 			postMapper, retripMapper, tripRepository, itineraryRepository,
@@ -162,10 +164,13 @@ class RetripCommunityPostServiceTest {
 
 		assertThat(result.itineraryVersion()).isEqualTo(1L);
 		ArgumentCaptor<ItineraryDayCreate> dayCaptor = ArgumentCaptor.forClass(ItineraryDayCreate.class);
-		verify(itineraryRepository, times(2)).insertDay(dayCaptor.capture());
+		verify(itineraryRepository, times(3)).insertDay(dayCaptor.capture());
+		assertThat(dayCaptor.getAllValues())
+			.extracting(day -> day.groupType().name())
+			.containsExactly("DAY", "DAY", "UNSCHEDULED");
 		assertThat(dayCaptor.getAllValues())
 			.extracting(ItineraryDayCreate::date)
-			.containsExactly(LocalDate.of(2026, 6, 25), LocalDate.of(2026, 6, 26));
+			.containsExactly(LocalDate.of(2026, 6, 25), LocalDate.of(2026, 6, 26), null);
 		verify(itineraryRepository, times(3)).insertItem(any());
 		verify(itineraryRepository).insertRouteSegment(any());
 		verify(noteMapper, times(2)).insert(any(), any(), any(), any(), any(), eq(userId), any());

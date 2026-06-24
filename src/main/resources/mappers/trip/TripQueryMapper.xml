@@ -19,19 +19,21 @@
 
   <select id="findTrip" resultType="com.soomgil.trip.infrastructure.persistence.row.TripRow">
     SELECT
-      id,
-      owner_user_id,
-      title,
-      display_destination,
-      status,
-      itinerary_version,
-      retripped_from_post_id,
-      retripped_from_snapshot_version,
-      created_at,
-      updated_at,
-      deleted_at
-    FROM trip.trips
-    WHERE id = #{tripId}
+      t.id,
+      t.owner_user_id,
+      t.title,
+      t.display_destination,
+      t.status,
+      t.itinerary_version,
+      (SELECT MIN(d.date) FROM itinerary.itinerary_days d WHERE d.trip_id = t.id AND d.group_type = 'DAY') AS start_date,
+      (SELECT MAX(d.date) FROM itinerary.itinerary_days d WHERE d.trip_id = t.id AND d.group_type = 'DAY') AS end_date,
+      t.retripped_from_post_id,
+      t.retripped_from_snapshot_version,
+      t.created_at,
+      t.updated_at,
+      t.deleted_at
+    FROM trip.trips t
+    WHERE t.id = #{tripId}
   </select>
 
   <select id="findTripMembers" resultType="com.soomgil.trip.infrastructure.persistence.row.TripMemberReadRow">
