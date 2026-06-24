@@ -63,6 +63,23 @@ class FindTripAccessHandlerTest {
 	}
 
 	@Test
+	void archivedTripCanBeAccessedByActiveMember() {
+		repository.snapshot = Optional.of(new TripAccessSnapshot(
+			tripId,
+			userId,
+			TripStatus.ARCHIVED,
+			TripMemberStatus.ACTIVE,
+			UUID.randomUUID()
+		));
+
+		TripAccessView view = handler.handle(new FindTripAccessQuery(tripId, userId));
+
+		assertThat(view.canAccess()).isTrue();
+		assertThat(view.activeMember()).isTrue();
+		assertThat(view.accessRole()).isEqualTo(TripAccessRole.MEMBER);
+	}
+
+	@Test
 	void nonMemberCannotAccessTrip() {
 		repository.snapshot = Optional.of(new TripAccessSnapshot(
 			tripId,

@@ -10,7 +10,7 @@ import java.util.UUID;
 /**
  * 여행방 접근 권한을 계산하는 정책.
  *
- * <p>권한 판단은 active trip, active membership, ownerUserId 세 가지 값으로만 수행한다.
+	 * <p>권한 판단은 삭제되지 않은 trip, active membership, ownerUserId 세 가지 값으로만 수행한다.
  * MVP에서는 trip_members.role에 OWNER를 저장하지 않는다.
  */
 public final class TripAccessPolicy {
@@ -27,7 +27,7 @@ public final class TripAccessPolicy {
 	 * @return 접근 가능 여부와 파생 role
 	 */
 	public static TripAccessView evaluate(UUID tripId, UUID userId, TripAccessSnapshot snapshot) {
-		if (snapshot == null || snapshot.tripStatus() != TripStatus.ACTIVE) {
+		if (snapshot == null || snapshot.tripStatus() == TripStatus.DELETED) {
 			return TripAccessView.denied(tripId, userId);
 		}
 
