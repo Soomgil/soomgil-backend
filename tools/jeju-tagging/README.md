@@ -24,8 +24,8 @@ run-windows.bat
 ```
 
 실행기는 루트 `.env`의 `GMS_API_KEY`, `GMS_GEMINI_BASE_URL`,
-`GMS_GEMINI_API_VERSION`, `GEMINI_CHAT_MODEL`을 사용한다. 기본 모델은
-`gemini-2.5-flash-lite`다.
+`GMS_GEMINI_API_VERSION`, `GMS_CHAT_MODEL`을 사용한다. 기본 모델은
+`gpt-5.5`다.
 
 처음 실행하면 제주 장소를 추출한 뒤 아직 처리하지 않은 장소만 5개씩 태깅한다. 진행 결과는
 `output/tagged.jsonl`에 묶음마다 저장되므로 중간에 종료해도 같은 명령으로 이어서 실행할

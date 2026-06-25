@@ -165,6 +165,23 @@ class AiChatServiceTest {
 		verify(model, never()).replyWithoutTools(any(), any());
 	}
 
+	@Test
+	void checklistGenerationCueUsesTheGenerationIntentEvenIfClassifierIsGenericWrite() {
+		stubAssistant("일정 기준으로 체크리스트를 만들었어요.");
+		when(model.classify(any())).thenReturn(decision(AiIntent.WRITE_CHECKLIST));
+		when(model.replyWithWriteTools(any(), any())).thenReturn(
+			new AiGuideReply("일정 기준으로 체크리스트를 만들었어요.", List.of())
+		);
+
+		service.createMessage(tripId, userId, "이번 여행 체크리스트 만들어줘", null);
+
+		verify(model).replyWithWriteTools(any(), org.mockito.ArgumentMatchers.argThat(
+			decision -> decision.intent() == AiIntent.GENERATE_CHECKLIST_FROM_ITINERARY
+		));
+		verify(model, never()).replyWithReadTools(any(), any());
+		verify(model, never()).replyWithoutTools(any(), any());
+	}
+
 	private AiIntentDecision decision(AiIntent intent) {
 		return new AiIntentDecision(intent, 0.99, "test", null);
 	}

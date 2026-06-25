@@ -106,7 +106,7 @@ public class AiChatService {
 			tripId, userId, session.id(), requestMessageId, session.summary(), recent,
 			question, baseVersion, viewport, null
 		);
-		AiIntentDecision decision = validDecision(model.classify(classificationRequest));
+		AiIntentDecision decision = applySafetyPolicy(question, model.classify(classificationRequest));
 		AiGuideRequest replyRequest = decision.intent().usesReadTools() || decision.intent().usesWriteTools()
 			? withTripContext(classificationRequest, contextService.load(tripId, userId))
 			: classificationRequest;
@@ -166,7 +166,6 @@ public class AiChatService {
 		);
 	}
 
-	@SuppressWarnings("unused")
 	private AiIntentDecision applySafetyPolicy(String question, AiIntentDecision classified) {
 		AiIntentDecision decision = classified == null
 			? new AiIntentDecision(AiIntent.AMBIGUOUS, 0.0, "분류 결과가 없습니다.", null)
@@ -182,6 +181,12 @@ public class AiChatService {
 		}
 		if (normalized.matches(".*(뭐할수있어|무엇을할수있어|어떤걸할수있어|사용법|기능알려줘|howtouse).*")) {
 			return decision.force(AiIntent.HELP, "사용법 질문은 도구를 사용하지 않습니다.");
+		}
+		if (isChecklistGenerationRequest(normalized)) {
+			return decision.force(
+				AiIntent.GENERATE_CHECKLIST_FROM_ITINERARY,
+				"일정 기반 체크리스트 생성 요청은 자동 생성 도구로 처리합니다."
+			);
 		}
 		if ((decision.intent().usesReadTools() || decision.intent().usesWriteTools())
 			&& !hasExplicitIntentCue(decision.intent(), normalized)) {
@@ -226,11 +231,21 @@ public class AiChatService {
 			case FILTER_PLACES_BY_CONDITION -> question.matches(".*(유료|무료|장애인|유모차|접근|휴무|닫은|폐업).*(빼|삭제|제거|없애).*")
 				|| question.matches(".*(빼|삭제|제거|없애).*(유료|무료|장애인|유모카|접근).*");
 			case GENERATE_CHECKLIST_FROM_ITINERARY -> question.matches(".*(체크리스트.*(자동|만들어|생성|추천|분석)|"
-				+ "준비물.*알려|필요.*준비|예약.*필요.*체크).*");
+				+ "준비물.*알려|필요.*준비|예약.*필요.*체크).*")
+				|| isChecklistGenerationRequest(question);
 			case OPTIMIZE_ROUTE -> question.matches(".*(동선.*최적화|최적화.*동선|가까운.*곳.*묶어|동선.*정리|"
 				+ "이동.*순서.*정리|효율.*동선).*");
 			default -> false;
 		};
+	}
+
+	private boolean isChecklistGenerationRequest(String question) {
+		return question.matches(".*(체크리스트|준비물).*(자동|만들|생성|추천|분석|작성|알려|짜).*")
+			|| question.matches(".*(자동|분석).*(체크리스트|준비물).*")
+			|| question.matches(".*여행.*필요.*준비.*")
+			|| question.matches(".*예약.*필요.*체크.*")
+			|| question.matches(".*준비물.*뭐.*")
+			|| question.matches(".*체크리스트.*뭐.*");
 	}
 
 	private AiChatSessionRow requireSession(UUID tripId) {

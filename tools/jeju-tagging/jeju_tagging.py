@@ -272,11 +272,11 @@ class GmsClient:
             "GMS_GEMINI_BASE_URL", "https://gms.ssafy.io/gmsapi/generativelanguage.googleapis.com"
         ).rstrip("/")
         self.api_version = os.getenv("GMS_GEMINI_API_VERSION", "v1beta").strip("/")
-        self.model = os.getenv("GEMINI_CHAT_MODEL", "gemini-2.5-flash-lite").strip()
+        self.model = os.getenv("GMS_CHAT_MODEL", os.getenv("GEMINI_CHAT_MODEL", "gpt-5.5")).strip()
         if not self.api_key:
             raise RuntimeError("루트 .env에 GMS_API_KEY가 필요합니다.")
-        if not self.model.startswith("gemini-2.5"):
-            raise RuntimeError(f"이번 작업은 Gemini 2.5 모델만 허용합니다: {self.model}")
+        if not self.model:
+            raise RuntimeError("루트 .env에 GMS_CHAT_MODEL이 필요합니다.")
 
     def tag(self, places: list[dict[str, object]], tags: list[Tag], retries: int = 30) -> list[dict[str, object]]:
         url = (
@@ -504,7 +504,7 @@ def generate_sql(rows: list[dict[str, object]], destination: Path = SQL_FILE) ->
             "  selection_policy_version, candidate_count, selected_count, enriched_at",
             ") VALUES (",
             f"  '{enrichment_id}'::uuid, 'KTO', {sql_literal(content_id)}, NULL, {sql_literal(row['source_hash'])}, 'SUCCEEDED',",
-            f"  'GOOGLE', {sql_literal(os.getenv('GEMINI_CHAT_MODEL', 'gemini-2.5-flash-lite'))}, {sql_literal(PROMPT_VERSION)},",
+            f"  'GOOGLE', {sql_literal(os.getenv('GMS_CHAT_MODEL', os.getenv('GEMINI_CHAT_MODEL', 'gpt-5.5')))}, {sql_literal(PROMPT_VERSION)},",
             f"  {sql_literal(DICTIONARY_VERSION)}, {sql_literal(SELECTION_POLICY_VERSION)}, {len(decisions)}, {len(selected)}, now()",
             ");",
         ])
