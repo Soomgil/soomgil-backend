@@ -2,9 +2,16 @@ package com.soomgil.place.application.query.handler;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.soomgil.global.error.BusinessException;
+import com.soomgil.global.error.ErrorCode;
 import com.soomgil.place.api.dto.PlaceDetail;
 import com.soomgil.place.api.dto.PlaceProvider;
 import com.soomgil.place.api.dto.PlaceSourceStatus;
+import com.soomgil.place.application.port.PlaceIntroRaw;
+import com.soomgil.place.application.port.TourismPlaceFeedClient;
+import com.soomgil.place.application.port.TourismPlaceFeedItem;
+import com.soomgil.place.application.port.TourismPlaceFeedRequest;
+import com.soomgil.place.application.port.TourismPlaceFeedResult;
 import com.soomgil.place.application.query.dto.PlaceDetailItem;
 import com.soomgil.place.application.query.dto.PlaceDetailQuery;
 import com.soomgil.place.application.query.dto.AccessibilityFlag;
@@ -21,6 +28,7 @@ import java.net.URI;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -28,14 +36,16 @@ import org.junit.jupiter.api.Test;
 class TourismSourcePlaceDetailQueryHandlerTest {
 
 	private RecordingTourismSourcePlaceDetailRepository repository;
+	private RecordingTourismPlaceFeedClient liveClient;
 	private RecordingPlaceAccessibilityCacheService accessibilityCacheService;
 	private TourismSourcePlaceDetailQueryHandler handler;
 
 	@BeforeEach
 	void setUp() {
 		repository = new RecordingTourismSourcePlaceDetailRepository();
+		liveClient = new RecordingTourismPlaceFeedClient();
 		accessibilityCacheService = new RecordingPlaceAccessibilityCacheService();
-		handler = new TourismSourcePlaceDetailQueryHandler(repository, accessibilityCacheService);
+		handler = new TourismSourcePlaceDetailQueryHandler(repository, liveClient, accessibilityCacheService);
 	}
 
 	@Test
@@ -89,6 +99,34 @@ class TourismSourcePlaceDetailQueryHandlerTest {
 		assertThat(result.accessibility().flags()).containsExactly(AccessibilityFlag.WHEELCHAIR);
 	}
 
+	@Test
+	void fallsBackToLiveKtoDetailWhenLocalSourceDoesNotHavePlace() {
+		repository.exception = new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "Place was not found.");
+		liveClient.item = new TourismPlaceFeedItem(
+			"2806554",
+			"Live KTO Place",
+			"Jeju",
+			33.45,
+			126.57,
+			"https://cdn.example.com/2806554.jpg",
+			"ATTRACTION",
+			"Fetched from KTO detailCommon2.",
+			List.of("https://cdn.example.com/2806554-1.jpg"),
+			OffsetDateTime.parse("2026-06-20T00:00:00Z")
+		);
+
+		PlaceDetail result = handler.handle(new PlaceDetailQuery(PlaceProvider.KTO, "2806554"));
+
+		assertThat(liveClient.lastExternalPlaceId).isEqualTo("2806554");
+		assertThat(result.externalPlaceId()).isEqualTo("2806554");
+		assertThat(result.name()).isEqualTo("Live KTO Place");
+		assertThat(result.thumbnailUrl()).isEqualTo(URI.create("https://cdn.example.com/2806554.jpg"));
+		assertThat(result.photos()).containsExactly(URI.create("https://cdn.example.com/2806554-1.jpg"));
+		assertThat(result.description()).isEqualTo("Fetched from KTO detailCommon2.");
+		assertThat(result.sourceUpdatedAt()).isEqualTo(OffsetDateTime.parse("2026-06-20T00:00:00Z"));
+		assertThat(result.enriched()).isFalse();
+	}
+
 	private static final class RecordingPlaceAccessibilityCacheService extends PlaceAccessibilityCacheService {
 
 		private List<PlaceRef> lastRefs = List.of();
@@ -111,6 +149,7 @@ class TourismSourcePlaceDetailQueryHandlerTest {
 
 		private PlaceDetailQuery lastQuery;
 		private PlaceDetailItem item;
+		private BusinessException exception;
 
 		private RecordingTourismSourcePlaceDetailRepository() {
 			super(
@@ -122,7 +161,32 @@ class TourismSourcePlaceDetailQueryHandlerTest {
 		@Override
 		public PlaceDetailItem find(PlaceDetailQuery query) {
 			lastQuery = query;
+			if (exception != null) {
+				throw exception;
+			}
 			return item;
+		}
+	}
+
+	private static final class RecordingTourismPlaceFeedClient implements TourismPlaceFeedClient {
+
+		private String lastExternalPlaceId;
+		private TourismPlaceFeedItem item;
+
+		@Override
+		public TourismPlaceFeedResult fetch(TourismPlaceFeedRequest request) {
+			return new TourismPlaceFeedResult(List.of(), null);
+		}
+
+		@Override
+		public Optional<TourismPlaceFeedItem> fetchOne(String externalPlaceId) {
+			lastExternalPlaceId = externalPlaceId;
+			return Optional.ofNullable(item);
+		}
+
+		@Override
+		public PlaceIntroRaw fetchIntro(String contentId, String contentTypeId) {
+			return PlaceIntroRaw.empty();
 		}
 	}
 
