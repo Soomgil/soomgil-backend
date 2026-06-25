@@ -101,6 +101,7 @@ public class AiChatService {
 			.toList());
 		UUID requestMessageId = UUID.randomUUID();
 		mapper.insertMessage(requestMessageId, session.id(), userId, AiMessageRole.USER.name(), question, Instant.now());
+		messagingTemplate.convertAndSend("/topic/trips/" + tripId + "/ai", toDto(mapper.findMessageById(requestMessageId)));
 		AiGuideRequest classificationRequest = new AiGuideRequest(
 			tripId, userId, session.id(), requestMessageId, session.summary(), recent,
 			question, baseVersion, viewport, null

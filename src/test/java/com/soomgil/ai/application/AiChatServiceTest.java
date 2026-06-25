@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -66,7 +67,7 @@ class AiChatServiceTest {
 			eq("비 오는 날 갈 곳 추천해줘"), any());
 		verify(mapper).insertMessage(any(), eq(sessionId), org.mockito.ArgumentMatchers.isNull(),
 			eq("ASSISTANT"), org.mockito.ArgumentMatchers.contains("박물관"), any());
-		verify(messagingTemplate).convertAndSend(eq("/topic/trips/" + tripId + "/ai"), any(Object.class));
+		verify(messagingTemplate, times(2)).convertAndSend(eq("/topic/trips/" + tripId + "/ai"), any(Object.class));
 		ArgumentCaptor<AiGuideRequest> requestCaptor = ArgumentCaptor.forClass(AiGuideRequest.class);
 		verify(model).classify(requestCaptor.capture());
 		assertThat(requestCaptor.getValue().tripContext()).isNull();
