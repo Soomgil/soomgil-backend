@@ -19,6 +19,7 @@ public record TripReadModel(
 	long itineraryVersion,
 	LocalDate startDate,
 	LocalDate endDate,
+	String coverImageUrl,
 	Instant createdAt,
 	UUID retrippedFromPostId
 ) {

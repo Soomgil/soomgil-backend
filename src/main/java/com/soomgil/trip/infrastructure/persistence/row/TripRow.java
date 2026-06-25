@@ -19,6 +19,7 @@ public record TripRow(
 	long itineraryVersion,
 	LocalDate startDate,
 	LocalDate endDate,
+	String coverImageUrl,
 	UUID retrippedFromPostId,
 	Integer retrippedFromSnapshotVersion,
 	Instant createdAt,

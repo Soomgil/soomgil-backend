@@ -82,7 +82,7 @@ public class CommunityPostAssembler {
 			.map(media -> media.mediaFileId())
 			.toList();
 		List<MediaFile> media = mediaFileQueryService.findByIds(mediaFileIds);
-		MediaFile coverMedia = mediaFileQueryService.findById(post.coverMediaFileId()).orElse(null);
+		MediaFile coverMedia = resolveCoverMedia(post);
 		int mediaCount = media.size();
 		int likeCount = postLikeMapper.countByPostId(post.id());
 		int commentCount = communityCommentMapper.countByPostId(post.id());
@@ -131,7 +131,7 @@ public class CommunityPostAssembler {
 		UserSummary publisher = resolvePublisher(post.publishedByUserId());
 		List<String> hashtags = postHashtagMapper.findHashtagNamesByPostId(post.id());
 		int mediaCount = postMediaMapper.countByPostId(post.id());
-		MediaFile coverMedia = mediaFileQueryService.findById(post.coverMediaFileId()).orElse(null);
+		MediaFile coverMedia = resolveCoverMedia(post);
 		int likeCount = postLikeMapper.countByPostId(post.id());
 		int commentCount = communityCommentMapper.countByPostId(post.id());
 		int retripCount = postRetripMapper.countByPostId(post.id());
@@ -179,6 +179,15 @@ public class CommunityPostAssembler {
 		String displayName = displayNameQueryHandler.handle(new FindDisplayNameQuery(userId));
 		URI profileImageUrl = displayNameQueryHandler.findProfileImageUrl(new FindDisplayNameQuery(userId));
 		return new UserSummary(userId, displayName, profileImageUrl);
+	}
+
+	private MediaFile resolveCoverMedia(CommunityPostRecord post) {
+		MediaFile coverMedia = mediaFileQueryService.findById(post.coverMediaFileId()).orElse(null);
+		if (coverMedia != null || post.sourceTripId() == null) {
+			return coverMedia;
+		}
+		return mediaFileQueryService.findById(postMediaMapper.findFirstRecordImageByTripId(post.sourceTripId()))
+			.orElse(null);
 	}
 
 	private URI buildShareUrl(UUID postId, String rawShareToken) {

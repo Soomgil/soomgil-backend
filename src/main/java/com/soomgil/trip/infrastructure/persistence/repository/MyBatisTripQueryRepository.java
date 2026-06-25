@@ -115,6 +115,7 @@ public class MyBatisTripQueryRepository implements TripQueryRepository {
 			row.itineraryVersion(),
 			row.startDate(),
 			row.endDate(),
+			row.coverImageUrl(),
 			row.createdAt(),
 			row.retrippedFromPostId()
 		);

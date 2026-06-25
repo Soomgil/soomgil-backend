@@ -300,6 +300,7 @@ public class TripController extends ApiControllerSupport {
 			view.itineraryVersion(),
 			view.startDate(),
 			view.endDate(),
+			view.coverImageUrl(),
 			OffsetDateTime.ofInstant(view.createdAt(), ZoneOffset.UTC)
 		);
 	}

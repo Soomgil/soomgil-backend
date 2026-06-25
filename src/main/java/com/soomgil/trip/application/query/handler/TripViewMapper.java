@@ -26,6 +26,7 @@ final class TripViewMapper {
 			trip.itineraryVersion(),
 			trip.startDate(),
 			trip.endDate(),
+			trip.coverImageUrl(),
 			trip.createdAt()
 		);
 	}

@@ -42,6 +42,7 @@ public class TripSearchService {
 			row.itineraryVersion(),
 			row.startDate(),
 			row.endDate(),
+			row.coverImageUrl(),
 			row.createdAt() == null ? java.time.OffsetDateTime.now() : row.createdAt().atOffset(java.time.ZoneOffset.UTC)
 		);
 	}

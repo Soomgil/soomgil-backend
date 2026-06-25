@@ -156,6 +156,7 @@ class TripInviteControllerTest {
 				0,
 				null,
 				null,
+				null,
 				Instant.parse("2026-06-16T00:00:00Z"),
 				null
 			));

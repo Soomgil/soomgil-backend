@@ -20,6 +20,7 @@ public record TripSummary(
 	Long itineraryVersion,
 	LocalDate startDate,
 	LocalDate endDate,
+	String coverImageUrl,
 	@NotNull
 	OffsetDateTime createdAt
 ) {

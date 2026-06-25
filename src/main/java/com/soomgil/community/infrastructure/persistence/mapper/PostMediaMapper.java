@@ -65,6 +65,28 @@ public interface PostMediaMapper {
 	int countByPostId(@Param("postId") UUID postId);
 
 	/**
+	 * 게시글 표지가 없을 때 원본 여행 기록에 연결된 이미지 하나를 대표 이미지 후보로 사용한다.
+	 *
+	 * @param tripId 원본 여행방 식별자
+	 * @return 활성 이미지 미디어 식별자. 없으면 null
+	 */
+	@Select("""
+		SELECT mf.id
+		FROM record.trip_record_entries e
+		JOIN record.trip_record_media rm
+		  ON rm.record_entry_id = e.id
+		JOIN media.media_files mf
+		  ON mf.id = rm.media_file_id
+		WHERE e.trip_id = #{tripId}
+		  AND e.status = 'ACTIVE'
+		  AND mf.status = 'ACTIVE'
+		  AND mf.mime_type LIKE 'image/%'
+		ORDER BY e.taken_at DESC NULLS LAST, e.created_at DESC, rm.sort_order ASC, mf.created_at DESC
+		LIMIT 1
+		""")
+	UUID findFirstRecordImageByTripId(@Param("tripId") UUID tripId);
+
+	/**
 	 * 게시글의 모든 미디어를 삭제한다.
 	 *
 	 * @param postId 게시글 식별자

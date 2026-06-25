@@ -49,6 +49,7 @@ class ListMyTripsHandlerTest {
 		assertThat(page.items().get(0).myRole()).isEqualTo(TripAccessRole.OWNER);
 		assertThat(page.items().get(0).startDate()).isEqualTo(LocalDate.of(2026, 7, 1));
 		assertThat(page.items().get(0).endDate()).isEqualTo(LocalDate.of(2026, 7, 4));
+		assertThat(page.items().get(0).coverImageUrl()).isEqualTo("https://cdn.example.com/trips/cover.jpg");
 		assertThat(page.items().get(1).myRole()).isEqualTo(TripAccessRole.MEMBER);
 		assertThat(page.totalElements()).isEqualTo(2);
 		assertThat(page.totalPages()).isEqualTo(1);
@@ -67,6 +68,7 @@ class ListMyTripsHandlerTest {
 			0,
 			LocalDate.of(2026, 7, 1),
 			LocalDate.of(2026, 7, 4),
+			"https://cdn.example.com/trips/cover.jpg",
 			Instant.parse("2026-06-16T00:00:00Z"),
 			null
 		);

@@ -27,6 +27,7 @@
       t.itinerary_version,
       (SELECT MIN(d.date) FROM itinerary.itinerary_days d WHERE d.trip_id = t.id AND d.group_type = 'DAY') AS start_date,
       (SELECT MAX(d.date) FROM itinerary.itinerary_days d WHERE d.trip_id = t.id AND d.group_type = 'DAY') AS end_date,
+      <include refid="tripCoverImageSelect" />,
       t.retripped_from_post_id,
       t.retripped_from_snapshot_version,
       t.created_at,
@@ -35,6 +36,37 @@
     FROM trip.trips t
     WHERE t.id = #{tripId}
   </select>
+
+  <sql id="tripCoverImageSelect">
+    COALESCE(
+      (
+        SELECT mf.public_url
+        FROM record.trip_record_entries e
+        JOIN record.trip_record_media rm
+          ON rm.record_entry_id = e.id
+        JOIN media.media_files mf
+          ON mf.id = rm.media_file_id
+        WHERE e.trip_id = t.id
+          AND e.status = 'ACTIVE'
+          AND mf.status = 'ACTIVE'
+          AND mf.mime_type LIKE 'image/%'
+          AND mf.public_url IS NOT NULL
+        ORDER BY e.taken_at DESC NULLS LAST, e.created_at DESC, rm.sort_order ASC, mf.created_at DESC
+        LIMIT 1
+      ),
+      (
+        SELECT i.thumbnail_url
+        FROM itinerary.itinerary_items i
+        JOIN itinerary.itinerary_days d
+          ON d.id = i.itinerary_day_id
+        WHERE i.trip_id = t.id
+          AND i.deleted_at IS NULL
+          AND i.thumbnail_url IS NOT NULL
+        ORDER BY d.sort_order ASC, i.sort_order ASC, i.created_at ASC
+        LIMIT 1
+      )
+    ) AS cover_image_url
+  </sql>
 
   <select id="findTripMembers" resultType="com.soomgil.trip.infrastructure.persistence.row.TripMemberReadRow">
     SELECT
@@ -86,6 +118,7 @@
       t.itinerary_version,
       (SELECT MIN(d.date) FROM itinerary.itinerary_days d WHERE d.trip_id = t.id AND d.group_type = 'DAY') AS start_date,
       (SELECT MAX(d.date) FROM itinerary.itinerary_days d WHERE d.trip_id = t.id AND d.group_type = 'DAY') AS end_date,
+      <include refid="tripCoverImageSelect" />,
       t.retripped_from_post_id,
       t.retripped_from_snapshot_version,
       t.created_at,
@@ -127,6 +160,7 @@
       t.itinerary_version,
       (SELECT MIN(d.date) FROM itinerary.itinerary_days d WHERE d.trip_id = t.id AND d.group_type = 'DAY') AS start_date,
       (SELECT MAX(d.date) FROM itinerary.itinerary_days d WHERE d.trip_id = t.id AND d.group_type = 'DAY') AS end_date,
+      <include refid="tripCoverImageSelect" />,
       t.retripped_from_post_id,
       t.retripped_from_snapshot_version,
       t.created_at,
@@ -195,13 +229,13 @@
             WHERE d.trip_id = t.id AND d.date &lt; CURRENT_DATE)
         ) AS startDate,
         (SELECT count(*) FROM trip.trip_members m2 WHERE m2.trip_id = t.id AND m2.status = 'ACTIVE') AS memberCount,
-        NULL AS coverImageUrl,
+        <include refid="tripCoverImageSelect" />,
         t.created_at AS created_at
       FROM trip.trips t
       JOIN trip.trip_members m ON m.trip_id = t.id AND m.user_id = CAST(#{userId} AS uuid) AND m.status = 'ACTIVE'
       WHERE t.status = 'ACTIVE'
     )
-    SELECT id, title, displayDestination, startDate, memberCount, coverImageUrl
+    SELECT id, title, displayDestination, startDate, memberCount, cover_image_url AS coverImageUrl
     FROM candidates
     ORDER BY
       (startDate IS NOT NULL AND startDate >= CURRENT_DATE) DESC,
