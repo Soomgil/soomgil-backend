@@ -65,6 +65,26 @@ class MapMatchRouteHandlerTest {
 	}
 
 	@Test
+	void defaultsMissingTidyToFalseWhenStoringRequestLog() {
+		MapMatchRouteHandler handler = handler(request -> {
+			assertThat(request.tidy()).isFalse();
+			return new MapMatchClientResult(
+				Map.of("type", "LineString", "coordinates", List.of(List.of(127.0, 37.0), List.of(127.1, 37.1))),
+				List.of(Map.of("waypoint_index", 0)),
+				Map.of("code", "Ok"),
+				120.0,
+				60.0,
+				0.98
+			);
+		});
+
+		MapMatchRouteResult result = handler.handle(command(null));
+
+		assertThat(result.matchRequestId()).isEqualTo(11L);
+		assertThat(repository.insertedLog.tidy()).isFalse();
+	}
+
+	@Test
 	void fallsBackToRawTraceWhenProviderCannotMatch() {
 		MapMatchRouteHandler handler = handler(request -> {
 			throw new MapMatchingException("NoMatch", "No matching route found.");
@@ -101,6 +121,10 @@ class MapMatchRouteHandlerTest {
 	}
 
 	private MapMatchRouteCommand command() {
+		return command(true);
+	}
+
+	private MapMatchRouteCommand command(Boolean tidy) {
 		return new MapMatchRouteCommand(
 			TRIP_ID,
 			USER_ID,
@@ -110,7 +134,7 @@ class MapMatchRouteHandlerTest {
 			RouteMode.WALKING,
 			List.of(new RouteCoordinate(127.0, 37.0), new RouteCoordinate(127.1, 37.1)),
 			null,
-			true
+			tidy
 		);
 	}
 
