@@ -39,6 +39,7 @@ public class SpringAiGuideModel implements AiGuideModel {
 		WRITE_NOTE: 메모 작성 또는 수정
 		WRITE_CHECKLIST: 체크리스트 생성·수정·항목 추가
 		ADD_PLACE_TO_ITINERARY: 장소를 일정에 추가
+		ADD_RECOMMENDED_PLACES_TO_ITINERARY: 멤버 취향 기반 추천 장소를 조회해 여러 장소를 일정에 추가. "추천 여행지 알아서 넣어줘", "갈만한 곳 3개 일정에 추가해줘" 등
 		DELETE_ITINERARY_ITEM: 사용자가 이름을 지정한 기존 일정 장소 하나를 삭제
 		MOVE_ITINERARY_ITEM: 기존 일정 항목 이동·재정렬
 		SUMMARIZE_ITINERARY: 현재 여행 일정을 요약·분석해 조언. "요약해줘", "정리해줘", "일정 분석", "여행 코스 리뷰" 등
@@ -50,6 +51,7 @@ public class SpringAiGuideModel implements AiGuideModel {
 		"경복궁 3일차로 옮겨줘"처럼 특정 장소와 목표 일차가 있는 요청은 MOVE_ITINERARY_ITEM입니다.
 		조건에 맞는 여러 장소를 삭제하는 요청만 FILTER_PLACES_BY_CONDITION입니다.
 		쓰기 intent는 사용자가 작성·추가·이동·삭제·최적화 의사를 명시한 경우에만 선택하세요.
+		"추천해줘"처럼 보여달라는 요청은 RECOMMEND_PLACES이고, "추천해서 넣어줘/추가해줘"는 ADD_RECOMMENDED_PLACES_TO_ITINERARY입니다.
 		애매하면 반드시 AMBIGUOUS로 분류하고 clarificationQuestion에 한국어 질문을 넣으세요.
 		"안녕", "고마워"는 GENERAL_CHAT, "뭐 할 수 있어?"는 HELP입니다.
 		""";
@@ -145,12 +147,20 @@ public class SpringAiGuideModel implements AiGuideModel {
 				+ "deleteItineraryItem 도구에 placeName을 전달하세요. UUID를 추측하지 마세요.";
 			case MOVE_ITINERARY_ITEM -> "현재 여행 맥락 JSON에서 사용자가 말한 장소와 목표 일차를 확인하고 "
 				+ "moveItineraryItem 도구에 placeName과 targetDayNumber를 전달하세요. UUID를 추측하지 마세요.";
+			case ADD_RECOMMENDED_PLACES_TO_ITINERARY -> "사용자가 추천 장소를 일정에 추가하라고 명시했을 때만 "
+				+ "addRecommendedPlacesToItinerary 도구를 사용하세요. 현재 지도 viewport가 있으면 bbox로 전달하고, "
+				+ "일차가 명확하지 않으면 itineraryDayId를 null로 두어 일차 미정에 추가하세요. "
+				+ "limit는 사용자가 말한 개수 또는 3개로 제한하세요.";
 			case FILTER_PLACES_BY_CONDITION -> "여행 맥락 JSON의 days[].items[] 에서 placeName·address 로 삭제 대상을 직접 판별해 "
 				+ "removeItineraryItemsByCondition 도구에 itemId 목록을 전달하라. "
 				+ "DB에 accessibility 메타데이터가 없으므로 장소 이름·유형(테마파크, 유료 관광지 등)으로 판단한다. "
 				+ "애매하면 삭제하지 말고 후보를 먼저 사용자에게 확인하라.";
 			case GENERATE_CHECKLIST_FROM_ITINERARY -> "여행 맥락 JSON의 days[].items[] 를 분석해 예약 필수 장소, 날씨 대비, "
-				+ "이동 수단, 입장료 등 필요한 준비물·할 일을 generateChecklistItems 도구로 자동 추가하라. "
+				+ "이동 수단, 입장료 등 필요한 준비물·할 일을 자동 추가하라. "
+				+ "사용자가 '각각 체크리스트에', '일차별로', '가는 일차에 맞춰서'라고 요청했거나 특정 장소에서 파생된 할 일은 "
+				+ "반드시 generateChecklistItemsByDay 도구를 사용하고, 해당 장소가 속한 days[].id를 itineraryDayId로 전달하라. "
+				+ "예: 롯데월드가 3일차 day에 있으면 그 3일차 itineraryDayId 그룹에 '롯데월드 예매 확인'을 넣는다. "
+				+ "여행방 전체 공통 준비물만 generateChecklistItems(TRIP)에 넣고, 일차별 항목을 전체 체크리스트에 몰아넣지 마라. "
 				+ "각 항목은 짧은 한국어 명령문 형태로 작성한다.";
 			case OPTIMIZE_ROUTE -> "여행 맥락 JSON의 days[].items[].lat,lng 로 가까운 장소끼리 같은 일차로 묶어 "
 				+ "optimizeRoute 도구에 이동 계획(moves)을 전달하라. 같은 날 여러 장소 이동 시 sort_order도 재정렬한다.";

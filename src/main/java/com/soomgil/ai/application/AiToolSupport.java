@@ -71,6 +71,9 @@ abstract class AiToolSupport implements AiExecutableTools {
 
 	private Long versionAfter(Object result) {
 		if (result instanceof ItineraryMutationResult itinerary) return itinerary.itineraryVersion();
+		if (result instanceof AiAddRecommendedPlacesTools.BulkAddRecommendedPlacesResult bulkAdd) {
+			return bulkAdd.versionAfter();
+		}
 		if (result instanceof PlanningMutationResponse planning) return planning.itineraryVersion();
 		return null;
 	}

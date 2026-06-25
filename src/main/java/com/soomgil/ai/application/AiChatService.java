@@ -112,8 +112,8 @@ public class AiChatService {
 		AiGuideReply reply = switch (decision.intent()) {
 			case READ_ITINERARY, SEARCH_PLACES, RECOMMEND_PLACES, SUMMARIZE_ITINERARY ->
 				model.replyWithReadTools(replyRequest, decision);
-			case WRITE_NOTE, WRITE_CHECKLIST, ADD_PLACE_TO_ITINERARY, DELETE_ITINERARY_ITEM,
-					MOVE_ITINERARY_ITEM,
+			case WRITE_NOTE, WRITE_CHECKLIST, ADD_PLACE_TO_ITINERARY, ADD_RECOMMENDED_PLACES_TO_ITINERARY,
+					DELETE_ITINERARY_ITEM, MOVE_ITINERARY_ITEM,
 					FILTER_PLACES_BY_CONDITION, GENERATE_CHECKLIST_FROM_ITINERARY, OPTIMIZE_ROUTE ->
 				model.replyWithWriteTools(replyRequest, decision);
 			case GENERAL_CHAT, HELP, AMBIGUOUS, UNSUPPORTED ->
@@ -217,6 +217,8 @@ public class AiChatService {
 				&& question.matches(".*(만들|작성|추가|수정|바꿔|넣어|체크).*");
 			case ADD_PLACE_TO_ITINERARY -> question.matches(".*(일정|일차).*(추가|넣어|등록).*")
 				|| question.matches(".*(추가|넣어|등록).*(일정|일차).*");
+			case ADD_RECOMMENDED_PLACES_TO_ITINERARY -> question.matches(".*(추천|갈만한|여행지|장소).*(넣어|추가|등록|일정에).*")
+				|| question.matches(".*(넣어|추가|등록).*(추천|갈만한|여행지|장소).*");
 			case MOVE_ITINERARY_ITEM -> question.matches(".*(옮겨|이동|재배치|순서.*바꿔).*");
 			case SUMMARIZE_ITINERARY -> question.matches(".*(요약|정리|분석|리뷰|코스.*봐줘|코스.*리뷰).*")
 				|| question.matches(".*(여행일정|여행.*일정|전체.*일정).*(어때|어떨까|봐줘).*");

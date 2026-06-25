@@ -55,6 +55,9 @@ public class AiTripToolsFactory {
 			case ADD_PLACE_TO_ITINERARY -> List.of(new AiAddPlaceTools(
 				request, auditService, itineraryToolService
 			));
+			case ADD_RECOMMENDED_PLACES_TO_ITINERARY -> List.of(new AiAddRecommendedPlacesTools(
+				request, auditService, recommendationHandler, itineraryToolService
+			));
 			case DELETE_ITINERARY_ITEM -> List.of(new AiDeleteItineraryItemTools(
 				request, auditService, itineraryToolService
 			));

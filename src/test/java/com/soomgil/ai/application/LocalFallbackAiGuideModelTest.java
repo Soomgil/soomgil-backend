@@ -50,6 +50,14 @@ class LocalFallbackAiGuideModelTest {
 		assertThat(reply.toolCalls()).containsExactly(call);
 	}
 
+	@Test
+	void distinguishesRecommendationLookupFromAddingRecommendedPlaces() {
+		assertThat(model.classify(request("갈만한 여행지 추천해줘", null)).intent())
+			.isEqualTo(AiIntent.RECOMMEND_PLACES);
+		assertThat(model.classify(request("추천 여행지 3개 알아서 일정에 넣어줘", null)).intent())
+			.isEqualTo(AiIntent.ADD_RECOMMENDED_PLACES_TO_ITINERARY);
+	}
+
 	private AiGuideRequest request(String question, AiTripContext context) {
 		return new AiGuideRequest(
 			UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), null,
