@@ -1,13 +1,16 @@
 package com.soomgil.place.application.query.handler;
 
+import com.soomgil.common.api.dto.PageMeta;
 import com.soomgil.place.api.dto.PagedPlaceSummary;
 import com.soomgil.place.api.dto.PlaceProvider;
+import com.soomgil.place.api.dto.PlaceSourceStatus;
 import com.soomgil.place.api.dto.PlaceSummary;
-import com.soomgil.place.application.query.dto.PlaceSearchCriteria;
-import com.soomgil.place.application.query.dto.PlaceSearchItem;
+import com.soomgil.place.application.port.TourismPlaceFeedClient;
+import com.soomgil.place.application.port.TourismPlaceFeedItem;
+import com.soomgil.place.application.port.TourismPlaceLiveSearchRequest;
 import com.soomgil.place.application.query.dto.PlaceSearchQuery;
-import com.soomgil.place.application.query.dto.PlaceSearchResult;
-import com.soomgil.place.infrastructure.persistence.repository.TourismSourcePlaceSearchRepository;
+import java.net.URI;
+import java.util.List;
 import org.springframework.stereotype.Service;
 
 /**
@@ -16,32 +19,37 @@ import org.springframework.stereotype.Service;
 @Service
 public class TourismSourcePlaceSearchQueryHandler implements PlaceSearchQueryHandler {
 
-	private final TourismSourcePlaceSearchRepository repository;
+	private final TourismPlaceFeedClient liveClient;
 
-	public TourismSourcePlaceSearchQueryHandler(TourismSourcePlaceSearchRepository repository) {
-		this.repository = repository;
+	public TourismSourcePlaceSearchQueryHandler(TourismPlaceFeedClient liveClient) {
+		this.liveClient = liveClient;
 	}
 
 	@Override
 	public PagedPlaceSummary handle(PlaceSearchQuery query) {
-		PlaceSearchResult result = repository.search(new PlaceSearchCriteria(
+		List<PlaceSummary> liveItems = liveClient.fetchLive(new TourismPlaceLiveSearchRequest(
 			query.q(),
 			query.bbox(),
 			query.legalRegionCode(),
 			query.category(),
-			query.page(),
 			query.size()
-		));
+		)).stream()
+			.map(this::toSummary)
+			.toList();
+		if (!liveItems.isEmpty()) {
+			return new PagedPlaceSummary(
+				liveItems,
+				new PageMeta(query.page(), query.size(), (long) liveItems.size(), liveItems.isEmpty() ? 0 : 1, List.of())
+			);
+		}
 
 		return new PagedPlaceSummary(
-			result.items().stream()
-				.map(this::toSummary)
-				.toList(),
-			result.page()
+			liveItems,
+			new PageMeta(query.page(), query.size(), (long) liveItems.size(), liveItems.isEmpty() ? 0 : 1, List.of())
 		);
 	}
 
-	private PlaceSummary toSummary(PlaceSearchItem item) {
+	private PlaceSummary toSummary(TourismPlaceFeedItem item) {
 		return new PlaceSummary(
 			PlaceProvider.KTO,
 			item.externalPlaceId(),
@@ -49,9 +57,16 @@ public class TourismSourcePlaceSearchQueryHandler implements PlaceSearchQueryHan
 			item.address(),
 			item.lat(),
 			item.lng(),
-			item.thumbnailUrl(),
+			toUri(item.thumbnailUrl()),
 			item.category(),
-			item.sourceStatus()
+			PlaceSourceStatus.AVAILABLE
 		);
+	}
+
+	private URI toUri(String value) {
+		if (value == null || value.isBlank()) {
+			return null;
+		}
+		return URI.create(value);
 	}
 }

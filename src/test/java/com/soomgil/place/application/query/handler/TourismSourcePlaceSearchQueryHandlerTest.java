@@ -7,14 +7,13 @@ import com.soomgil.place.api.dto.PagedPlaceSummary;
 import com.soomgil.place.api.dto.PlaceProvider;
 import com.soomgil.place.api.dto.PlaceSourceStatus;
 import com.soomgil.place.api.dto.PlaceSummary;
-import com.soomgil.place.application.query.dto.PlaceSearchCriteria;
-import com.soomgil.place.application.query.dto.PlaceSearchItem;
+import com.soomgil.place.application.port.PlaceIntroRaw;
+import com.soomgil.place.application.port.TourismPlaceFeedClient;
+import com.soomgil.place.application.port.TourismPlaceFeedItem;
+import com.soomgil.place.application.port.TourismPlaceFeedRequest;
+import com.soomgil.place.application.port.TourismPlaceFeedResult;
+import com.soomgil.place.application.port.TourismPlaceLiveSearchRequest;
 import com.soomgil.place.application.query.dto.PlaceSearchQuery;
-import com.soomgil.place.application.query.dto.PlaceSearchResult;
-import com.soomgil.place.application.query.dto.PlaceViewportCandidateCriteria;
-import com.soomgil.place.infrastructure.persistence.mapper.TourismSourcePlaceSearchMapper;
-import com.soomgil.place.infrastructure.persistence.repository.TourismSourcePlaceSearchRepository;
-import com.soomgil.place.infrastructure.persistence.row.TourismSourcePlaceSearchRow;
 import java.net.URI;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -22,30 +21,28 @@ import org.junit.jupiter.api.Test;
 
 class TourismSourcePlaceSearchQueryHandlerTest {
 
-	private RecordingTourismSourcePlaceSearchRepository repository;
+	private RecordingTourismPlaceFeedClient liveClient;
 	private TourismSourcePlaceSearchQueryHandler handler;
 
 	@BeforeEach
 	void setUp() {
-		repository = new RecordingTourismSourcePlaceSearchRepository();
-		handler = new TourismSourcePlaceSearchQueryHandler(repository);
+		liveClient = new RecordingTourismPlaceFeedClient();
+		handler = new TourismSourcePlaceSearchQueryHandler(liveClient);
 	}
 
 	@Test
-	void searchesTourismSourcePlacesWithQueryCriteria() {
-		repository.result = new PlaceSearchResult(
-			List.of(new PlaceSearchItem(
-				"126508",
-				"Haeundae Beach",
-				"Busan Haeundae-gu",
-				35.1587,
-				129.1604,
-				URI.create("https://cdn.soomgil.example.com/places/126508.jpg"),
-				"ATTRACTION",
-				PlaceSourceStatus.AVAILABLE
-			)),
-			new PageMeta(0, 20, 1L, 1, List.of())
-		);
+	void searchesKtoLivePlacesWithQueryCriteria() {
+		liveClient.items = List.of(new TourismPlaceFeedItem(
+			"126508",
+			"Haeundae Beach",
+			"Busan Haeundae-gu",
+			35.1587,
+			129.1604,
+			"https://cdn.soomgil.example.com/places/126508.jpg",
+			"ATTRACTION",
+			null,
+			List.of("https://cdn.soomgil.example.com/places/126508.jpg")
+		));
 
 		PagedPlaceSummary result = handler.handle(new PlaceSearchQuery(
 			"Busan beach",
@@ -56,12 +53,11 @@ class TourismSourcePlaceSearchQueryHandlerTest {
 			20
 		));
 
-		assertThat(repository.lastCriteria.q()).isEqualTo("Busan beach");
-		assertThat(repository.lastCriteria.bbox()).isEqualTo("129.0,35.0,130.0,36.0");
-		assertThat(repository.lastCriteria.legalRegionCode()).isEqualTo("26000");
-		assertThat(repository.lastCriteria.category()).isEqualTo("ATTRACTION");
-		assertThat(repository.lastCriteria.page()).isZero();
-		assertThat(repository.lastCriteria.size()).isEqualTo(20);
+		assertThat(liveClient.lastRequest.q()).isEqualTo("Busan beach");
+		assertThat(liveClient.lastRequest.bbox()).isEqualTo("129.0,35.0,130.0,36.0");
+		assertThat(liveClient.lastRequest.legalRegionCode()).isEqualTo("26000");
+		assertThat(liveClient.lastRequest.category()).isEqualTo("ATTRACTION");
+		assertThat(liveClient.lastRequest.limit()).isEqualTo(20);
 
 		assertThat(result.items()).hasSize(1);
 		PlaceSummary item = result.items().getFirst();
@@ -78,9 +74,7 @@ class TourismSourcePlaceSearchQueryHandlerTest {
 	}
 
 	@Test
-	void returnsEmptyPageWhenRepositoryFindsNoPlaces() {
-		repository.result = new PlaceSearchResult(List.of(), new PageMeta(1, 20, 0L, 0, List.of()));
-
+	void returnsEmptyPageWhenKtoLiveFindsNoPlaces() {
 		PagedPlaceSummary result = handler.handle(new PlaceSearchQuery("unknown", null, null, null, 1, 20));
 
 		assertThat(result.items()).isEmpty();
@@ -88,37 +82,56 @@ class TourismSourcePlaceSearchQueryHandlerTest {
 		assertThat(result.page().totalElements()).isZero();
 	}
 
-	private static final class RecordingTourismSourcePlaceSearchRepository extends TourismSourcePlaceSearchRepository {
+	@Test
+	void returnsLiveKtoPlacesForJejuSearch() {
+		liveClient.items = List.of(new TourismPlaceFeedItem(
+			"126435",
+			"성산일출봉",
+			"제주특별자치도 서귀포시 성산읍 일출로 284-12",
+			33.4581111,
+			126.9415156,
+			"https://tong.visitkorea.or.kr/cms/resource/00/2613500_image2_1.jpg",
+			"관광지",
+			null,
+			List.of("https://tong.visitkorea.or.kr/cms/resource/00/2613500_image2_1.jpg")
+		));
 
-		private PlaceSearchCriteria lastCriteria;
-		private PlaceSearchResult result;
+		PagedPlaceSummary result = handler.handle(new PlaceSearchQuery(
+			"성산",
+			"126.1,33.0,127.1,33.7",
+			null,
+			null,
+			0,
+			20
+		));
 
-		private RecordingTourismSourcePlaceSearchRepository() {
-			super(new NoopTourismSourcePlaceSearchMapper());
-		}
-
-		@Override
-		public PlaceSearchResult search(PlaceSearchCriteria criteria) {
-			lastCriteria = criteria;
-			return result;
-		}
+		assertThat(liveClient.lastRequest.q()).isEqualTo("성산");
+		assertThat(liveClient.lastRequest.bbox()).isEqualTo("126.1,33.0,127.1,33.7");
+		assertThat(result.items()).hasSize(1);
+		assertThat(result.items().getFirst().externalPlaceId()).isEqualTo("126435");
+		assertThat(result.items().getFirst().name()).isEqualTo("성산일출봉");
+		assertThat(result.page().totalElements()).isEqualTo(1L);
 	}
 
-	private static final class NoopTourismSourcePlaceSearchMapper implements TourismSourcePlaceSearchMapper {
+	private static final class RecordingTourismPlaceFeedClient implements TourismPlaceFeedClient {
+
+		private TourismPlaceLiveSearchRequest lastRequest;
+		private List<TourismPlaceFeedItem> items = List.of();
 
 		@Override
-		public long count(PlaceSearchCriteria criteria) {
-			return 0;
+		public TourismPlaceFeedResult fetch(TourismPlaceFeedRequest request) {
+			return new TourismPlaceFeedResult(List.of(), null);
 		}
 
 		@Override
-		public List<TourismSourcePlaceSearchRow> search(PlaceSearchCriteria criteria) {
-			return List.of();
+		public List<TourismPlaceFeedItem> fetchLive(TourismPlaceLiveSearchRequest request) {
+			lastRequest = request;
+			return items;
 		}
 
 		@Override
-		public List<TourismSourcePlaceSearchRow> findViewportCandidates(PlaceViewportCandidateCriteria criteria) {
-			return List.of();
+		public PlaceIntroRaw fetchIntro(String contentId, String contentTypeId) {
+			return PlaceIntroRaw.empty();
 		}
 	}
 }
