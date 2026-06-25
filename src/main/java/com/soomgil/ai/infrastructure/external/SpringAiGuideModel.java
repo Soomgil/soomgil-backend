@@ -153,7 +153,9 @@ public class SpringAiGuideModel implements AiGuideModel {
 				+ "limit는 사용자가 말한 개수 또는 3개로 제한하세요.";
 			case FILTER_PLACES_BY_CONDITION -> "여행 맥락 JSON의 days[].items[] 에서 placeName·address 로 삭제 대상을 직접 판별해 "
 				+ "removeItineraryItemsByCondition 도구에 itemId 목록을 전달하라. "
-				+ "DB에 accessibility 메타데이터가 없으므로 장소 이름·유형(테마파크, 유료 관광지 등)으로 판단한다. "
+				+ "days[].items[].accessibility.flags/unavailableFlags를 우선 근거로 사용하라. "
+				+ "휠체어 이용 불가, 장애인 접근 불가 조건은 unavailableFlags에 WHEELCHAIR가 있는 항목을 삭제 대상으로 본다. "
+				+ "접근성 정보가 null이거나 UNKNOWN이면 이름·주소 추정만으로 과도하게 삭제하지 말라. "
 				+ "애매하면 삭제하지 말고 후보를 먼저 사용자에게 확인하라.";
 			case GENERATE_CHECKLIST_FROM_ITINERARY -> "여행 맥락 JSON의 days[].items[] 를 분석해 예약 필수 장소, 날씨 대비, "
 				+ "이동 수단, 입장료 등 필요한 준비물·할 일을 자동 추가하라. "

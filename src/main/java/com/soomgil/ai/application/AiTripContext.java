@@ -53,8 +53,17 @@ public record AiTripContext(
 
 	public record ItemSummary(
 		UUID id, int sortOrder, String itemType, String placeProvider, String externalPlaceId,
-		String placeName, String address, Double lat, Double lng
+		String placeName, String address, Double lat, Double lng, AccessibilitySummary accessibility
 	) {
+	}
+
+	public record AccessibilitySummary(
+		String parkingType, List<String> flags, List<String> unavailableFlags
+	) {
+		public AccessibilitySummary {
+			flags = copy(flags);
+			unavailableFlags = copy(unavailableFlags);
+		}
 	}
 
 	public record RouteSummary(

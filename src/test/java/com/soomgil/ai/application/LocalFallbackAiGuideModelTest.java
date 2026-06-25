@@ -58,10 +58,59 @@ class LocalFallbackAiGuideModelTest {
 			.isEqualTo(AiIntent.ADD_RECOMMENDED_PLACES_TO_ITINERARY);
 	}
 
+	@Test
+	void localFallbackUsesAccessibilityMetadataWhenFilteringPlaces() {
+		AiFilterPlacesTools filterTools = mock(AiFilterPlacesTools.class);
+		AiToolCall call = mock(AiToolCall.class);
+		when(toolsFactory.create(any(), org.mockito.ArgumentMatchers.eq(AiIntent.FILTER_PLACES_BY_CONDITION)))
+			.thenReturn(List.of(filterTools));
+		when(filterTools.executedCalls()).thenReturn(List.of(call));
+		UUID blockedItemId = UUID.randomUUID();
+		UUID supportedItemId = UUID.randomUUID();
+		AiTripContext context = contextWithItems(
+			item(blockedItemId, "성산일출봉", new AiTripContext.AccessibilitySummary("UNKNOWN", List.of(), List.of("WHEELCHAIR"))),
+			item(supportedItemId, "오설록 티뮤지엄", new AiTripContext.AccessibilitySummary("FREE", List.of("WHEELCHAIR"), List.of()))
+		);
+
+		AiGuideReply reply = model.replyWithWriteTools(
+			request("휠체어 이용 불가 시설 삭제해줘", context),
+			new AiIntentDecision(AiIntent.FILTER_PLACES_BY_CONDITION, 1.0, "test", null)
+		);
+
+		ArgumentCaptor<AiFilterPlacesTools.RemoveItemsInput> input =
+			ArgumentCaptor.forClass(AiFilterPlacesTools.RemoveItemsInput.class);
+		verify(filterTools).removeItineraryItemsByCondition(input.capture());
+		assertThat(input.getValue().itemIds()).containsExactly(blockedItemId);
+		assertThat(reply.toolCalls()).containsExactly(call);
+	}
+
 	private AiGuideRequest request(String question, AiTripContext context) {
 		return new AiGuideRequest(
 			UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), null,
 			List.of(), question, 1L, null, context
+		);
+	}
+
+	private AiTripContext contextWithItems(AiTripContext.ItemSummary... items) {
+		return new AiTripContext(
+			new AiTripContext.TripSummary(UUID.randomUUID(), "제주 여행", "제주", "PLANNING", "OWNER", 1L),
+			List.of(),
+			List.of(new AiTripContext.DaySummary(UUID.randomUUID(), "DAY", 1, null, "1일차", List.of(items))),
+			List.of(),
+			List.of(),
+			List.of(),
+			List.of(),
+			List.of()
+		);
+	}
+
+	private AiTripContext.ItemSummary item(
+		UUID id,
+		String placeName,
+		AiTripContext.AccessibilitySummary accessibility
+	) {
+		return new AiTripContext.ItemSummary(
+			id, 0, "PLACE", "KTO", "seed-" + id, placeName, "제주특별자치도", 33.45, 126.55, accessibility
 		);
 	}
 }

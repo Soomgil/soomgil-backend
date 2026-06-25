@@ -364,7 +364,12 @@ public class LocalFallbackAiGuideModel implements AiGuideModel {
 	private boolean matchesRemovalCondition(String question, AiTripContext.ItemSummary item) {
 		String q = normalize(question);
 		String text = normalize((item.placeName() == null ? "" : item.placeName()) + " " + (item.address() == null ? "" : item.address()));
-		if (q.contains("장애인") || q.contains("유모차") || q.contains("접근")) {
+		if (q.contains("장애인") || q.contains("휠체어") || q.contains("유모차") || q.contains("접근")) {
+			if (accessibilityKnown(item)) {
+				if (accessibilityUnavailable(item, "WHEELCHAIR")) return true;
+				if (requiresSupportedAccessibility(q)) return !accessibilitySupports(item, "WHEELCHAIR");
+				return false;
+			}
 			return text.matches(".*(산|등산|계단|전망대|오름|동굴|출렁다리|케이블카).*");
 		}
 		if (q.contains("유료") || q.contains("입장료")) {
@@ -374,6 +379,27 @@ public class LocalFallbackAiGuideModel implements AiGuideModel {
 			return text.matches(".*(박물관|미술관|전시관|문화원).*");
 		}
 		return false;
+	}
+
+	private boolean accessibilityKnown(AiTripContext.ItemSummary item) {
+		AiTripContext.AccessibilitySummary accessibility = item.accessibility();
+		return accessibility != null
+			&& (!accessibility.flags().isEmpty() || !accessibility.unavailableFlags().isEmpty());
+	}
+
+	private boolean accessibilitySupports(AiTripContext.ItemSummary item, String flag) {
+		AiTripContext.AccessibilitySummary accessibility = item.accessibility();
+		return accessibility != null && accessibility.flags().contains(flag);
+	}
+
+	private boolean accessibilityUnavailable(AiTripContext.ItemSummary item, String flag) {
+		AiTripContext.AccessibilitySummary accessibility = item.accessibility();
+		return accessibility != null && accessibility.unavailableFlags().contains(flag);
+	}
+
+	private boolean requiresSupportedAccessibility(String question) {
+		return question.contains("가능") || question.contains("되는곳") || question.contains("되는장소")
+			|| question.contains("이용가능") || question.contains("접근가능");
 	}
 
 	private List<AiGenerateChecklistTools.DayChecklistInput> dayChecklistCandidates(AiGuideRequest request) {

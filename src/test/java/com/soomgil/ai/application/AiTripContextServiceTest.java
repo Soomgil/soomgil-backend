@@ -10,6 +10,7 @@ import com.soomgil.common.api.dto.PageMeta;
 import com.soomgil.itinerary.application.query.dto.FindItineraryQuery;
 import com.soomgil.itinerary.application.query.dto.ItineraryView;
 import com.soomgil.itinerary.application.query.handler.FindItineraryHandler;
+import com.soomgil.place.application.service.PlaceAccessibilityCacheService;
 import com.soomgil.planning.application.handler.GetNoteQueryHandler;
 import com.soomgil.planning.application.handler.ListChecklistsQueryHandler;
 import com.soomgil.planning.application.query.ListChecklistsQuery;
@@ -29,6 +30,7 @@ import com.soomgil.user.api.dto.UserSummary;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import java.util.Optional;
@@ -45,6 +47,7 @@ class AiTripContextServiceTest {
 		GetNoteQueryHandler noteHandler = mock(GetNoteQueryHandler.class);
 		ListChecklistsQueryHandler checklistHandler = mock(ListChecklistsQueryHandler.class);
 		FindDisplayNameQueryHandler displayNameHandler = mock(FindDisplayNameQueryHandler.class);
+		PlaceAccessibilityCacheService accessibilityCacheService = mock(PlaceAccessibilityCacheService.class);
 		TripMemberView member = new TripMemberView(
 			UUID.randomUUID(), tripId, userId, TripMemberRole.MEMBER,
 			TripAccessRole.OWNER, TripMemberStatus.ACTIVE, Instant.now()
@@ -71,9 +74,12 @@ class AiTripContextServiceTest {
 			.thenReturn(List.of());
 		when(noteHandler.findOptional(org.mockito.ArgumentMatchers.any()))
 			.thenReturn(Optional.empty());
+		when(accessibilityCacheService.getMany(org.mockito.ArgumentMatchers.any()))
+			.thenReturn(Map.of());
 
 		AiTripContext context = new AiTripContextService(
-			tripHandler, itineraryHandler, recordService, noteHandler, checklistHandler, displayNameHandler
+			tripHandler, itineraryHandler, recordService, noteHandler, checklistHandler, displayNameHandler,
+			accessibilityCacheService
 		).load(tripId, userId);
 
 		assertThat(context.trip().title()).isEqualTo("제주 여름 여행");

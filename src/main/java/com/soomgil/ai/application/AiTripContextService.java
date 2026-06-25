@@ -2,9 +2,13 @@ package com.soomgil.ai.application;
 
 import com.soomgil.auth.application.handler.FindDisplayNameQueryHandler;
 import com.soomgil.auth.application.query.FindDisplayNameQuery;
+import com.soomgil.itinerary.application.command.dto.ItineraryItemView;
 import com.soomgil.itinerary.application.query.dto.FindItineraryQuery;
 import com.soomgil.itinerary.application.query.dto.ItineraryView;
 import com.soomgil.itinerary.application.query.handler.FindItineraryHandler;
+import com.soomgil.place.application.query.dto.AccessibilityFlag;
+import com.soomgil.place.application.query.dto.PlaceAccessibilityInfo;
+import com.soomgil.place.application.service.PlaceAccessibilityCacheService;
 import com.soomgil.planning.api.dto.Checklist;
 import com.soomgil.planning.api.dto.PlanningScopeType;
 import com.soomgil.planning.application.handler.GetNoteQueryHandler;
@@ -38,6 +42,7 @@ public class AiTripContextService {
 	private final GetNoteQueryHandler noteHandler;
 	private final ListChecklistsQueryHandler checklistHandler;
 	private final FindDisplayNameQueryHandler displayNameHandler;
+	private final PlaceAccessibilityCacheService accessibilityCacheService;
 
 	public AiTripContextService(
 		FindTripDetailHandler tripDetailHandler,
@@ -45,7 +50,8 @@ public class AiTripContextService {
 		TripRecordService recordService,
 		GetNoteQueryHandler noteHandler,
 		ListChecklistsQueryHandler checklistHandler,
-		FindDisplayNameQueryHandler displayNameHandler
+		FindDisplayNameQueryHandler displayNameHandler,
+		PlaceAccessibilityCacheService accessibilityCacheService
 	) {
 		this.tripDetailHandler = tripDetailHandler;
 		this.itineraryHandler = itineraryHandler;
@@ -53,6 +59,7 @@ public class AiTripContextService {
 		this.noteHandler = noteHandler;
 		this.checklistHandler = checklistHandler;
 		this.displayNameHandler = displayNameHandler;
+		this.accessibilityCacheService = accessibilityCacheService;
 	}
 
 	/**
@@ -75,6 +82,7 @@ public class AiTripContextService {
 		List<Checklist> checklists = checklistHandler.handle(new ListChecklistsQuery(
 			tripId, null, null, requesterUserId
 		));
+		Map<String, PlaceAccessibilityInfo> accessibilityByPlace = loadAccessibility(itinerary);
 
 		return new AiTripContext(
 			new AiTripContext.TripSummary(
@@ -88,7 +96,8 @@ public class AiTripContextService {
 				day.id(), day.groupType().name(), day.dayNumber(), day.date(), day.title(),
 				day.items().stream().map(item -> new AiTripContext.ItemSummary(
 					item.id(), item.sortOrder(), item.itemType().name(), item.placeProvider(),
-					item.externalPlaceId(), item.placeName(), item.address(), item.lat(), item.lng()
+					item.externalPlaceId(), item.placeName(), item.address(), item.lat(), item.lng(),
+					accessibilitySummary(accessibilityByPlace, item)
 				)).toList()
 			)).toList(),
 			itinerary.routes().stream().map(route -> new AiTripContext.RouteSummary(
@@ -102,6 +111,38 @@ public class AiTripContextService {
 			records.stream().map(record -> recordSummary(record, names)).toList(),
 			loadNotes(tripId, requesterUserId, itinerary),
 			checklists.stream().map(this::checklistSummary).toList()
+		);
+	}
+
+	private Map<String, PlaceAccessibilityInfo> loadAccessibility(ItineraryView itinerary) {
+		List<PlaceAccessibilityCacheService.PlaceRef> refs = itinerary.days().stream()
+			.flatMap(day -> day.items().stream())
+			.filter(item -> item.placeProvider() != null && item.externalPlaceId() != null)
+			.map(item -> new PlaceAccessibilityCacheService.PlaceRef(
+				item.placeProvider(),
+				item.externalPlaceId(),
+				null
+			))
+			.distinct()
+			.toList();
+		return accessibilityCacheService.getMany(refs);
+	}
+
+	private AiTripContext.AccessibilitySummary accessibilitySummary(
+		Map<String, PlaceAccessibilityInfo> accessibilityByPlace,
+		ItineraryItemView item
+	) {
+		if (item.placeProvider() == null || item.externalPlaceId() == null) {
+			return null;
+		}
+		PlaceAccessibilityInfo accessibility = accessibilityByPlace.get(item.placeProvider() + ":" + item.externalPlaceId());
+		if (accessibility == null) {
+			return null;
+		}
+		return new AiTripContext.AccessibilitySummary(
+			accessibility.parkingType().name(),
+			accessibility.flags().stream().map(AccessibilityFlag::name).sorted().toList(),
+			accessibility.unavailableFlags().stream().map(AccessibilityFlag::name).sorted().toList()
 		);
 	}
 
