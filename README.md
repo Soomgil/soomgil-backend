@@ -1,11 +1,24 @@
-# Soomgil Backend
+# 숨길 Backend
 
-Spring Boot backend for Soomgil.
+숨길의 Spring Boot API 서버입니다. 여행방 협업, 취향 기반 장소 추천, 일정 편집, 기록, 커뮤니티 기능을 제공하고 프론트엔드가 사용하는 REST/WebSocket API를 담당합니다.
 
-## Stack
+## 서비스 도메인
+
+| 도메인 | 설명 |
+| :--- | :--- |
+| Auth/User | 회원가입, 로그인, OAuth, 내 프로필과 설정 |
+| Trip | 여행방 생성, 멤버 관리, 초대 링크, 권한 확인 |
+| Itinerary | 일차/일정/경로/지도 그림 관리 |
+| Preference/Swipe | 장소 스와이프, 슈퍼라이크, 사용자 취향 projection |
+| Place/Search | 장소 검색, 접근성 정보, 추천 후보 조회 |
+| AI | 여행방 상태를 참고하는 AI 가이드와 제한된 도구 실행 |
+| Chat/Notification | 여행방 채팅, 초대 알림 |
+| Record/Community | 여행 기록 미디어, 여행기 발행, 댓글, 좋아요, 리트립 |
+
+## 기술 스택
 
 - Java 21
-- Spring Boot 3.5.15
+- Spring Boot 3
 - Gradle
 - PostgreSQL
 - Redis
@@ -13,234 +26,72 @@ Spring Boot backend for Soomgil.
 - MyBatis
 - Spring Security
 - Spring Modulith
+- MinIO/S3
 
-## Run
+## 실행
 
-Requirements:
-
-- JDK 21
-- Docker Desktop or a compatible Docker runtime
-
-Recommended local runtime:
-
-- macOS: Docker Desktop or Colima
-- Windows: Docker Desktop with WSL2 backend
+JDK 21과 Docker 실행 환경이 필요합니다.
 
 ```bash
-cp .env.example .env
-./gradlew bootRun
-```
-
-On Windows PowerShell:
-
-```powershell
-copy .env.example .env
-.\gradlew.bat bootRun
-```
-
-Spring Boot Docker Compose support starts `compose.yaml` automatically when Docker is running.
-
-Useful endpoints:
-
-- `GET /api/v1/health`
-- `GET /actuator/health`
-- `GET /swagger-ui`
-- Mailpit: `http://localhost:8025`
-- MinIO console: `http://localhost:9001`
-
-## Local Infrastructure
-
-macOS/Linux:
-
-```bash
-colima start
 docker compose up -d
-docker compose ps
-docker compose down
+./gradlew bootRun
 ```
 
 Windows PowerShell:
 
 ```powershell
 docker compose up -d
-docker compose ps
-docker compose down
+.\gradlew.bat bootRun
 ```
 
-The compose stack contains PostgreSQL, Redis, Mailpit, and MinIO.
+기본 API 서버 주소는 http://localhost:8080 입니다.
 
-## Test
+## 주요 명령
 
-```bash
-./gradlew test
-```
+| 명령 | 설명 |
+| :--- | :--- |
+| `./gradlew bootRun` | 로컬 서버 실행 |
+| `./gradlew test` | 테스트 실행 |
+| `./gradlew build` | 빌드 |
+| `docker compose up -d` | PostgreSQL, Redis, Mailpit, MinIO 실행 |
+| `docker compose down` | 로컬 인프라 종료 |
 
-On Windows PowerShell:
+## 주요 엔드포인트
 
-```powershell
-.\gradlew.bat test
-```
+| 엔드포인트 | 설명 |
+| :--- | :--- |
+| `/api/v1/health` | 서비스 헬스 체크 |
+| `/actuator/health` | Actuator 헬스 체크 |
+| `/swagger-ui` | Swagger UI |
 
-The generated context test uses Testcontainers, so Docker must be available.
-When using Colima, the Gradle test task automatically sets the Docker socket environment if `~/.colima/default/docker.sock` exists. If you run tests outside Gradle, use:
+로컬 보조 서비스:
 
-```bash
-export DOCKER_HOST=unix://$HOME/.colima/default/docker.sock
-export TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock
-```
+| 서비스 | 주소 |
+| :--- | :--- |
+| Mailpit | http://localhost:8025 |
+| MinIO Console | http://localhost:9001 |
 
-## CQRS-lite Structure
+## 구조
 
-Each domain package follows the same shape:
+도메인은 CQRS-lite 형태로 구성합니다.
 
 ```text
 {domain}/
   api/
   application/
     command/
-      dto/
-      handler/
     query/
-      dto/
-      handler/
   domain/
-    model/
-    policy/
-    event/
   infrastructure/
-    persistence/
-      mapper/
-      repository/
-      row/
-    external/
 ```
 
-Rules:
+기본 원칙:
 
-- Controllers call command handlers or query handlers.
-- Command handlers own writes and transactions.
-- Query handlers own read-only lookup and projection access.
-- Domain code does not depend on API, persistence, MyBatis, or external clients.
-- Application code may depend on infrastructure repository interfaces/classes directly in this lite structure.
-- Infrastructure repositories use MyBatis mappers and row records.
-- Use `common.cqrs.Command`, `CommandHandler`, `Query`, and `QueryHandler` when a use case benefits from explicit typing.
+- Controller는 command/query handler를 호출합니다.
+- Command는 상태 변경, Query는 조회 책임을 가집니다.
+- DB 접근은 MyBatis mapper와 repository에서 처리합니다.
+- JPA/Hibernate는 사용하지 않습니다.
 
-## MyBatis Persistence
+## 환경변수
 
-Use this shape for SQL-backed persistence:
-
-```text
-{domain}/
-  application/
-    command/
-      dto/
-        CreateTripCommand.java
-      handler/
-        CreateTripHandler.java
-    query/
-      dto/
-        FindTripDetailQuery.java
-        TripDetailView.java
-      handler/
-        FindTripDetailHandler.java
-  infrastructure/
-    persistence/
-      mapper/
-        TripCommandMapper.java
-        TripQueryMapper.java
-      repository/
-        TripCommandRepository.java
-        TripQueryRepository.java
-      row/
-        TripRow.java
-
-src/main/resources/mappers/{domain}/
-  TripCommandMapper.xml
-  TripQueryMapper.xml
-```
-
-Guidelines:
-
-- Mapper interfaces are annotated with `@Mapper`.
-- XML SQL lives under `src/main/resources/mappers/{domain}/`.
-- `row` records represent database rows, not domain models.
-- Repository implementations translate between domain/view DTOs and rows.
-- Command handlers use command repositories for writes.
-- Query handlers use query repositories for reads.
-- Do not introduce JPA entities, `EntityManager`, Hibernate repositories, or `spring-boot-starter-data-jpa`.
-
-## Preference Resources
-
-Preference and recommendation seed inputs live under `src/main/resources/preference/`.
-
-```text
-src/main/resources/preference/
-  tags/
-    # Fixed tag dictionary seed. Must match .agent/docs/product-specs/preference_tagging_policy.md.
-  personas/
-    # 50 fixed cold-start persona definitions for synthetic swipe generation.
-```
-
-Rules:
-
-- Tag dictionary seed data must use only the fixed whitelist from the product policy.
-- Persona definitions must keep exactly 50 active personas per generator version.
-- Synthetic persona swipe data must stay separate from real user swipe events.
-
-## Tourism Source Resources
-
-Tourism source import and award-photo matching resources live under `src/main/resources/tourism-source/`.
-
-```text
-src/main/resources/tourism-source/
-  imports/
-    # Manifests for KTO/SSAFY-style sidos, guguns, contenttypes, attractions, attraction image imports.
-  award-photos/
-    # S3 object metadata manifests for downloaded KTO Contents Lab award photos.
-  matching-rules/
-    # Region/file-name alias rules used before manual matching.
-```
-
-Rules:
-
-- Source tourism data is for enrichment/tag extraction and is not the production service place master.
-- Award photo binaries are uploaded to S3-compatible storage, not committed to the repository.
-- Award photos may match exact attractions, region only, or remain unmatched for future use.
-
-## Naming
-
-- `Command`: request data for an operation that changes state.
-- `CommandHandler`: one focused class that handles one command and owns the write transaction.
-- `Query`: request data for an operation that reads state.
-- `QueryHandler`: one focused class that handles one query and owns the read use case.
-- `Repository`: persistence-facing class that calls MyBatis mappers.
-- `Mapper`: MyBatis interface connected to XML SQL.
-- `Row`: database row shape.
-
-Use the same action name across a command/query, its handler, and its result/view:
-
-```text
-CreateTripCommand -> CreateTripHandler -> CreateTripResult
-InviteTripMemberCommand -> InviteTripMemberHandler -> InviteTripMemberResult
-FindTripDetailQuery -> FindTripDetailHandler -> TripDetailView
-FindRecommendedPlacesQuery -> FindRecommendedPlacesHandler -> PageResponse<RecommendedPlaceView>
-```
-
-Handler return rules:
-
-- Commands that create or change state return an explicit `{Action}Result` record.
-- Commands that do not need a response body return `NoResult`, not `Void` or `null`.
-- Queries that return one object use `{Resource}View`.
-- Queries that return a list use `PageResponse<{Resource}View>` or another agreed page response type.
-- API response DTOs stay in `api/dto`; application handlers return result/view records, not HTTP DTOs.
-
-## Common Contracts
-
-- CQRS handler generic order is input first, result second: `CommandHandler<CreateTripCommand, CreateTripResult>` and `QueryHandler<FindTripQuery, TripView>`.
-- Use `NoResult` for command handlers that intentionally produce no response body.
-- Controllers and application services should use `ProblemDetails` for common error response shape.
-- `CurrentUserProvider` is the minimal security contract for domain code that needs the authenticated user id.
-- Tests can use a fake `CurrentUserProvider` without waiting for full auth implementation.
-- Domain events shared across modules use `EventEnvelope<T>` with `eventId`, `eventType`, `schemaVersion`, `occurredAt`, aggregate metadata, optional `actorUserId`, and typed payload.
-- S3/MinIO metadata shared across modules uses `StorageObjectKey` and `StorageObjectMetadata`; object keys are relative, forward-slash paths and `publicUrl` is optional.
-- Use `Ids`, `TimeProvider`, and `ValidationRules` for shared UUID parsing, testable current time, and repeated domain invariants.
+로컬 통합 실행은 루트 `soomgil/.env`와 `compose.yaml` 기준으로 관리합니다. 실제 비밀값은 커밋하지 않습니다.
