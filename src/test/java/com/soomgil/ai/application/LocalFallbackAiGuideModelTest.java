@@ -3,6 +3,7 @@ package com.soomgil.ai.application;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -81,6 +82,33 @@ class LocalFallbackAiGuideModelTest {
 			ArgumentCaptor.forClass(AiFilterPlacesTools.RemoveItemsInput.class);
 		verify(filterTools).removeItineraryItemsByCondition(input.capture());
 		assertThat(input.getValue().itemIds()).containsExactly(blockedItemId);
+		assertThat(reply.toolCalls()).containsExactly(call);
+	}
+
+	@Test
+	void overallChecklistRequestWritesTripLevelChecklistInsteadOfDayChecklists() {
+		AiGenerateChecklistTools checklistTools = mock(AiGenerateChecklistTools.class);
+		AiToolCall call = mock(AiToolCall.class);
+		when(toolsFactory.create(any(), org.mockito.ArgumentMatchers.eq(AiIntent.GENERATE_CHECKLIST_FROM_ITINERARY)))
+			.thenReturn(List.of(checklistTools));
+		when(checklistTools.executedCalls()).thenReturn(List.of(call));
+		AiTripContext context = contextWithItems(
+			item(UUID.randomUUID(), "제주해수욕장", null),
+			item(UUID.randomUUID(), "제주박물관", null)
+		);
+
+		AiGuideReply reply = model.replyWithWriteTools(
+			request("여행계획 보고 준비물 전체 체크리스트에 작성해줘", context),
+			new AiIntentDecision(AiIntent.GENERATE_CHECKLIST_FROM_ITINERARY, 1.0, "test", null)
+		);
+
+		ArgumentCaptor<AiGenerateChecklistTools.GenerateItemsInput> input =
+			ArgumentCaptor.forClass(AiGenerateChecklistTools.GenerateItemsInput.class);
+		verify(checklistTools).generateChecklistItems(input.capture());
+		verify(checklistTools, never()).generateChecklistItemsByDay(any());
+		assertThat(input.getValue().scope()).isEqualTo("TRIP");
+		assertThat(input.getValue().itineraryDayId()).isNull();
+		assertThat(input.getValue().items()).contains("입장권 예약 여부와 운영시간 확인하기");
 		assertThat(reply.toolCalls()).containsExactly(call);
 	}
 

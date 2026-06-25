@@ -182,6 +182,38 @@ class AiChatServiceTest {
 		verify(model, never()).replyWithoutTools(any(), any());
 	}
 
+	@Test
+	void deleteCueUsesTheDeleteToolEvenIfClassifierIsAmbiguous() {
+		stubAssistant("경복궁을 일정에서 삭제했어요.");
+		when(model.classify(any())).thenReturn(decision(AiIntent.AMBIGUOUS));
+		when(model.replyWithWriteTools(any(), any())).thenReturn(
+			new AiGuideReply("경복궁을 일정에서 삭제했어요.", List.of())
+		);
+
+		service.createMessage(tripId, userId, "경복궁 지워줘", null);
+
+		verify(model).replyWithWriteTools(any(), org.mockito.ArgumentMatchers.argThat(
+			decision -> decision.intent() == AiIntent.DELETE_ITINERARY_ITEM
+		));
+		verify(model, never()).replyWithoutTools(any(), any());
+	}
+
+	@Test
+	void numberedPlaceAddCueUsesRecommendedPlaceAddEvenIfClassifierIsGenericAdd() {
+		stubAssistant("추천 여행지 2개를 2일차에 추가했어요.");
+		when(model.classify(any())).thenReturn(decision(AiIntent.ADD_PLACE_TO_ITINERARY));
+		when(model.replyWithWriteTools(any(), any())).thenReturn(
+			new AiGuideReply("추천 여행지 2개를 2일차에 추가했어요.", List.of())
+		);
+
+		service.createMessage(tripId, userId, "2일차에 여행지 2개 추가해줘", null);
+
+		verify(model).replyWithWriteTools(any(), org.mockito.ArgumentMatchers.argThat(
+			decision -> decision.intent() == AiIntent.ADD_RECOMMENDED_PLACES_TO_ITINERARY
+		));
+		verify(model, never()).replyWithoutTools(any(), any());
+	}
+
 	private AiIntentDecision decision(AiIntent intent) {
 		return new AiIntentDecision(intent, 0.99, "test", null);
 	}

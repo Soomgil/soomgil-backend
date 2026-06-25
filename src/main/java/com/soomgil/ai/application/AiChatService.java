@@ -182,6 +182,18 @@ public class AiChatService {
 		if (normalized.matches(".*(뭐할수있어|무엇을할수있어|어떤걸할수있어|사용법|기능알려줘|howtouse).*")) {
 			return decision.force(AiIntent.HELP, "사용법 질문은 도구를 사용하지 않습니다.");
 		}
+		if (isRecommendedPlaceAddRequest(normalized)) {
+			return decision.force(
+				AiIntent.ADD_RECOMMENDED_PLACES_TO_ITINERARY,
+				"장소 이름 없이 여행지 개수를 지정한 추가 요청은 추천 장소 추가로 처리합니다."
+			);
+		}
+		if (isDeleteItineraryItemRequest(normalized)) {
+			return decision.force(
+				AiIntent.DELETE_ITINERARY_ITEM,
+				"장소 이름 삭제 요청은 일정 장소 삭제 도구로 처리합니다."
+			);
+		}
 		if (isChecklistGenerationRequest(normalized)) {
 			return decision.force(
 				AiIntent.GENERATE_CHECKLIST_FROM_ITINERARY,
@@ -224,7 +236,9 @@ public class AiChatService {
 			case ADD_PLACE_TO_ITINERARY -> question.matches(".*(일정|일차).*(추가|넣어|등록).*")
 				|| question.matches(".*(추가|넣어|등록).*(일정|일차).*");
 			case ADD_RECOMMENDED_PLACES_TO_ITINERARY -> question.matches(".*(추천|갈만한|여행지|장소).*(넣어|추가|등록|일정에).*")
-				|| question.matches(".*(넣어|추가|등록).*(추천|갈만한|여행지|장소).*");
+				|| question.matches(".*(넣어|추가|등록).*(추천|갈만한|여행지|장소).*")
+				|| isRecommendedPlaceAddRequest(question);
+			case DELETE_ITINERARY_ITEM -> isDeleteItineraryItemRequest(question);
 			case MOVE_ITINERARY_ITEM -> question.matches(".*(옮겨|이동|재배치|순서.*바꿔).*");
 			case SUMMARIZE_ITINERARY -> question.matches(".*(요약|정리|분석|리뷰|코스.*봐줘|코스.*리뷰).*")
 				|| question.matches(".*(여행일정|여행.*일정|전체.*일정).*(어때|어떨까|봐줘).*");
@@ -246,6 +260,21 @@ public class AiChatService {
 			|| question.matches(".*예약.*필요.*체크.*")
 			|| question.matches(".*준비물.*뭐.*")
 			|| question.matches(".*체크리스트.*뭐.*");
+	}
+
+	private boolean isRecommendedPlaceAddRequest(String question) {
+		return question.matches(".*(여행지|장소|갈만한곳|갈곳).*\\d+개.*(추가|넣어|등록).*")
+			|| question.matches(".*\\d+개.*(여행지|장소|갈만한곳|갈곳).*(추가|넣어|등록).*")
+			|| question.matches(".*(추천|알아서).*(여행지|장소|갈만한곳|갈곳).*(추가|넣어|등록).*");
+	}
+
+	private boolean isDeleteItineraryItemRequest(String question) {
+		return !isConditionBasedRemovalRequest(question)
+			&& question.matches(".*(지워|삭제|제거|빼줘|빼기|없애).*");
+	}
+
+	private boolean isConditionBasedRemovalRequest(String question) {
+		return question.matches(".*(유료|무료|장애인|휠체어|유모차|접근|휴무|닫은|폐업|입장료).*");
 	}
 
 	private AiChatSessionRow requireSession(UUID tripId) {

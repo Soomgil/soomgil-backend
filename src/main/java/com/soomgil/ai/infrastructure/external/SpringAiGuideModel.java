@@ -142,6 +142,9 @@ public class SpringAiGuideModel implements AiGuideModel {
 		if (!decision.intent().usesWriteTools()) {
 			throw new IllegalArgumentException("Write tools cannot handle intent: " + decision.intent());
 		}
+		if (runsDeterministically(decision.intent())) {
+			return fallback.replyWithWriteTools(request, decision);
+		}
 		String mode = switch (decision.intent()) {
 			case DELETE_ITINERARY_ITEM -> "현재 여행 맥락 JSON에서 사용자가 말한 장소 이름을 확인하고 "
 				+ "deleteItineraryItem 도구에 placeName을 전달하세요. UUID를 추측하지 마세요.";
@@ -159,6 +162,8 @@ public class SpringAiGuideModel implements AiGuideModel {
 				+ "애매하면 삭제하지 말고 후보를 먼저 사용자에게 확인하라.";
 			case GENERATE_CHECKLIST_FROM_ITINERARY -> "여행 맥락 JSON의 days[].items[] 를 분석해 예약 필수 장소, 날씨 대비, "
 				+ "이동 수단, 입장료 등 필요한 준비물·할 일을 자동 추가하라. "
+				+ "사용자가 '전체 체크리스트', '공통 준비물', '여행 계획 보고 준비물'처럼 전체/공통을 요청하면 "
+				+ "반드시 generateChecklistItems 도구를 scope TRIP, itineraryDayId null로 호출하라. "
 				+ "사용자가 '각각 체크리스트에', '일차별로', '가는 일차에 맞춰서'라고 요청했거나 특정 장소에서 파생된 할 일은 "
 				+ "반드시 generateChecklistItemsByDay 도구를 사용하고, 해당 장소가 속한 days[].id를 itineraryDayId로 전달하라. "
 				+ "예: 롯데월드가 3일차 day에 있으면 그 3일차 itineraryDayId 그룹에 '롯데월드 예매 확인'을 넣는다. "
@@ -169,6 +174,12 @@ public class SpringAiGuideModel implements AiGuideModel {
 			default -> "등록된 단 하나의 쓰기 도구 범위만 사용하세요. 다른 종류의 변경을 시도하지 마세요.";
 		};
 		return replyWithTools(request, decision, mode);
+	}
+
+	private boolean runsDeterministically(AiIntent intent) {
+		return intent == AiIntent.DELETE_ITINERARY_ITEM
+			|| intent == AiIntent.ADD_RECOMMENDED_PLACES_TO_ITINERARY
+			|| intent == AiIntent.GENERATE_CHECKLIST_FROM_ITINERARY;
 	}
 
 	private AiGuideReply replyWithTools(AiGuideRequest request, AiIntentDecision decision, String mode) {

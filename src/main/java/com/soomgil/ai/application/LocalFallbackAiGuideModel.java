@@ -130,8 +130,7 @@ public class LocalFallbackAiGuideModel implements AiGuideModel {
 				);
 			}
 			return new AiGuideReply(
-				"AI 분석 서버가 일시적으로 원활하지 않아요. 방금 조회한 데이터는 화면에서 확인할 수 있어요. "
-				+ "잠시 후 다시 요청해주시면 자연어로 정리해드릴게요.",
+				"요청한 정보를 조회했어요. 화면에서 최신 내용을 확인해주세요.",
 				calls
 			);
 		}
@@ -193,6 +192,13 @@ public class LocalFallbackAiGuideModel implements AiGuideModel {
 	}
 
 	private AiGuideReply generateChecklist(AiGuideRequest request, AiGenerateChecklistTools tools) {
+		if (requiresTripLevelChecklist(request.question())) {
+			tools.generateChecklistItems(new AiGenerateChecklistTools.GenerateItemsInput(
+				checklistIdForTrip(request.tripContext()), "TRIP", null, "AI 추천 준비물",
+				tripChecklistItems(request), null
+			));
+			return new AiGuideReply("현재 여행 계획 기준으로 전체 체크리스트에 준비물을 추가했어요.", tools.executedCalls());
+		}
 		List<AiGenerateChecklistTools.DayChecklistInput> dayGroups = dayChecklistCandidates(request);
 		if (!dayGroups.isEmpty()) {
 			tools.generateChecklistItemsByDay(new AiGenerateChecklistTools.GenerateItemsByDayInput(dayGroups));
@@ -428,9 +434,47 @@ public class LocalFallbackAiGuideModel implements AiGuideModel {
 		return groups;
 	}
 
+	private boolean requiresTripLevelChecklist(String question) {
+		String normalized = normalize(question);
+		return normalized.contains("전체") || normalized.contains("공통")
+			|| normalized.contains("여행방") || normalized.contains("여행계획")
+			|| normalized.contains("여행계획보고") || normalized.contains("일정보고");
+	}
+
+	private List<String> tripChecklistItems(AiGuideRequest request) {
+		List<String> items = new ArrayList<>();
+		items.add("교통편과 이동 시간 확인하기");
+		items.add("보조배터리와 충전기 챙기기");
+		items.add("날씨에 맞는 옷과 편한 신발 챙기기");
+		if (request.tripContext() != null) {
+			boolean hasOutdoor = request.tripContext().days().stream()
+				.flatMap(day -> day.items().stream())
+				.anyMatch(item -> normalize((item.placeName() == null ? "" : item.placeName())
+					+ " " + (item.address() == null ? "" : item.address()))
+					.matches(".*(해수욕장|바다|수변|공원|수목원|오름|산|전망대).*"));
+			boolean hasTicketed = request.tripContext().days().stream()
+				.flatMap(day -> day.items().stream())
+				.anyMatch(item -> normalize((item.placeName() == null ? "" : item.placeName())
+					+ " " + (item.address() == null ? "" : item.address()))
+					.matches(".*(월드|랜드|테마파크|케이블카|전망대|박물관|미술관).*"));
+			if (hasOutdoor) items.add("야외 일정용 물과 자외선 차단제 챙기기");
+			if (hasTicketed) items.add("입장권 예약 여부와 운영시간 확인하기");
+		}
+		return items.stream().distinct().limit(10).toList();
+	}
+
 	private UUID checklistIdForDay(AiTripContext context, UUID dayId) {
 		return context.checklists().stream()
 			.filter(checklist -> "DAY".equals(checklist.scopeType()) && dayId.equals(checklist.itineraryDayId()))
+			.map(AiTripContext.ChecklistSummary::id)
+			.findFirst()
+			.orElse(null);
+	}
+
+	private UUID checklistIdForTrip(AiTripContext context) {
+		if (context == null) return null;
+		return context.checklists().stream()
+			.filter(checklist -> "TRIP".equals(checklist.scopeType()))
 			.map(AiTripContext.ChecklistSummary::id)
 			.findFirst()
 			.orElse(null);
