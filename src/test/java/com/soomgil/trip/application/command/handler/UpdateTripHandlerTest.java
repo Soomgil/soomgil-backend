@@ -97,7 +97,33 @@ class UpdateTripHandlerTest {
 	}
 
 	@Test
-	void nonOwnerCannotUpdateTripSettings() {
+	void activeMemberCanUpdateTripSettings() {
+		queryRepository.access = Optional.of(new TripAccessSnapshot(
+			tripId,
+			memberUserId,
+			TripStatus.ACTIVE,
+			TripMemberStatus.ACTIVE,
+			ownerUserId
+		));
+
+		handler.handle(new UpdateTripCommand(
+			tripId,
+			memberUserId,
+			"제주 여행",
+			"제주",
+			List.of("5011010100"),
+			null
+		));
+
+		assertThat(commandRepository.updated.tripId()).isEqualTo(tripId);
+		assertThat(commandRepository.updated.title()).isEqualTo("제주 여행");
+		assertThat(commandRepository.updated.displayDestination()).isEqualTo("제주");
+		assertThat(commandRepository.updated.status()).isNull();
+		assertThat(commandRepository.replacedRegionCodes).containsExactly("5011010100");
+	}
+
+	@Test
+	void nonOwnerCannotUpdateTripStatus() {
 		queryRepository.access = Optional.of(new TripAccessSnapshot(
 			tripId,
 			memberUserId,
@@ -109,10 +135,10 @@ class UpdateTripHandlerTest {
 		assertThatThrownBy(() -> handler.handle(new UpdateTripCommand(
 			tripId,
 			memberUserId,
-			"제주 여행",
 			null,
 			null,
-			null
+			null,
+			TripStatus.ARCHIVED
 		))).isInstanceOfSatisfying(BusinessException.class, exception ->
 			assertThat(exception.errorCode()).isEqualTo(ErrorCode.FORBIDDEN)
 		);

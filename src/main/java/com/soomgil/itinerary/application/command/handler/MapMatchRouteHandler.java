@@ -23,10 +23,14 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HexFormat;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Mapbox map matching 결과로 route segment를 생성한다.
@@ -35,6 +39,7 @@ import org.springframework.stereotype.Component;
 public class MapMatchRouteHandler implements CommandHandler<MapMatchRouteCommand, MapMatchRouteResult> {
 
 	private static final String PROVIDER = "MAPBOX";
+	private static final String FALLBACK_PROVIDER = "USER_TRACE";
 
 	private final ItineraryCommandRepository repository;
 	private final TripAccessGuard tripAccessGuard;
@@ -63,6 +68,7 @@ public class MapMatchRouteHandler implements CommandHandler<MapMatchRouteCommand
 	}
 
 	@Override
+	@Transactional
 	public MapMatchRouteResult handle(MapMatchRouteCommand command) {
 		tripAccessGuard.requireActiveMember(command.tripId(), command.actorUserId());
 		validate(command);
@@ -79,10 +85,33 @@ public class MapMatchRouteHandler implements CommandHandler<MapMatchRouteCommand
 			clientResult = mapMatchingClient.match(clientRequest);
 		}
 		catch (MapMatchingException exception) {
-			Long requestId = saveMatchLog(command, providerProfile, null, "FAILED", null, exception);
-			throw new BusinessException(
-				ErrorCode.BUSINESS_RULE_VIOLATION,
-				"Route matching failed. requestId=" + requestId
+			ItineraryMutationResult fallbackMutation = saveRouteSegmentHandler.handle(new SaveRouteSegmentCommand(
+				command.tripId(),
+				command.actorUserId(),
+				command.baseVersion(),
+				command.originItineraryItemId(),
+				command.destinationItineraryItemId(),
+				command.mode(),
+				FALLBACK_PROVIDER,
+				fallbackProviderProfile(command.mode()),
+				rawLineStringGeometry(command.coordinates()),
+				null,
+				null,
+				null
+			));
+			Long requestId = saveMatchLog(
+				command,
+				providerProfile,
+				fallbackMutation.route().id(),
+				"FALLBACK",
+				null,
+				exception
+			);
+			return new MapMatchRouteResult(
+				fallbackMutation,
+				requestId,
+				List.of(),
+				fallbackMetadata(exception)
 			);
 		}
 
@@ -189,6 +218,32 @@ public class MapMatchRouteHandler implements CommandHandler<MapMatchRouteCommand
 			case DRIVING -> "mapbox/driving";
 			case WALKING -> "mapbox/walking";
 		};
+	}
+
+	private String fallbackProviderProfile(RouteMode mode) {
+		return switch (mode) {
+			case DRIVING -> "user-trace/driving";
+			case WALKING -> "user-trace/walking";
+		};
+	}
+
+	private Map<String, Object> fallbackMetadata(MapMatchingException exception) {
+		Map<String, Object> metadata = new LinkedHashMap<>();
+		metadata.put("code", "FALLBACK");
+		metadata.put("reason", exception.providerCode());
+		metadata.put("message", exception.getMessage());
+		return metadata;
+	}
+
+	private Map<String, Object> rawLineStringGeometry(List<RouteCoordinate> coordinates) {
+		List<List<Double>> lineCoordinates = new ArrayList<>();
+		for (RouteCoordinate coordinate : coordinates) {
+			lineCoordinates.add(List.of(coordinate.lng(), coordinate.lat()));
+		}
+		return Map.of(
+			"type", "LineString",
+			"coordinates", lineCoordinates
+		);
 	}
 
 	private String toJson(Object value) {
