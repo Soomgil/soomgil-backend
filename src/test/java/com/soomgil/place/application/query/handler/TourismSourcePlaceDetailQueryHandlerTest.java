@@ -7,6 +7,10 @@ import com.soomgil.place.api.dto.PlaceProvider;
 import com.soomgil.place.api.dto.PlaceSourceStatus;
 import com.soomgil.place.application.query.dto.PlaceDetailItem;
 import com.soomgil.place.application.query.dto.PlaceDetailQuery;
+import com.soomgil.place.application.query.dto.AccessibilityFlag;
+import com.soomgil.place.application.query.dto.ParkingType;
+import com.soomgil.place.application.query.dto.PlaceAccessibilityInfo;
+import com.soomgil.place.application.service.PlaceAccessibilityCacheService;
 import com.soomgil.place.infrastructure.persistence.mapper.TourismSourcePlaceDetailMapper;
 import com.soomgil.place.infrastructure.persistence.mapper.TourismSourcePlaceImageMapper;
 import com.soomgil.place.infrastructure.persistence.repository.TourismSourcePlaceDetailRepository;
@@ -16,18 +20,22 @@ import com.soomgil.place.infrastructure.persistence.row.TourismSourcePlaceImageR
 import java.net.URI;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 class TourismSourcePlaceDetailQueryHandlerTest {
 
 	private RecordingTourismSourcePlaceDetailRepository repository;
+	private RecordingPlaceAccessibilityCacheService accessibilityCacheService;
 	private TourismSourcePlaceDetailQueryHandler handler;
 
 	@BeforeEach
 	void setUp() {
 		repository = new RecordingTourismSourcePlaceDetailRepository();
-		handler = new TourismSourcePlaceDetailQueryHandler(repository);
+		accessibilityCacheService = new RecordingPlaceAccessibilityCacheService();
+		handler = new TourismSourcePlaceDetailQueryHandler(repository, accessibilityCacheService);
 	}
 
 	@Test
@@ -73,6 +81,30 @@ class TourismSourcePlaceDetailQueryHandlerTest {
 		assertThat(result.phone()).isEqualTo("+82-51-000-0000");
 		assertThat(result.sourceUpdatedAt()).isEqualTo(OffsetDateTime.parse("2026-06-01T00:00:00Z"));
 		assertThat(result.enriched()).isTrue();
+		assertThat(accessibilityCacheService.lastRefs).containsExactly(new PlaceAccessibilityCacheService.PlaceRef(
+			"KTO",
+			"126508",
+			null
+		));
+		assertThat(result.accessibility().flags()).containsExactly(AccessibilityFlag.WHEELCHAIR);
+	}
+
+	private static final class RecordingPlaceAccessibilityCacheService extends PlaceAccessibilityCacheService {
+
+		private List<PlaceRef> lastRefs = List.of();
+
+		private RecordingPlaceAccessibilityCacheService() {
+			super(null);
+		}
+
+		@Override
+		public Map<String, PlaceAccessibilityInfo> getMany(List<PlaceRef> refs) {
+			lastRefs = refs;
+			return Map.of(
+				"KTO:126508",
+				new PlaceAccessibilityInfo(null, null, ParkingType.FREE, Set.of(AccessibilityFlag.WHEELCHAIR), Set.of())
+			);
+		}
 	}
 
 	private static final class RecordingTourismSourcePlaceDetailRepository extends TourismSourcePlaceDetailRepository {
