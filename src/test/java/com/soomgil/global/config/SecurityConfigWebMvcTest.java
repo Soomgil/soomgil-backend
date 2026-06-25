@@ -1,6 +1,8 @@
 package com.soomgil.global.config;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.soomgil.global.error.ProblemDetailsFactory;
@@ -10,7 +12,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.HttpHeaders;
 import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -23,10 +27,14 @@ import org.springframework.web.bind.annotation.RestController;
 	ProblemDetailsFactory.class,
 	SecurityConfigWebMvcTest.AdminTestController.class
 })
+@TestPropertySource(properties = "soomgil.cors.allowed-origin-patterns=https://*.example.com")
 class SecurityConfigWebMvcTest {
 
 	@Autowired
 	private MockMvc mockMvc;
+
+	@Autowired
+	private CorsProperties corsProperties;
 
 	@org.springframework.boot.test.mock.mockito.MockBean
 	private org.springframework.security.oauth2.jwt.JwtDecoder jwtDecoder;
@@ -60,6 +68,18 @@ class SecurityConfigWebMvcTest {
 	void allowsWebSocketHandshakePathWithoutHttpAuthentication() throws Exception {
 		mockMvc.perform(get("/ws"))
 			.andExpect(status().isOk());
+	}
+
+	@Test
+	void allowsCorsPreflightFromConfiguredOriginPattern() throws Exception {
+		org.assertj.core.api.Assertions.assertThat(corsProperties.allowedOriginPatternList())
+			.containsExactly("https://*.example.com");
+
+		mockMvc.perform(options("/api/v1/users/10000000-0000-0000-0000-000000000001/followers")
+				.header(HttpHeaders.ORIGIN, "https://app.example.com")
+				.header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "GET"))
+			.andExpect(status().isOk())
+			.andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "https://app.example.com"));
 	}
 
 	@RestController
