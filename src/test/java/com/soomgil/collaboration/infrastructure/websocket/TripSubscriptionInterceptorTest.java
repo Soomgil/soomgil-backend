@@ -34,7 +34,10 @@ class TripSubscriptionInterceptorTest {
 	private final TripQueryRepository tripRepository = mock(TripQueryRepository.class);
 	private final CollaborationWebSocketSessionRegistry sessionRegistry = new CollaborationWebSocketSessionRegistry();
 	private final SimpMessagingTemplate messagingTemplate = mock(SimpMessagingTemplate.class);
-	private final TripPresenceBroadcaster presenceBroadcaster = new TripPresenceBroadcaster(sessionRegistry, messagingTemplate);
+	private final TripPresenceBroadcaster presenceBroadcaster = new TripPresenceBroadcaster(
+		sessionRegistry,
+		() -> messagingTemplate
+	);
 	private final TripSubscriptionInterceptor interceptor = new TripSubscriptionInterceptor(
 		new TripAccessGuard(tripRepository),
 		sessionRegistry,

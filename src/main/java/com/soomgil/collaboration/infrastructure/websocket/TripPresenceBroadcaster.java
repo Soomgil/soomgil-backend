@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import org.springframework.beans.factory.ObjectFactory;
 import org.springframework.context.event.EventListener;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Component;
@@ -14,14 +15,17 @@ import org.springframework.web.socket.messaging.SessionDisconnectEvent;
 public class TripPresenceBroadcaster {
 
 	private final CollaborationWebSocketSessionRegistry sessionRegistry;
-	private final SimpMessagingTemplate messagingTemplate;
+	private final ObjectFactory<SimpMessagingTemplate> messagingTemplateFactory;
 
 	public TripPresenceBroadcaster(
 		CollaborationWebSocketSessionRegistry sessionRegistry,
-		SimpMessagingTemplate messagingTemplate
+		ObjectFactory<SimpMessagingTemplate> messagingTemplateFactory
 	) {
 		this.sessionRegistry = Objects.requireNonNull(sessionRegistry, "sessionRegistry must not be null");
-		this.messagingTemplate = Objects.requireNonNull(messagingTemplate, "messagingTemplate must not be null");
+		this.messagingTemplateFactory = Objects.requireNonNull(
+			messagingTemplateFactory,
+			"messagingTemplateFactory must not be null"
+		);
 	}
 
 	public void registerSubscription(String sessionId, UUID userId, UUID tripId) {
@@ -46,7 +50,7 @@ public class TripPresenceBroadcaster {
 	}
 
 	private void broadcastSnapshot(UUID tripId, List<UUID> activeUserIds) {
-		messagingTemplate.convertAndSend(
+		messagingTemplateFactory.getObject().convertAndSend(
 			"/topic/trips/" + tripId + "/collaboration",
 			TripPresenceEvent.snapshot(tripId, activeUserIds)
 		);
