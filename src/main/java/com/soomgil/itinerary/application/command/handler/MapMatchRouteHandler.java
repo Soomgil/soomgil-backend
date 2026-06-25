@@ -72,12 +72,13 @@ public class MapMatchRouteHandler implements CommandHandler<MapMatchRouteCommand
 	public MapMatchRouteResult handle(MapMatchRouteCommand command) {
 		tripAccessGuard.requireActiveMember(command.tripId(), command.actorUserId());
 		validate(command);
+		boolean tidy = Boolean.TRUE.equals(command.tidy());
 		String providerProfile = providerProfile(command.mode());
 		MapMatchClientRequest clientRequest = new MapMatchClientRequest(
 			providerProfile,
 			command.coordinates(),
 			command.radiuses(),
-			command.tidy()
+			tidy
 		);
 
 		MapMatchClientResult clientResult;
@@ -103,9 +104,10 @@ public class MapMatchRouteHandler implements CommandHandler<MapMatchRouteCommand
 				command,
 				providerProfile,
 				fallbackMutation.route().id(),
-				"FALLBACK",
+				"FAILED",
 				null,
-				exception
+				exception,
+				tidy
 			);
 			return new MapMatchRouteResult(
 				fallbackMutation,
@@ -135,7 +137,8 @@ public class MapMatchRouteHandler implements CommandHandler<MapMatchRouteCommand
 			mutation.route().id(),
 			"SUCCEEDED",
 			clientResult,
-			null
+			null,
+			tidy
 		);
 		return new MapMatchRouteResult(
 			mutation,
@@ -155,8 +158,8 @@ public class MapMatchRouteHandler implements CommandHandler<MapMatchRouteCommand
 		if (command.mode() == null) {
 			throw new BusinessException(ErrorCode.VALIDATION_FAILED, "Route mode is required.");
 		}
-		if (command.coordinates() == null || command.coordinates().size() < 2 || command.coordinates().size() > 100) {
-			throw new BusinessException(ErrorCode.VALIDATION_FAILED, "Route coordinates must contain 2 to 100 points.");
+		if (command.coordinates() == null || command.coordinates().size() < 2 || command.coordinates().size() > 25) {
+			throw new BusinessException(ErrorCode.VALIDATION_FAILED, "Route coordinates must contain 2 to 25 points.");
 		}
 		for (RouteCoordinate coordinate : command.coordinates()) {
 			if (coordinate == null) {
@@ -181,7 +184,8 @@ public class MapMatchRouteHandler implements CommandHandler<MapMatchRouteCommand
 		java.util.UUID routeId,
 		String status,
 		MapMatchClientResult result,
-		MapMatchingException exception
+		MapMatchingException exception,
+		boolean tidy
 	) {
 		Instant now = timeProvider.now();
 		String inputCoordinates = toJson(command.coordinates());
@@ -198,8 +202,8 @@ public class MapMatchRouteHandler implements CommandHandler<MapMatchRouteCommand
 			providerProfile,
 			inputCoordinates,
 			radiuses,
-			command.tidy(),
-			hash(providerProfile + "|" + inputCoordinates + "|" + radiuses + "|" + command.tidy()),
+			tidy,
+			hash(providerProfile + "|" + inputCoordinates + "|" + radiuses + "|" + tidy),
 			status,
 			result == null ? null : result.confidence(),
 			result == null ? null : result.distanceMeters(),

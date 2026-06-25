@@ -14,7 +14,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
-class MapboxMapMatchingClientTest {
+class MapboxDirectionsClientTest {
 
 	private HttpServer server;
 
@@ -26,20 +26,19 @@ class MapboxMapMatchingClientTest {
 	}
 
 	@Test
-	void sendsMapboxRequestAndParsesFirstMatching() throws Exception {
+	void sendsDirectionsRequestAndParsesFirstRoute() throws Exception {
 		AtomicReference<URI> requestedUri = new AtomicReference<>();
 		server = HttpServer.create(new InetSocketAddress(0), 0);
-		server.createContext("/matching/v5/", exchange -> {
+		server.createContext("/directions/v5/", exchange -> {
 			requestedUri.set(exchange.getRequestURI());
 			byte[] body = ("""
 				{
 				  "code": "Ok",
-				  "tracepoints": [{"waypoint_index": 0}, null],
-				  "matchings": [{
+				  "waypoints": [{"distance": 0}, {"distance": 1}],
+				  "routes": [{
 				    "geometry": {"type": "LineString", "coordinates": [[127.0, 37.0], [127.1, 37.1]]},
 				    "distance": 120.5,
-				    "duration": 60.25,
-				    "confidence": 0.95
+				    "duration": 60.25
 				  }]
 				}
 				""").getBytes(StandardCharsets.UTF_8);
@@ -53,7 +52,7 @@ class MapboxMapMatchingClientTest {
 		MapboxProperties properties = new MapboxProperties();
 		properties.setBaseUrl("http://localhost:" + server.getAddress().getPort());
 		properties.setAccessToken("test-token");
-		MapboxMapMatchingClient client = new MapboxMapMatchingClient(properties, new ObjectMapper());
+		MapboxDirectionsClient client = new MapboxDirectionsClient(properties, new ObjectMapper());
 
 		var result = client.match(new MapMatchClientRequest(
 			"mapbox/walking",
@@ -63,13 +62,14 @@ class MapboxMapMatchingClientTest {
 		));
 
 		assertThat(requestedUri.get().getPath())
-			.isEqualTo("/matching/v5/mapbox/walking/127.0,37.0;127.1,37.1.json");
+			.isEqualTo("/directions/v5/mapbox/walking/127.0,37.0;127.1,37.1.json");
 		assertThat(requestedUri.get().getQuery())
-			.contains("access_token=test-token", "geometries=geojson", "radiuses=10.0;20.0", "tidy=true");
+			.contains("access_token=test-token", "geometries=geojson", "overview=full", "steps=false")
+			.doesNotContain("radiuses=", "tidy=");
 		assertThat(result.geometry()).containsEntry("type", "LineString");
 		assertThat(result.tracepoints()).hasSize(2);
 		assertThat(result.distanceMeters()).isEqualTo(120.5);
 		assertThat(result.durationSeconds()).isEqualTo(60.25);
-		assertThat(result.confidence()).isEqualTo(0.95);
+		assertThat(result.confidence()).isNull();
 	}
 }

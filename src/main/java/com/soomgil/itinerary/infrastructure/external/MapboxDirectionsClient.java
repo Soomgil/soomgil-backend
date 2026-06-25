@@ -22,10 +22,10 @@ import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.util.UriComponentsBuilder;
 
 /**
- * Mapbox Map Matching API client.
+ * Mapbox Directions API client.
  */
 @Component
-public class MapboxMapMatchingClient implements MapMatchingClient {
+public class MapboxDirectionsClient implements MapMatchingClient {
 
 	private static final TypeReference<Map<String, Object>> MAP_TYPE = new TypeReference<>() {
 	};
@@ -34,7 +34,7 @@ public class MapboxMapMatchingClient implements MapMatchingClient {
 	private final ObjectMapper objectMapper;
 	private final RestClient restClient;
 
-	public MapboxMapMatchingClient(MapboxProperties properties, ObjectMapper objectMapper) {
+	public MapboxDirectionsClient(MapboxProperties properties, ObjectMapper objectMapper) {
 		this.properties = Objects.requireNonNull(properties, "properties must not be null");
 		this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper must not be null");
 		this.restClient = RestClient.builder().build();
@@ -64,25 +64,25 @@ public class MapboxMapMatchingClient implements MapMatchingClient {
 		}
 		String code = response.path("code").asText("UNKNOWN");
 		if (!"Ok".equals(code)) {
-			throw new MapMatchingException(code, response.path("message").asText("Mapbox route matching failed."));
+			throw new MapMatchingException(code, response.path("message").asText("Mapbox directions request failed."));
 		}
-		JsonNode matchings = response.path("matchings");
-		if (!matchings.isArray() || matchings.isEmpty()) {
-			throw new MapMatchingException("NO_MATCHING", "Mapbox response does not contain matching result.");
+		JsonNode routes = response.path("routes");
+		if (!routes.isArray() || routes.isEmpty()) {
+			throw new MapMatchingException("NO_ROUTE", "Mapbox response does not contain route result.");
 		}
-		JsonNode firstMatching = matchings.get(0);
-		JsonNode geometry = firstMatching.path("geometry");
+		JsonNode firstRoute = routes.get(0);
+		JsonNode geometry = firstRoute.path("geometry");
 		if (geometry.isMissingNode() || geometry.isNull() || geometry.isEmpty()) {
 			throw new MapMatchingException("NO_GEOMETRY", "Mapbox response does not contain route geometry.");
 		}
 
 		return new MapMatchClientResult(
 			objectMapper.convertValue(geometry, MAP_TYPE),
-			tracepoints(response.path("tracepoints")),
-			metadata(response, firstMatching),
-			nullableDouble(firstMatching, "distance"),
-			nullableDouble(firstMatching, "duration"),
-			nullableDouble(firstMatching, "confidence")
+			waypoints(response.path("waypoints")),
+			metadata(response, firstRoute),
+			nullableDouble(firstRoute, "distance"),
+			nullableDouble(firstRoute, "duration"),
+			null
 		);
 	}
 
@@ -92,21 +92,14 @@ public class MapboxMapMatchingClient implements MapMatchingClient {
 			.collect(Collectors.joining(";"));
 		UriComponentsBuilder builder = UriComponentsBuilder
 			.fromUriString(properties.getBaseUrl())
-			.path("/matching/v5/")
+			.path("/directions/v5/")
 			.path(request.providerProfile())
 			.path("/")
 			.path(coordinates + ".json")
 			.queryParam("access_token", properties.getAccessToken())
 			.queryParam("geometries", "geojson")
-			.queryParam("overview", "full");
-		if (request.tidy() != null) {
-			builder.queryParam("tidy", request.tidy());
-		}
-		if (request.radiuses() != null) {
-			builder.queryParam("radiuses", request.radiuses().stream()
-				.map(radius -> radius == null ? "" : radius.toString())
-				.collect(Collectors.joining(";")));
-		}
+			.queryParam("overview", "full")
+			.queryParam("steps", "false");
 		return builder.build(true).toUri();
 	}
 
@@ -127,28 +120,27 @@ public class MapboxMapMatchingClient implements MapMatchingClient {
 		}
 	}
 
-	private List<Map<String, Object>> tracepoints(JsonNode tracepoints) {
-		if (!tracepoints.isArray()) {
+	private List<Map<String, Object>> waypoints(JsonNode waypoints) {
+		if (!waypoints.isArray()) {
 			return List.of();
 		}
 		List<Map<String, Object>> result = new ArrayList<>();
-		for (JsonNode tracepoint : tracepoints) {
-			result.add(tracepoint == null || tracepoint.isNull() ? null : objectMapper.convertValue(tracepoint, MAP_TYPE));
+		for (JsonNode waypoint : waypoints) {
+			result.add(waypoint == null || waypoint.isNull() ? null : objectMapper.convertValue(waypoint, MAP_TYPE));
 		}
 		return result;
 	}
 
-	private Map<String, Object> metadata(JsonNode response, JsonNode firstMatching) {
+	private Map<String, Object> metadata(JsonNode response, JsonNode firstRoute) {
 		Map<String, Object> result = new LinkedHashMap<>();
 		result.put("code", response.path("code").asText());
-		result.put("matchingCount", response.path("matchings").size());
-		result.put("confidence", nullableDouble(firstMatching, "confidence"));
-		result.put("distance", nullableDouble(firstMatching, "distance"));
-		result.put("duration", nullableDouble(firstMatching, "duration"));
-		result.put("weight", nullableDouble(firstMatching, "weight"));
-		result.put("weightName", firstMatching.path("weight_name").isMissingNode()
+		result.put("routeCount", response.path("routes").size());
+		result.put("distance", nullableDouble(firstRoute, "distance"));
+		result.put("duration", nullableDouble(firstRoute, "duration"));
+		result.put("weight", nullableDouble(firstRoute, "weight"));
+		result.put("weightName", firstRoute.path("weight_name").isMissingNode()
 			? null
-			: firstMatching.path("weight_name").asText());
+			: firstRoute.path("weight_name").asText());
 		return result;
 	}
 
