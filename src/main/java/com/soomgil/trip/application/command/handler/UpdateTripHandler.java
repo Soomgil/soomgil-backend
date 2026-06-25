@@ -10,6 +10,8 @@ import com.soomgil.trip.application.port.TripCommandRepository;
 import com.soomgil.trip.application.port.TripQueryRepository;
 import com.soomgil.trip.application.port.TripSettingsUpdate;
 import com.soomgil.trip.application.query.handler.TripAccessGuard;
+import com.soomgil.trip.application.query.dto.TripAccessView;
+import com.soomgil.trip.domain.model.TripAccessRole;
 import com.soomgil.trip.domain.model.TripStatus;
 import com.soomgil.trip.domain.model.TripTitlePolicy;
 import java.time.Instant;
@@ -22,7 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * {@link UpdateTripCommand}를 처리해 여행방 기본 설정을 수정한다.
  *
- * <p>멤버 수정 범위는 아직 정책이 열려 있어, 현재는 owner만 수정할 수 있다.
+ * <p>기본 정보는 active member가 수정할 수 있고, 여행 상태 변경은 owner만 수정할 수 있다.
  */
 @Component
 public class UpdateTripHandler implements CommandHandler<UpdateTripCommand, NoResult> {
@@ -46,8 +48,11 @@ public class UpdateTripHandler implements CommandHandler<UpdateTripCommand, NoRe
 	public NoResult handle(UpdateTripCommand command) {
 		Objects.requireNonNull(command.tripId(), "tripId must not be null");
 		Objects.requireNonNull(command.actorUserId(), "actorUserId must not be null");
-		accessGuard.requireOwner(command.tripId(), command.actorUserId());
+		TripAccessView access = accessGuard.requireActiveMember(command.tripId(), command.actorUserId());
 		validateStatus(command.status());
+		if (command.status() != null && access.accessRole() != TripAccessRole.OWNER) {
+			throw new BusinessException(ErrorCode.FORBIDDEN, "Trip owner access is required to update trip status.");
+		}
 
 		Instant now = timeProvider.now();
 		String title = command.title() == null ? null : TripTitlePolicy.normalizeTitle(command.title());

@@ -1,13 +1,10 @@
 package com.soomgil.itinerary.application.command.handler;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.soomgil.collaboration.application.port.CollaborationCommandEvent;
 import com.soomgil.collaboration.application.port.CollaborationCommandEventRepository;
-import com.soomgil.global.error.BusinessException;
-import com.soomgil.global.error.ErrorCode;
 import com.soomgil.itinerary.application.command.dto.MapMatchRouteCommand;
 import com.soomgil.itinerary.application.command.dto.MapMatchRouteResult;
 import com.soomgil.itinerary.application.port.ItineraryCommandRepository;
@@ -68,18 +65,20 @@ class MapMatchRouteHandlerTest {
 	}
 
 	@Test
-	void recordsFailedRequestWhenProviderCannotMatch() {
+	void fallsBackToRawTraceWhenProviderCannotMatch() {
 		MapMatchRouteHandler handler = handler(request -> {
 			throw new MapMatchingException("NoMatch", "No matching route found.");
 		});
 
-		assertThatThrownBy(() -> handler.handle(command()))
-			.isInstanceOfSatisfying(BusinessException.class, exception -> {
-				assertThat(exception.errorCode()).isEqualTo(ErrorCode.BUSINESS_RULE_VIOLATION);
-				assertThat(exception.getMessage()).contains("requestId=11");
-			});
-		assertThat(repository.insertedRoute).isNull();
-		assertThat(repository.insertedLog.status()).isEqualTo("FAILED");
+		MapMatchRouteResult result = handler.handle(command());
+
+		assertThat(result.matchRequestId()).isEqualTo(11L);
+		assertThat(result.mutation().route().provider()).isEqualTo("USER_TRACE");
+		assertThat(result.mutation().route().providerProfile()).isEqualTo("user-trace/walking");
+		assertThat(result.mutation().route().geometry()).containsEntry("type", "LineString");
+		assertThat(repository.insertedRoute).isNotNull();
+		assertThat(repository.insertedLog.status()).isEqualTo("FALLBACK");
+		assertThat(repository.insertedLog.tripRouteId()).isEqualTo(repository.insertedRoute.id());
 		assertThat(repository.insertedLog.errorCode()).isEqualTo("NoMatch");
 	}
 
