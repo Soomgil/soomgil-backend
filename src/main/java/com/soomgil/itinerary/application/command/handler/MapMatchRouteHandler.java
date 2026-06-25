@@ -103,7 +103,7 @@ public class MapMatchRouteHandler implements CommandHandler<MapMatchRouteCommand
 				command,
 				providerProfile,
 				fallbackMutation.route().id(),
-				"FALLBACK",
+				"FAILED",
 				null,
 				exception
 			);

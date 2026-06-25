@@ -77,9 +77,10 @@ class MapMatchRouteHandlerTest {
 		assertThat(result.mutation().route().providerProfile()).isEqualTo("user-trace/walking");
 		assertThat(result.mutation().route().geometry()).containsEntry("type", "LineString");
 		assertThat(repository.insertedRoute).isNotNull();
-		assertThat(repository.insertedLog.status()).isEqualTo("FALLBACK");
+		assertThat(repository.insertedLog.status()).isEqualTo("FAILED");
 		assertThat(repository.insertedLog.tripRouteId()).isEqualTo(repository.insertedRoute.id());
 		assertThat(repository.insertedLog.errorCode()).isEqualTo("NoMatch");
+		assertThat(result.matchingsMetadata()).containsEntry("code", "FALLBACK");
 	}
 
 	private MapMatchRouteHandler handler(MapMatchingClient client) {
