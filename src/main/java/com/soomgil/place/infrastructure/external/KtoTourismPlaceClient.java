@@ -6,9 +6,11 @@ import com.soomgil.place.application.port.TourismPlaceFeedClient;
 import com.soomgil.place.application.port.TourismPlaceFeedItem;
 import com.soomgil.place.application.port.TourismPlaceFeedRequest;
 import com.soomgil.place.application.port.TourismPlaceFeedResult;
+import com.soomgil.place.application.port.TourismPlaceLiveSearchRequest;
 import jakarta.annotation.PreDestroy;
 import java.net.URI;
 import java.net.http.HttpClient;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
@@ -34,6 +36,7 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.util.HtmlUtils;
 import org.springframework.web.util.UriComponentsBuilder;
+import org.springframework.web.util.UriUtils;
 
 /**
  * 한국관광공사 KorService2 API client.
@@ -43,8 +46,14 @@ public class KtoTourismPlaceClient implements TourismPlaceFeedClient {
 
 	private static final Logger log = LoggerFactory.getLogger(KtoTourismPlaceClient.class);
 	private static final int DETAIL_CONCURRENCY = 12;
+	private static final int LIVE_PAGE_SIZE = 100;
+	private static final int LIVE_MAX_PAGES = 20;
 	private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(2);
 	private static final Duration READ_TIMEOUT = Duration.ofSeconds(4);
+	private static final double JEJU_MIN_LNG = 126.10;
+	private static final double JEJU_MIN_LAT = 33.05;
+	private static final double JEJU_MAX_LNG = 127.05;
+	private static final double JEJU_MAX_LAT = 33.65;
 
 	private static final Map<String, String> CONTENT_TYPE_NAMES = Map.of(
 		"12", "관광지",
@@ -101,6 +110,52 @@ public class KtoTourismPlaceClient implements TourismPlaceFeedClient {
 			detailExecutor
 		);
 		return new TourismPlaceFeedResult(places, UUID.randomUUID().toString());
+	}
+
+	@Override
+	public List<TourismPlaceFeedItem> fetchLive(TourismPlaceLiveSearchRequest request) {
+		validateConfiguration();
+		if (request.q() != null && !request.q().isBlank()) {
+			return fetchKeywordLive(request);
+		}
+
+		String areaCode = liveAreaCode(request);
+		if (areaCode == null) {
+			return List.of();
+		}
+
+		int limit = Math.min(Math.max(request.limit(), 1), LIVE_PAGE_SIZE);
+		List<TourismPlaceFeedItem> result = new ArrayList<>();
+		for (int page = 1; page <= LIVE_MAX_PAGES && result.size() < limit; page++) {
+			JsonNode response = get(buildAreaListUri(areaCode, request.category(), LIVE_PAGE_SIZE, page));
+			List<TourismPlaceFeedItem> pageItems = parseList(response).stream()
+				.filter(place -> matchesQuery(place, request.q()))
+				.filter(place -> matchesBounds(place, request.bbox()))
+				.limit(limit - result.size())
+				.toList();
+			result.addAll(pageItems);
+			if (page >= totalPages(response, LIVE_PAGE_SIZE)) {
+				break;
+			}
+		}
+		return List.copyOf(result);
+	}
+
+	private List<TourismPlaceFeedItem> fetchKeywordLive(TourismPlaceLiveSearchRequest request) {
+		int limit = Math.min(Math.max(request.limit(), 1), LIVE_PAGE_SIZE);
+		List<TourismPlaceFeedItem> result = new ArrayList<>();
+		for (int page = 1; page <= LIVE_MAX_PAGES && result.size() < limit; page++) {
+			JsonNode response = get(buildKeywordListUri(request.q(), request.category(), LIVE_PAGE_SIZE, page));
+			List<TourismPlaceFeedItem> pageItems = parseList(response).stream()
+				.filter(place -> matchesBounds(place, request.bbox()))
+				.limit(limit - result.size())
+				.toList();
+			result.addAll(pageItems);
+			if (page >= totalPages(response, LIVE_PAGE_SIZE)) {
+				break;
+			}
+		}
+		return List.copyOf(result);
 	}
 
 	@Override
@@ -252,15 +307,33 @@ public class KtoTourismPlaceClient implements TourismPlaceFeedClient {
 	}
 
 	private URI buildListUri(TourismPlaceFeedRequest request, int page) {
+		String areaCode = request.legalRegionCode() == null || request.legalRegionCode().isBlank()
+			? null : request.legalRegionCode();
+		return buildAreaListUri(areaCode, request.category(), Math.min(Math.max(request.limit(), 1), 50), page);
+	}
+
+	private URI buildAreaListUri(String areaCode, String category, int numOfRows, int page) {
 		UriComponentsBuilder builder = commonUri("/areaBasedList2")
-			.queryParam("numOfRows", Math.min(Math.max(request.limit(), 1), 50))
+			.queryParam("numOfRows", numOfRows)
 			.queryParam("pageNo", page)
 			.queryParam("arrange", "Q");
-		if (request.legalRegionCode() != null && !request.legalRegionCode().isBlank()) {
-			builder.queryParam("areaCode", request.legalRegionCode());
+		if (areaCode != null && !areaCode.isBlank()) {
+			builder.queryParam("areaCode", areaCode);
 		}
-		if (request.category() != null && !request.category().isBlank()) {
-			builder.queryParam("contentTypeId", request.category());
+		if (category != null && !category.isBlank() && category.chars().allMatch(Character::isDigit)) {
+			builder.queryParam("contentTypeId", category);
+		}
+		return builder.build(true).toUri();
+	}
+
+	private URI buildKeywordListUri(String keyword, String category, int numOfRows, int page) {
+		UriComponentsBuilder builder = commonUri("/searchKeyword2")
+			.queryParam("numOfRows", numOfRows)
+			.queryParam("pageNo", page)
+			.queryParam("arrange", "Q")
+			.queryParam("keyword", UriUtils.encodeQueryParam(keyword.trim(), StandardCharsets.UTF_8));
+		if (category != null && !category.isBlank() && category.chars().allMatch(Character::isDigit)) {
+			builder.queryParam("contentTypeId", category);
 		}
 		return builder.build(true).toUri();
 	}
@@ -555,6 +628,87 @@ public class KtoTourismPlaceClient implements TourismPlaceFeedClient {
 			throw new KtoTourismPlaceException(header.path("resultMsg").asText("KTO request failed."));
 		}
 		return root.path("body");
+	}
+
+	private static int totalPages(JsonNode response, int pageSize) {
+		JsonNode body = successfulBody(response);
+		int totalCount = body.path("totalCount").asInt(0);
+		if (totalCount == 0) {
+			return 0;
+		}
+		return (int) Math.ceil((double) totalCount / pageSize);
+	}
+
+	private static String liveAreaCode(TourismPlaceLiveSearchRequest request) {
+		String legalRegionCode = request.legalRegionCode();
+		if (legalRegionCode != null && !legalRegionCode.isBlank()) {
+			return legalRegionCode.startsWith("39") ? "39" : null;
+		}
+		String query = request.q();
+		if (query != null && query.contains("제주")) {
+			return "39";
+		}
+		return bboxOverlapsJeju(request.bbox()) ? "39" : null;
+	}
+
+	private static boolean matchesQuery(TourismPlaceFeedItem place, String query) {
+		if (query == null || query.isBlank()) {
+			return true;
+		}
+		String normalized = query.trim().toLowerCase();
+		return containsIgnoreCase(place.name(), normalized)
+			|| containsIgnoreCase(place.address(), normalized)
+			|| containsIgnoreCase(place.category(), normalized);
+	}
+
+	private static boolean containsIgnoreCase(String value, String normalizedQuery) {
+		return value != null && value.toLowerCase().contains(normalizedQuery);
+	}
+
+	private static boolean matchesBounds(TourismPlaceFeedItem place, String bbox) {
+		double[] bounds = parseBbox(bbox);
+		if (bounds == null) {
+			return true;
+		}
+		return place.lng() != null && place.lat() != null
+			&& place.lng() >= bounds[0]
+			&& place.lat() >= bounds[1]
+			&& place.lng() <= bounds[2]
+			&& place.lat() <= bounds[3];
+	}
+
+	private static boolean bboxOverlapsJeju(String bbox) {
+		double[] bounds = parseBbox(bbox);
+		if (bounds == null) {
+			return false;
+		}
+		return bounds[0] <= JEJU_MAX_LNG
+			&& bounds[2] >= JEJU_MIN_LNG
+			&& bounds[1] <= JEJU_MAX_LAT
+			&& bounds[3] >= JEJU_MIN_LAT;
+	}
+
+	private static double[] parseBbox(String bbox) {
+		if (bbox == null || bbox.isBlank()) {
+			return null;
+		}
+		String[] parts = bbox.split(",");
+		if (parts.length != 4) {
+			return null;
+		}
+		try {
+			double minLng = Double.parseDouble(parts[0].trim());
+			double minLat = Double.parseDouble(parts[1].trim());
+			double maxLng = Double.parseDouble(parts[2].trim());
+			double maxLat = Double.parseDouble(parts[3].trim());
+			if (minLng > maxLng || minLat > maxLat) {
+				return null;
+			}
+			return new double[] { minLng, minLat, maxLng, maxLat };
+		}
+		catch (NumberFormatException exception) {
+			return null;
+		}
 	}
 
 	private static String plainText(String value) {

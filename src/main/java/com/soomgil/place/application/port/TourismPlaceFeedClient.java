@@ -1,5 +1,6 @@
 package com.soomgil.place.application.port;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -8,6 +9,10 @@ import java.util.Optional;
 public interface TourismPlaceFeedClient {
 
 	TourismPlaceFeedResult fetch(TourismPlaceFeedRequest request);
+
+	default List<TourismPlaceFeedItem> fetchLive(TourismPlaceLiveSearchRequest request) {
+		return List.of();
+	}
 
 	default Optional<TourismPlaceFeedItem> fetchOne(String externalPlaceId) {
 		return Optional.empty();
