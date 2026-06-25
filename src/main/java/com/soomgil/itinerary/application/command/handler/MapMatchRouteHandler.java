@@ -155,8 +155,8 @@ public class MapMatchRouteHandler implements CommandHandler<MapMatchRouteCommand
 		if (command.mode() == null) {
 			throw new BusinessException(ErrorCode.VALIDATION_FAILED, "Route mode is required.");
 		}
-		if (command.coordinates() == null || command.coordinates().size() < 2 || command.coordinates().size() > 100) {
-			throw new BusinessException(ErrorCode.VALIDATION_FAILED, "Route coordinates must contain 2 to 100 points.");
+		if (command.coordinates() == null || command.coordinates().size() < 2 || command.coordinates().size() > 25) {
+			throw new BusinessException(ErrorCode.VALIDATION_FAILED, "Route coordinates must contain 2 to 25 points.");
 		}
 		for (RouteCoordinate coordinate : command.coordinates()) {
 			if (coordinate == null) {
