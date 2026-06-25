@@ -3,8 +3,10 @@ package com.soomgil.collaboration.infrastructure.websocket;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.soomgil.collaboration.api.dto.TripPresenceEvent;
 import com.soomgil.trip.application.port.TripAccessSnapshot;
 import com.soomgil.trip.application.port.TripQueryRepository;
 import com.soomgil.trip.application.query.handler.TripAccessGuard;
@@ -14,8 +16,10 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.messaging.simp.stomp.StompCommand;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.messaging.support.MessageBuilder;
@@ -29,9 +33,12 @@ class TripSubscriptionInterceptorTest {
 
 	private final TripQueryRepository tripRepository = mock(TripQueryRepository.class);
 	private final CollaborationWebSocketSessionRegistry sessionRegistry = new CollaborationWebSocketSessionRegistry();
+	private final SimpMessagingTemplate messagingTemplate = mock(SimpMessagingTemplate.class);
+	private final TripPresenceBroadcaster presenceBroadcaster = new TripPresenceBroadcaster(sessionRegistry, messagingTemplate);
 	private final TripSubscriptionInterceptor interceptor = new TripSubscriptionInterceptor(
 		new TripAccessGuard(tripRepository),
-		sessionRegistry
+		sessionRegistry,
+		presenceBroadcaster
 	);
 	private final MessageChannel channel = mock(MessageChannel.class);
 
@@ -106,9 +113,38 @@ class TripSubscriptionInterceptorTest {
 		when(event.getSessionId()).thenReturn("session-1");
 		sessionRegistry.register("session-1", USER_ID);
 
-		sessionRegistry.handleDisconnect(event);
+		presenceBroadcaster.handleDisconnect(event);
 
 		assertThat(sessionRegistry.isOwnedBy("session-1", USER_ID)).isFalse();
+	}
+
+	@Test
+	void broadcastsPresenceSnapshotWhenSubscribedSessionHasId() {
+		when(tripRepository.findTripAccess(TRIP_ID, USER_ID)).thenReturn(Optional.of(new TripAccessSnapshot(
+			TRIP_ID,
+			USER_ID,
+			TripStatus.ACTIVE,
+			TripMemberStatus.ACTIVE,
+			USER_ID
+		)));
+		Message<?> connect = message(StompCommand.CONNECT, null, true, "session-1");
+		Message<?> subscribe = message(
+			StompCommand.SUBSCRIBE,
+			"/topic/trips/" + TRIP_ID + "/collaboration",
+			false,
+			"session-1"
+		);
+
+		interceptor.preSend(connect, channel);
+		interceptor.preSend(subscribe, channel);
+
+		ArgumentCaptor<TripPresenceEvent> eventCaptor = ArgumentCaptor.forClass(TripPresenceEvent.class);
+		verify(messagingTemplate).convertAndSend(
+			org.mockito.ArgumentMatchers.eq("/topic/trips/" + TRIP_ID + "/collaboration"),
+			eventCaptor.capture()
+		);
+		assertThat(eventCaptor.getValue().eventType()).isEqualTo("presence.snapshot");
+		assertThat(eventCaptor.getValue().activeUserIds()).containsExactly(USER_ID);
 	}
 
 	@Test

@@ -27,13 +27,16 @@ public class TripSubscriptionInterceptor implements ChannelInterceptor {
 
 	private final TripAccessGuard tripAccessGuard;
 	private final CollaborationWebSocketSessionRegistry sessionRegistry;
+	private final TripPresenceBroadcaster presenceBroadcaster;
 
 	public TripSubscriptionInterceptor(
 		TripAccessGuard tripAccessGuard,
-		CollaborationWebSocketSessionRegistry sessionRegistry
+		CollaborationWebSocketSessionRegistry sessionRegistry,
+		TripPresenceBroadcaster presenceBroadcaster
 	) {
 		this.tripAccessGuard = Objects.requireNonNull(tripAccessGuard, "tripAccessGuard must not be null");
 		this.sessionRegistry = Objects.requireNonNull(sessionRegistry, "sessionRegistry must not be null");
+		this.presenceBroadcaster = Objects.requireNonNull(presenceBroadcaster, "presenceBroadcaster must not be null");
 	}
 
 	@Override
@@ -43,15 +46,16 @@ public class TripSubscriptionInterceptor implements ChannelInterceptor {
 			sessionRegistry.register(accessor.getSessionId(), requireUser(accessor.getUser(), null));
 		}
 		if (StompCommand.SUBSCRIBE.equals(accessor.getCommand())) {
-			authorizeSubscription(accessor);
+			AuthorizedTripSubscription subscription = authorizeSubscription(accessor);
+			presenceBroadcaster.registerSubscription(accessor.getSessionId(), subscription.userId(), subscription.tripId());
 		}
 		if (StompCommand.DISCONNECT.equals(accessor.getCommand())) {
-			sessionRegistry.unregister(accessor.getSessionId());
+			presenceBroadcaster.unregisterSession(accessor.getSessionId());
 		}
 		return message;
 	}
 
-	private void authorizeSubscription(StompHeaderAccessor accessor) {
+	private AuthorizedTripSubscription authorizeSubscription(StompHeaderAccessor accessor) {
 		UUID userId = requireUser(accessor.getUser(), accessor.getSessionId());
 		String destination = accessor.getDestination();
 		Matcher matcher = destination == null ? null : TRIP_TOPIC.matcher(destination);
@@ -71,6 +75,7 @@ public class TripSubscriptionInterceptor implements ChannelInterceptor {
 		catch (BusinessException exception) {
 			throw new AccessDeniedException("Trip member subscription is required.", exception);
 		}
+		return new AuthorizedTripSubscription(tripId, userId);
 	}
 
 	private UUID requireUser(Principal principal, String sessionId) {
@@ -84,5 +89,8 @@ public class TripSubscriptionInterceptor implements ChannelInterceptor {
 		catch (IllegalArgumentException exception) {
 			throw new AccessDeniedException("Authenticated user ID must be a UUID.", exception);
 		}
+	}
+
+	private record AuthorizedTripSubscription(UUID tripId, UUID userId) {
 	}
 }
