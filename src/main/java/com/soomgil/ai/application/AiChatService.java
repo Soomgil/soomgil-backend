@@ -255,6 +255,9 @@ public class AiChatService {
 
 	private boolean isChecklistGenerationRequest(String question) {
 		return question.matches(".*(체크리스트|준비물).*(자동|만들|생성|추천|분석|작성|알려|짜).*")
+			|| question.matches(".*(체크리스트|준비물).*(여행계획|여행|여행전|여행전준비|준비물).*(추가|넣어|작성).*")
+			|| question.matches(".*(여행계획|여행|여행전|여행전준비|준비물).*(체크리스트).*(추가|넣어|작성).*")
+			|| question.matches(".*체크리스트에.*(여행|여행전|준비물).*")
 			|| question.matches(".*(자동|분석).*(체크리스트|준비물).*")
 			|| question.matches(".*여행.*필요.*준비.*")
 			|| question.matches(".*예약.*필요.*체크.*")

@@ -162,6 +162,8 @@ public class SpringAiGuideModel implements AiGuideModel {
 				+ "애매하면 삭제하지 말고 후보를 먼저 사용자에게 확인하라.";
 			case GENERATE_CHECKLIST_FROM_ITINERARY -> "여행 맥락 JSON의 days[].items[] 를 분석해 예약 필수 장소, 날씨 대비, "
 				+ "이동 수단, 입장료 등 필요한 준비물·할 일을 자동 추가하라. "
+				+ "'체크리스트에 여행전 준비물 추가', '체크리스트에 여행'처럼 체크리스트 뒤에 짧은 단어가 있어도 "
+				+ "그 문구를 항목으로 그대로 넣지 말고, 여행 맥락을 읽어 실제 준비물 항목들을 생성하라. "
 				+ "사용자가 '전체 체크리스트', '공통 준비물', '여행 계획 보고 준비물'처럼 전체/공통을 요청하면 "
 				+ "반드시 generateChecklistItems 도구를 scope TRIP, itineraryDayId null로 호출하라. "
 				+ "사용자가 '각각 체크리스트에', '일차별로', '가는 일차에 맞춰서'라고 요청했거나 특정 장소에서 파생된 할 일은 "
@@ -178,8 +180,7 @@ public class SpringAiGuideModel implements AiGuideModel {
 
 	private boolean runsDeterministically(AiIntent intent) {
 		return intent == AiIntent.DELETE_ITINERARY_ITEM
-			|| intent == AiIntent.ADD_RECOMMENDED_PLACES_TO_ITINERARY
-			|| intent == AiIntent.GENERATE_CHECKLIST_FROM_ITINERARY;
+			|| intent == AiIntent.ADD_RECOMMENDED_PLACES_TO_ITINERARY;
 	}
 
 	private AiGuideReply replyWithTools(AiGuideRequest request, AiIntentDecision decision, String mode) {

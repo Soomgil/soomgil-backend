@@ -245,6 +245,9 @@ public class LocalFallbackAiGuideModel implements AiGuideModel {
 	}
 
 	private AiGuideReply writeChecklist(AiGuideRequest request, AiChecklistTools tools) {
+		if (looksLikeGeneratedChecklistRequest(request.question())) {
+			return new AiGuideReply("여행 계획을 기준으로 준비물 체크리스트를 만들려면 다시 요청해주세요.", List.of());
+		}
 		UUID dayId = dayId(request);
 		AiTripContext.ChecklistSummary existing = request.tripContext() == null ? null
 			: request.tripContext().checklists().stream()
@@ -269,6 +272,13 @@ public class LocalFallbackAiGuideModel implements AiGuideModel {
 		if (checklistId == null) return new AiGuideReply("체크리스트를 만들지 못했어요. 다시 시도해주세요.", tools.executedCalls());
 		tools.addChecklistItem(new AiChecklistTools.ChecklistItemInput(checklistId, itemText, null));
 		return new AiGuideReply("체크리스트에 '" + itemText + "' 항목을 추가했어요.", tools.executedCalls());
+	}
+
+	private boolean looksLikeGeneratedChecklistRequest(String question) {
+		String normalized = normalize(question);
+		return normalized.contains("체크리스트")
+			&& (normalized.contains("여행계획") || normalized.contains("여행전")
+				|| normalized.contains("준비물") || normalized.matches(".*체크리스트에여행.*"));
 	}
 
 	private AiGuideReply moveItem(AiGuideRequest request, AiMoveItineraryItemTools tools) {

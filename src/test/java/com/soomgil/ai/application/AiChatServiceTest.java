@@ -183,6 +183,38 @@ class AiChatServiceTest {
 	}
 
 	@Test
+	void travelPrepChecklistCueDoesNotWriteTheLiteralTextAfterChecklistMarker() {
+		stubAssistant("여행 계획 기준으로 준비물 체크리스트를 만들었어요.");
+		when(model.classify(any())).thenReturn(decision(AiIntent.WRITE_CHECKLIST));
+		when(model.replyWithWriteTools(any(), any())).thenReturn(
+			new AiGuideReply("여행 계획 기준으로 준비물 체크리스트를 만들었어요.", List.of())
+		);
+
+		service.createMessage(tripId, userId, "체크리스트에 여행전 준비물 추가", null);
+
+		verify(model).replyWithWriteTools(any(), org.mockito.ArgumentMatchers.argThat(
+			decision -> decision.intent() == AiIntent.GENERATE_CHECKLIST_FROM_ITINERARY
+		));
+		verify(model, never()).replyWithoutTools(any(), any());
+	}
+
+	@Test
+	void shortTravelChecklistCueStillUsesGenerationIntent() {
+		stubAssistant("여행 계획 기준으로 준비물 체크리스트를 만들었어요.");
+		when(model.classify(any())).thenReturn(decision(AiIntent.WRITE_CHECKLIST));
+		when(model.replyWithWriteTools(any(), any())).thenReturn(
+			new AiGuideReply("여행 계획 기준으로 준비물 체크리스트를 만들었어요.", List.of())
+		);
+
+		service.createMessage(tripId, userId, "체크리스트에 여행", null);
+
+		verify(model).replyWithWriteTools(any(), org.mockito.ArgumentMatchers.argThat(
+			decision -> decision.intent() == AiIntent.GENERATE_CHECKLIST_FROM_ITINERARY
+		));
+		verify(model, never()).replyWithoutTools(any(), any());
+	}
+
+	@Test
 	void deleteCueUsesTheDeleteToolEvenIfClassifierIsAmbiguous() {
 		stubAssistant("경복궁을 일정에서 삭제했어요.");
 		when(model.classify(any())).thenReturn(decision(AiIntent.AMBIGUOUS));
