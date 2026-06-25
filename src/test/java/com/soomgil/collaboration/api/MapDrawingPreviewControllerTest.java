@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
+import com.soomgil.collaboration.infrastructure.websocket.CollaborationWebSocketSessionRegistry;
 import com.soomgil.global.error.BusinessException;
 import com.soomgil.global.error.ErrorCode;
 import com.soomgil.trip.application.query.handler.TripAccessGuard;
@@ -21,9 +22,11 @@ class MapDrawingPreviewControllerTest {
 
 	private final TripAccessGuard tripAccessGuard = mock(TripAccessGuard.class);
 	private final SimpMessagingTemplate messagingTemplate = mock(SimpMessagingTemplate.class);
+	private final CollaborationWebSocketSessionRegistry sessionRegistry = new CollaborationWebSocketSessionRegistry();
 	private final MapDrawingPreviewController controller = new MapDrawingPreviewController(
 		tripAccessGuard,
-		messagingTemplate
+		messagingTemplate,
+		sessionRegistry
 	);
 
 	@Test
@@ -35,7 +38,7 @@ class MapDrawingPreviewControllerTest {
 			"phase", "UPDATE"
 		);
 
-		controller.preview(TRIP_ID, payload, () -> USER_ID.toString());
+		controller.preview(TRIP_ID, payload, () -> USER_ID.toString(), null);
 
 		ArgumentCaptor<Map<String, Object>> messageCaptor = ArgumentCaptor.forClass(Map.class);
 		verify(tripAccessGuard).requireActiveMember(TRIP_ID, USER_ID);
@@ -50,18 +53,31 @@ class MapDrawingPreviewControllerTest {
 	}
 
 	@Test
+	void broadcastsPreviewFromRegisteredSessionWhenPrincipalIsMissing() {
+		sessionRegistry.register("session-1", USER_ID);
+
+		controller.preview(TRIP_ID, Map.of("clientId", "client-1"), null, "session-1");
+
+		verify(tripAccessGuard).requireActiveMember(TRIP_ID, USER_ID);
+		verify(messagingTemplate).convertAndSend(
+			org.mockito.ArgumentMatchers.eq("/topic/trips/" + TRIP_ID + "/map-drawings"),
+			org.mockito.ArgumentMatchers.any(Map.class)
+		);
+	}
+
+	@Test
 	void rejectsNonMemberPreview() {
 		org.mockito.Mockito.doThrow(new BusinessException(ErrorCode.FORBIDDEN))
 			.when(tripAccessGuard)
 			.requireActiveMember(TRIP_ID, USER_ID);
 
-		assertThatThrownBy(() -> controller.preview(TRIP_ID, Map.of(), () -> USER_ID.toString()))
+		assertThatThrownBy(() -> controller.preview(TRIP_ID, Map.of(), () -> USER_ID.toString(), null))
 			.isInstanceOf(AccessDeniedException.class);
 	}
 
 	@Test
 	void rejectsUnauthenticatedPreview() {
-		assertThatThrownBy(() -> controller.preview(TRIP_ID, Map.of(), null))
+		assertThatThrownBy(() -> controller.preview(TRIP_ID, Map.of(), null, null))
 			.isInstanceOf(AccessDeniedException.class);
 	}
 }

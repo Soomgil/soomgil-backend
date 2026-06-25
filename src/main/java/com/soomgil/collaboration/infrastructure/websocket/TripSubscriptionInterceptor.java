@@ -40,7 +40,7 @@ public class TripSubscriptionInterceptor implements ChannelInterceptor {
 	public Message<?> preSend(Message<?> message, MessageChannel channel) {
 		StompHeaderAccessor accessor = StompHeaderAccessor.wrap(message);
 		if (StompCommand.CONNECT.equals(accessor.getCommand())) {
-			sessionRegistry.register(accessor.getSessionId(), requireUser(accessor.getUser()));
+			sessionRegistry.register(accessor.getSessionId(), requireUser(accessor.getUser(), null));
 		}
 		if (StompCommand.SUBSCRIBE.equals(accessor.getCommand())) {
 			authorizeSubscription(accessor);
@@ -52,7 +52,7 @@ public class TripSubscriptionInterceptor implements ChannelInterceptor {
 	}
 
 	private void authorizeSubscription(StompHeaderAccessor accessor) {
-		UUID userId = requireUser(accessor.getUser());
+		UUID userId = requireUser(accessor.getUser(), accessor.getSessionId());
 		String destination = accessor.getDestination();
 		Matcher matcher = destination == null ? null : TRIP_TOPIC.matcher(destination);
 		if (matcher == null || !matcher.matches()) {
@@ -73,9 +73,10 @@ public class TripSubscriptionInterceptor implements ChannelInterceptor {
 		}
 	}
 
-	private UUID requireUser(Principal principal) {
+	private UUID requireUser(Principal principal, String sessionId) {
 		if (principal == null || principal.getName() == null || principal.getName().isBlank()) {
-			throw new AccessDeniedException("Authenticated WebSocket connection is required.");
+			return sessionRegistry.findUserId(sessionId)
+				.orElseThrow(() -> new AccessDeniedException("Authenticated WebSocket connection is required."));
 		}
 		try {
 			return UUID.fromString(principal.getName());

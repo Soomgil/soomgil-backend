@@ -1,5 +1,6 @@
 package com.soomgil.collaboration.infrastructure.websocket;
 
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.context.event.EventListener;
@@ -33,5 +34,9 @@ public class CollaborationWebSocketSessionRegistry {
 
 	public boolean isOwnedBy(String sessionId, UUID userId) {
 		return userId != null && userId.equals(sessions.get(sessionId));
+	}
+
+	public Optional<UUID> findUserId(String sessionId) {
+		return Optional.ofNullable(sessionId == null ? null : sessions.get(sessionId));
 	}
 }

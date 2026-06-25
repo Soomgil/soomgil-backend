@@ -35,7 +35,7 @@ public class HttpCollaborationSessionIdProvider implements CollaborationSessionI
 		if (value == null || value.isBlank()) {
 			return null;
 		}
-		return requireOwnedSession(value, request.getUserPrincipal());
+		return ownedSessionOrNull(value, request.getUserPrincipal());
 	}
 
 	public String requireOwnedSession(String sessionId, Principal principal) {
@@ -50,6 +50,18 @@ public class HttpCollaborationSessionIdProvider implements CollaborationSessionI
 		return normalized;
 	}
 
+	private String ownedSessionOrNull(String sessionId, Principal principal) {
+		String normalized = sessionId == null ? null : sessionId.trim();
+		if (normalized == null || normalized.isBlank()) {
+			return null;
+		}
+		UUID userId = parseUserIdOrNull(principal);
+		if (userId == null || !sessionRegistry.isOwnedBy(normalized, userId)) {
+			return null;
+		}
+		return normalized;
+	}
+
 	private UUID parseUserId(Principal principal) {
 		if (principal == null || principal.getName() == null || principal.getName().isBlank()) {
 			throw new BusinessException(ErrorCode.UNAUTHORIZED, "Authenticated user is required.");
@@ -59,6 +71,18 @@ public class HttpCollaborationSessionIdProvider implements CollaborationSessionI
 		}
 		catch (IllegalArgumentException exception) {
 			throw new BusinessException(ErrorCode.UNAUTHORIZED, "Authenticated user is invalid.");
+		}
+	}
+
+	private UUID parseUserIdOrNull(Principal principal) {
+		if (principal == null || principal.getName() == null || principal.getName().isBlank()) {
+			return null;
+		}
+		try {
+			return UUID.fromString(principal.getName());
+		}
+		catch (IllegalArgumentException exception) {
+			return null;
 		}
 	}
 }

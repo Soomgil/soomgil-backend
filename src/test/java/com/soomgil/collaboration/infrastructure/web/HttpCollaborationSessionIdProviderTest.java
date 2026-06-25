@@ -8,7 +8,11 @@ import com.soomgil.global.error.BusinessException;
 import com.soomgil.global.error.ErrorCode;
 import java.security.Principal;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 class HttpCollaborationSessionIdProviderTest {
 
@@ -16,6 +20,11 @@ class HttpCollaborationSessionIdProviderTest {
 	private final CollaborationWebSocketSessionRegistry registry = new CollaborationWebSocketSessionRegistry();
 	private final HttpCollaborationSessionIdProvider provider = new HttpCollaborationSessionIdProvider(registry);
 	private final Principal principal = () -> USER_ID.toString();
+
+	@AfterEach
+	void tearDown() {
+		RequestContextHolder.resetRequestAttributes();
+	}
 
 	@Test
 	void returnsSessionOwnedByCurrentUser() {
@@ -32,5 +41,26 @@ class HttpCollaborationSessionIdProviderTest {
 			.isInstanceOfSatisfying(BusinessException.class, exception ->
 				assertThat(exception.errorCode()).isEqualTo(ErrorCode.FORBIDDEN)
 			);
+	}
+
+	@Test
+	void currentSessionIdReturnsNullWhenHeaderSessionIsStale() {
+		MockHttpServletRequest request = new MockHttpServletRequest();
+		request.setUserPrincipal(principal);
+		request.addHeader(HttpCollaborationSessionIdProvider.SESSION_HEADER, "stale-session");
+		RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
+
+		assertThat(provider.currentSessionId()).isNull();
+	}
+
+	@Test
+	void currentSessionIdReturnsOwnedSessionFromRequestHeader() {
+		registry.register("session-1", USER_ID);
+		MockHttpServletRequest request = new MockHttpServletRequest();
+		request.setUserPrincipal(principal);
+		request.addHeader(HttpCollaborationSessionIdProvider.SESSION_HEADER, " session-1 ");
+		RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
+
+		assertThat(provider.currentSessionId()).isEqualTo("session-1");
 	}
 }

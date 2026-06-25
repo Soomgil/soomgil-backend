@@ -81,6 +81,26 @@ class TripSubscriptionInterceptorTest {
 	}
 
 	@Test
+	void authorizesSubscriptionFromRegisteredSessionWhenPrincipalIsMissing() {
+		when(tripRepository.findTripAccess(TRIP_ID, USER_ID)).thenReturn(Optional.of(new TripAccessSnapshot(
+			TRIP_ID,
+			USER_ID,
+			TripStatus.ACTIVE,
+			TripMemberStatus.ACTIVE,
+			USER_ID
+		)));
+		sessionRegistry.register("session-1", USER_ID);
+		Message<?> message = message(
+			StompCommand.SUBSCRIBE,
+			"/topic/trips/" + TRIP_ID + "/map-drawings",
+			false,
+			"session-1"
+		);
+
+		assertThat(interceptor.preSend(message, channel)).isSameAs(message);
+	}
+
+	@Test
 	void removesSessionWhenTransportDisconnectEventArrives() {
 		SessionDisconnectEvent event = mock(SessionDisconnectEvent.class);
 		when(event.getSessionId()).thenReturn("session-1");
