@@ -10,6 +10,7 @@ import com.soomgil.trip.application.port.TripQueryRepository;
 import com.soomgil.trip.application.query.handler.TripAccessGuard;
 import com.soomgil.trip.domain.model.TripMemberStatus;
 import com.soomgil.trip.domain.model.TripStatus;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -35,7 +36,7 @@ class TripSubscriptionInterceptorTest {
 	private final MessageChannel channel = mock(MessageChannel.class);
 
 	@Test
-	void allowsActiveMemberToSubscribeToTripTopic() {
+	void allowsActiveMemberToSubscribeToTripTopics() {
 		when(tripRepository.findTripAccess(TRIP_ID, USER_ID)).thenReturn(Optional.of(new TripAccessSnapshot(
 			TRIP_ID,
 			USER_ID,
@@ -43,9 +44,20 @@ class TripSubscriptionInterceptorTest {
 			TripMemberStatus.ACTIVE,
 			USER_ID
 		)));
-		Message<?> message = message(StompCommand.SUBSCRIBE, "/topic/trips/" + TRIP_ID + "/itinerary", true);
 
-		assertThat(interceptor.preSend(message, channel)).isSameAs(message);
+		for (String topic : List.of(
+			"collaboration",
+			"itinerary",
+			"map-drawings",
+			"route-matching",
+			"chat",
+			"planning",
+			"ai"
+		)) {
+			Message<?> message = message(StompCommand.SUBSCRIBE, "/topic/trips/" + TRIP_ID + "/" + topic, true);
+
+			assertThat(interceptor.preSend(message, channel)).isSameAs(message);
+		}
 	}
 
 	@Test

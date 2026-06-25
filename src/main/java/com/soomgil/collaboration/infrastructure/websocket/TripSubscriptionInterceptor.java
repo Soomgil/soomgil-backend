@@ -22,7 +22,7 @@ import org.springframework.stereotype.Component;
 public class TripSubscriptionInterceptor implements ChannelInterceptor {
 
 	private static final Pattern TRIP_TOPIC = Pattern.compile(
-		"^/topic/trips/([0-9a-fA-F-]{36})/(collaboration|itinerary|map-drawings|route-matching)$"
+		"^/topic/trips/([0-9a-fA-F-]{36})/(collaboration|itinerary|map-drawings|route-matching|chat|planning|ai)$"
 	);
 
 	private final TripAccessGuard tripAccessGuard;
