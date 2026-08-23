@@ -27,6 +27,9 @@ import com.soomgil.media.domain.policy.MediaObjectKeyPolicy;
 import com.soomgil.media.domain.policy.MediaUploadPolicy;
 import com.soomgil.media.infrastructure.persistence.mapper.MediaUploadIntentMapper;
 import com.soomgil.media.infrastructure.persistence.row.MediaUploadIntentRow;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.net.URI;
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -34,6 +37,7 @@ import java.time.ZoneOffset;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.Supplier;
+import javax.imageio.ImageIO;
 import org.junit.jupiter.api.Test;
 
 class MediaCommandHandlersTest {
@@ -124,6 +128,40 @@ class MediaCommandHandlersTest {
 	}
 
 	@Test
+	void sanitizesMapOverlayBeforeRegisteringMetadata() throws IOException {
+		FakeStorage storage = new FakeStorage();
+		StorageObjectKey key = keyPolicy.create(USER_ID, MediaPurpose.MAP_OVERLAY, GENERATED_ID, "image/png");
+		storage.bytes = pngBytes(320, 180);
+		storage.storedObject = new StoredObject(
+			new StorageObjectMetadata(
+				"soomgil-media", key, "image/png", storage.bytes.length, "sha256:test",
+				URI.create("https://cdn.example.com/" + key.value())
+			),
+			"image/png",
+			320,
+			180
+		);
+		FakeRepository repository = new FakeRepository();
+		CreateMediaFileCommandHandler handler = new CreateMediaFileCommandHandler(
+			storage, repository, (userId, type, resourceId) -> true,
+			uploadPolicy, keyPolicy, TIME, intentMapper(key), IDS
+		);
+		UUID tripId = UUID.randomUUID();
+
+		MediaFileMetadata result = handler.handle(new CreateMediaFileCommand(
+			USER_ID, key.value(), null, "image/png", storage.bytes.length,
+			320, 180, "TRIP", tripId
+		));
+
+		assertThat(storage.replaced).isTrue();
+		assertThat(result.mimeType()).isEqualTo("image/png");
+		assertThat(result.byteSize()).isEqualTo(storage.bytes.length);
+		assertThat(result.width()).isEqualTo(320);
+		assertThat(result.height()).isEqualTo(180);
+		assertThat(result.linkedResourceId()).isEqualTo(tripId);
+	}
+
+	@Test
 	void softDeletesOwnedMediaAndSchedulesPurgeAfterSevenDays() {
 		FakeRepository repository = new FakeRepository();
 		repository.found = metadata(USER_ID, "ACTIVE");
@@ -173,6 +211,13 @@ class MediaCommandHandlersTest {
 		);
 	}
 
+	private byte[] pngBytes(int width, int height) throws IOException {
+		BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+		ByteArrayOutputStream output = new ByteArrayOutputStream();
+		ImageIO.write(image, "png", output);
+		return output.toByteArray();
+	}
+
 	private MediaUploadIntentMapper intentMapper(StorageObjectKey key) {
 		MediaUploadIntentMapper mapper = mock(MediaUploadIntentMapper.class);
 		when(mapper.findPendingOwned(USER_ID, key.value())).thenReturn(new MediaUploadIntentRow(
@@ -186,6 +231,8 @@ class MediaCommandHandlersTest {
 	private static final class FakeStorage implements ObjectStorageGateway {
 		private StorageUploadRequest uploadRequest;
 		private StoredObject storedObject;
+		private byte[] bytes;
+		private boolean replaced;
 
 		@Override
 		public PresignedStorageUpload presignUpload(StorageUploadRequest request) {
@@ -208,6 +255,26 @@ class MediaCommandHandlersTest {
 		@Override
 		public StoredObject inspect(StorageObjectKey objectKey) {
 			return storedObject;
+		}
+
+		@Override
+		public byte[] read(StorageObjectKey objectKey) {
+			return bytes;
+		}
+
+		@Override
+		public void replace(StorageObjectKey objectKey, byte[] bytes, String contentType) {
+			this.bytes = bytes;
+			this.replaced = true;
+			this.storedObject = new StoredObject(
+				new StorageObjectMetadata(
+					"soomgil-media", objectKey, contentType, bytes.length, "sha256:sanitized",
+					URI.create("https://cdn.example.com/" + objectKey.value())
+				),
+				contentType,
+				storedObject.width(),
+				storedObject.height()
+			);
 		}
 
 		@Override

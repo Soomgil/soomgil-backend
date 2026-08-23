@@ -17,9 +17,11 @@ public final class MediaUploadPolicy {
 
 	private static final long MIB = 1024L * 1024L;
 	private static final Set<String> IMAGE_TYPES = Set.of("image/jpeg", "image/png");
+	private static final Set<String> MAP_OVERLAY_TYPES = Set.of("image/jpeg", "image/png", "image/webp");
 	private static final Map<MediaPurpose, Long> SIZE_LIMITS = Map.of(
 		MediaPurpose.PROFILE_IMAGE, 5 * MIB,
 		MediaPurpose.TRIP_RECORD, 100 * MIB,
+		MediaPurpose.MAP_OVERLAY, 10 * MIB,
 		MediaPurpose.COMMUNITY_POST, 10 * MIB
 	);
 
@@ -42,6 +44,9 @@ public final class MediaUploadPolicy {
 	private Set<String> allowedMimeTypes(MediaPurpose purpose) {
 		if (purpose == MediaPurpose.TRIP_RECORD) {
 			return Set.of("image/jpeg", "image/png", "video/mp4");
+		}
+		if (purpose == MediaPurpose.MAP_OVERLAY) {
+			return MAP_OVERLAY_TYPES;
 		}
 		return IMAGE_TYPES;
 	}

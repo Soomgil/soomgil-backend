@@ -1,6 +1,7 @@
 package com.soomgil.itinerary.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.soomgil.collaboration.application.port.CollaborationCommandEvent;
 import com.soomgil.collaboration.application.port.CollaborationCommandEventRepository;
@@ -255,9 +256,9 @@ class ItineraryControllerTest {
 	@Test
 	void createsMapDrawingResponse() {
 		StubItineraryCommandRepository repository = new StubItineraryCommandRepository();
-		ItineraryController controller = controller(repository);
+		MapDrawingController controller = mapDrawingController(repository);
 
-		ItineraryMutationResponse result = controller.createDrawing(
+		ItineraryMutationResponse result = controller.create(
 			TRIP_ID,
 			new CreateMapDrawingRequest(
 				0L,
@@ -353,11 +354,12 @@ class ItineraryControllerTest {
 	@Test
 	void deletesMapDrawingResponse() {
 		StubItineraryCommandRepository repository = new StubItineraryCommandRepository();
-		ItineraryController controller = controller(repository);
+		MapDrawingController controller = mapDrawingController(repository);
 
-		ItineraryMutationResponse result = controller.deleteDrawing(
+		ItineraryMutationResponse result = controller.delete(
 			TRIP_ID,
 			DRAWING_ID,
+			"session-1",
 			new com.soomgil.collaboration.api.dto.VersionedCommandRequest(0L),
 			principal()
 		);
@@ -371,11 +373,12 @@ class ItineraryControllerTest {
 	@Test
 	void updatesMapDrawingResponse() {
 		StubItineraryCommandRepository repository = new StubItineraryCommandRepository();
-		ItineraryController controller = controller(repository);
+		MapDrawingController controller = mapDrawingController(repository);
 
-		ItineraryMutationResponse result = controller.updateDrawing(
+		ItineraryMutationResponse result = controller.update(
 			TRIP_ID,
 			DRAWING_ID,
+			"session-1",
 			new UpdateMapDrawingRequest(
 				0L,
 				java.util.Map.of("type", "LineString"),
@@ -392,6 +395,104 @@ class ItineraryControllerTest {
 		assertThat(result.drawing().id()).isEqualTo(DRAWING_ID);
 		assertThat(result.drawing().version()).isEqualTo(1);
 		assertThat(result.drawing().label()).isEqualTo("수정된 선");
+	}
+
+	@Test
+	void rejectsMapDrawingUpdateWithoutOwnedWebSocketLease() {
+		StubItineraryCommandRepository repository = new StubItineraryCommandRepository();
+		var leaseStore = new com.soomgil.collaboration.infrastructure.websocket.InMemoryMapObjectLeaseStore();
+		MapDrawingController controller = mapDrawingController(repository, leaseStore);
+
+		assertThatThrownBy(() -> controller.update(
+			TRIP_ID,
+			DRAWING_ID,
+			"session-1",
+			new UpdateMapDrawingRequest(
+				0L,
+				java.util.Map.of("type", "LineString"),
+				java.util.Map.of("color", "#222222"),
+				"수정된 선",
+				2,
+				0L
+			),
+			principal()
+		)).isInstanceOf(com.soomgil.global.error.BusinessException.class)
+			.hasMessageContaining("lease");
+	}
+
+	@Test
+	void updatesMapDrawingWithOwnedWebSocketLease() {
+		StubItineraryCommandRepository repository = new StubItineraryCommandRepository();
+		var leaseStore = new com.soomgil.collaboration.infrastructure.websocket.InMemoryMapObjectLeaseStore();
+		leaseStore.acquire(
+			TRIP_ID, DRAWING_ID, USER_ID, "session-1", Instant.parse("2026-06-17T00:00:00Z")
+		);
+		MapDrawingController controller = mapDrawingController(repository, leaseStore);
+
+		ItineraryMutationResponse result = controller.update(
+			TRIP_ID,
+			DRAWING_ID,
+			"session-1",
+			new UpdateMapDrawingRequest(
+				0L,
+				java.util.Map.of("type", "LineString"),
+				java.util.Map.of("color", "#222222"),
+				"수정된 선",
+				2,
+				0L
+			),
+			principal()
+		);
+
+		assertThat(result.drawing().id()).isEqualTo(DRAWING_ID);
+	}
+
+	private MapDrawingController mapDrawingController(StubItineraryCommandRepository repository) {
+		CapturingEventRepository eventRepository = new CapturingEventRepository();
+		var accessGuard = new com.soomgil.trip.application.query.handler.TripAccessGuard(new StubTripQueryRepository());
+		var sessionRegistry = new com.soomgil.collaboration.infrastructure.websocket.CollaborationWebSocketSessionRegistry();
+		sessionRegistry.register("session-1", USER_ID);
+		return new MapDrawingController(
+			new CreateMapDrawingHandler(
+				repository, eventRepository, accessGuard,
+				() -> Instant.parse("2026-06-17T00:00:00Z"), new ObjectMapper()
+			),
+			new UpdateMapDrawingHandler(
+				repository, eventRepository, accessGuard,
+				() -> Instant.parse("2026-06-17T00:00:00Z"), new ObjectMapper()
+			),
+			new DeleteMapDrawingHandler(
+				repository, eventRepository, accessGuard,
+				() -> Instant.parse("2026-06-17T00:00:00Z")
+			),
+			new com.soomgil.collaboration.infrastructure.web.HttpCollaborationSessionIdProvider(sessionRegistry)
+		);
+	}
+
+	private MapDrawingController mapDrawingController(
+		StubItineraryCommandRepository repository,
+		com.soomgil.collaboration.application.port.MapObjectLeaseStore leaseStore
+	) {
+		CapturingEventRepository eventRepository = new CapturingEventRepository();
+		var accessGuard = new com.soomgil.trip.application.query.handler.TripAccessGuard(new StubTripQueryRepository());
+		var sessionRegistry = new com.soomgil.collaboration.infrastructure.websocket.CollaborationWebSocketSessionRegistry();
+		sessionRegistry.register("session-1", USER_ID);
+		return new MapDrawingController(
+			new CreateMapDrawingHandler(
+				repository, eventRepository, accessGuard,
+				() -> Instant.parse("2026-06-17T00:00:00Z"), new ObjectMapper()
+			),
+			new UpdateMapDrawingHandler(
+				repository, eventRepository, accessGuard,
+				() -> Instant.parse("2026-06-17T00:00:00Z"), new ObjectMapper(),
+				new com.soomgil.itinerary.domain.policy.MapDrawingObjectPolicy(), leaseStore
+			),
+			new DeleteMapDrawingHandler(
+				repository, eventRepository, accessGuard,
+				() -> Instant.parse("2026-06-17T00:00:00Z"), leaseStore
+			),
+			new com.soomgil.collaboration.infrastructure.web.HttpCollaborationSessionIdProvider(sessionRegistry)
+		);
 	}
 
 	private ItineraryController controller(StubItineraryCommandRepository repository) {
@@ -414,13 +515,6 @@ class ItineraryControllerTest {
 				eventRepository,
 				new com.soomgil.trip.application.query.handler.TripAccessGuard(new StubTripQueryRepository()),
 				() -> Instant.parse("2026-06-17T00:00:00Z")
-			),
-			new CreateMapDrawingHandler(
-				repository,
-				eventRepository,
-				new com.soomgil.trip.application.query.handler.TripAccessGuard(new StubTripQueryRepository()),
-				() -> Instant.parse("2026-06-17T00:00:00Z"),
-				new ObjectMapper()
 			),
 			new MapMatchRouteHandler(
 				repository,
@@ -445,19 +539,6 @@ class ItineraryControllerTest {
 				eventRepository,
 				new com.soomgil.trip.application.query.handler.TripAccessGuard(new StubTripQueryRepository()),
 				() -> Instant.parse("2026-06-17T00:00:00Z")
-			),
-			new DeleteMapDrawingHandler(
-				repository,
-				eventRepository,
-				new com.soomgil.trip.application.query.handler.TripAccessGuard(new StubTripQueryRepository()),
-				() -> Instant.parse("2026-06-17T00:00:00Z")
-			),
-			new UpdateMapDrawingHandler(
-				repository,
-				eventRepository,
-				new com.soomgil.trip.application.query.handler.TripAccessGuard(new StubTripQueryRepository()),
-				() -> Instant.parse("2026-06-17T00:00:00Z"),
-				new ObjectMapper()
 			),
 			new UpdateItineraryDayHandler(
 				repository,

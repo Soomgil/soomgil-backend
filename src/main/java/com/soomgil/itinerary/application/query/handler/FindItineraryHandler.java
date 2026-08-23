@@ -83,6 +83,9 @@ public class FindItineraryHandler implements QueryHandler<FindItineraryQuery, It
 				drawing.geometry(),
 				drawing.style(),
 				drawing.label(),
+				drawing.mediaFileId(),
+				drawing.stickerCode(),
+				drawing.transform(),
 				drawing.sortOrder(),
 				drawing.version()
 			))

@@ -7,6 +7,8 @@ import java.util.UUID;
 
 /**
  * 일정 변경 응답에 포함되는 저장 지도 도형 view.
+ *
+ * <p>지도 오브젝트는 {@code mediaFileId} 또는 {@code stickerCode}와 meter 기반 transform을 포함한다.
  */
 public record MapDrawingView(
 	UUID id,
@@ -16,7 +18,24 @@ public record MapDrawingView(
 	Map<String, Object> geometry,
 	Map<String, Object> style,
 	String label,
+	UUID mediaFileId,
+	String stickerCode,
+	Map<String, Object> transform,
 	int sortOrder,
 	long version
 ) {
+	public MapDrawingView(
+		UUID id,
+		UUID itineraryDayId,
+		DrawingType drawingType,
+		GeometryFormat geometryFormat,
+		Map<String, Object> geometry,
+		Map<String, Object> style,
+		String label,
+		int sortOrder,
+		long version
+	) {
+		this(id, itineraryDayId, drawingType, geometryFormat, geometry, style, label, null, null, null,
+			sortOrder, version);
+	}
 }

@@ -18,6 +18,7 @@ import com.soomgil.media.application.command.handler.DeleteMediaFileCommandHandl
 import com.soomgil.media.domain.model.MediaFileMetadata;
 import com.soomgil.media.domain.model.MediaPurpose;
 import com.soomgil.media.application.port.MediaFileRepository;
+import com.soomgil.media.application.port.LinkedMediaResourceAuthorizer;
 import com.soomgil.global.storage.ObjectStorageGateway;
 import com.soomgil.media.domain.policy.MediaObjectKeyPolicy;
 import jakarta.validation.Valid;
@@ -49,6 +50,7 @@ public class MediaController extends ApiControllerSupport {
 	private final MediaFileRepository mediaFileRepository;
 	private final ObjectStorageGateway storage;
 	private final MediaObjectKeyPolicy keyPolicy;
+	private final LinkedMediaResourceAuthorizer resourceAuthorizer;
 
 	@Autowired
 	public MediaController(
@@ -57,7 +59,8 @@ public class MediaController extends ApiControllerSupport {
 		DeleteMediaFileCommandHandler deleteMediaFileHandler,
 		MediaFileRepository mediaFileRepository,
 		ObjectStorageGateway storage,
-		MediaObjectKeyPolicy keyPolicy
+		MediaObjectKeyPolicy keyPolicy,
+		LinkedMediaResourceAuthorizer resourceAuthorizer
 	) {
 		this.uploadUrlHandler = uploadUrlHandler;
 		this.createMediaFileHandler = createMediaFileHandler;
@@ -65,6 +68,7 @@ public class MediaController extends ApiControllerSupport {
 		this.mediaFileRepository = mediaFileRepository;
 		this.storage = storage;
 		this.keyPolicy = keyPolicy;
+		this.resourceAuthorizer = resourceAuthorizer;
 	}
 
 	MediaController(
@@ -72,18 +76,25 @@ public class MediaController extends ApiControllerSupport {
 		CreateMediaFileCommandHandler createMediaFileHandler,
 		DeleteMediaFileCommandHandler deleteMediaFileHandler
 	) {
-		this(uploadUrlHandler, createMediaFileHandler, deleteMediaFileHandler, null, null, null);
+		this(uploadUrlHandler, createMediaFileHandler, deleteMediaFileHandler, null, null, null, null);
 	}
 
 	@GetMapping("/files/{mediaId}/content")
-	public ResponseEntity<byte[]> getPublicContent(@PathVariable UUID mediaId) {
+	public ResponseEntity<byte[]> getContent(@PathVariable UUID mediaId, Principal principal) {
 		MediaFileMetadata mediaFile = mediaFileRepository.findById(mediaId);
 		if (mediaFile == null || !"ACTIVE".equals(mediaFile.status())) {
 			throw new BusinessException(ErrorCode.OBJECT_NOT_FOUND);
 		}
 		MediaPurpose purpose = keyPolicy.requireOwnedPurpose(mediaFile.ownerUserId(), mediaFile.objectKey());
 		if (!purpose.publicServingAllowed()) {
-			throw new BusinessException(ErrorCode.FORBIDDEN);
+			UUID userId = currentUserId(principal);
+			boolean readableMapOverlay = purpose == MediaPurpose.MAP_OVERLAY
+				&& "TRIP".equals(mediaFile.linkedResourceType())
+				&& mediaFile.linkedResourceId() != null
+				&& resourceAuthorizer.canLink(userId, "TRIP", mediaFile.linkedResourceId());
+			if (!readableMapOverlay) {
+				throw new BusinessException(ErrorCode.FORBIDDEN);
+			}
 		}
 		return ResponseEntity.ok()
 			.cacheControl(CacheControl.noCache())

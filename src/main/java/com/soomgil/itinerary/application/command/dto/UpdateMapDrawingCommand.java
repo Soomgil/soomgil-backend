@@ -14,8 +14,10 @@ import java.util.UUID;
  * @param geometry GeoJSON geometry
  * @param style style JSON
  * @param label 표시 label
+ * @param transform 지도 오브젝트 중심, meter 크기, 회전 정보
  * @param sortOrder 정렬 순서
  * @param drawingVersion 요청자가 본 drawing version
+ * @param websocketSessionId 편집 lease를 소유한 WebSocket session ID
  */
 public record UpdateMapDrawingCommand(
 	UUID tripId,
@@ -25,7 +27,22 @@ public record UpdateMapDrawingCommand(
 	Map<String, Object> geometry,
 	Map<String, Object> style,
 	String label,
+	Map<String, Object> transform,
 	Integer sortOrder,
-	Long drawingVersion
+	Long drawingVersion,
+	String websocketSessionId
 ) implements Command<ItineraryMutationResult> {
+	public UpdateMapDrawingCommand(
+		UUID tripId,
+		UUID actorUserId,
+		long baseVersion,
+		UUID drawingId,
+		Map<String, Object> geometry,
+		Map<String, Object> style,
+		String label,
+		Integer sortOrder,
+		Long drawingVersion
+	) {
+		this(tripId, actorUserId, baseVersion, drawingId, geometry, style, label, null, sortOrder, drawingVersion, null);
+	}
 }

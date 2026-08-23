@@ -12,8 +12,21 @@ public record MapDrawingSnapshotUpdate(
 	String geometry,
 	String style,
 	String label,
+	String transform,
 	Integer sortOrder,
 	UUID updatedByUserId,
 	Instant updatedAt
 ) {
+	public MapDrawingSnapshotUpdate(
+		UUID tripId,
+		UUID drawingId,
+		String geometry,
+		String style,
+		String label,
+		Integer sortOrder,
+		UUID updatedByUserId,
+		Instant updatedAt
+	) {
+		this(tripId, drawingId, geometry, style, label, null, sortOrder, updatedByUserId, updatedAt);
+	}
 }

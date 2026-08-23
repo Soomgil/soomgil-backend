@@ -13,7 +13,10 @@ import com.soomgil.itinerary.application.command.dto.ItineraryMutationResult;
 import com.soomgil.itinerary.application.command.dto.MapDrawingView;
 import com.soomgil.itinerary.application.port.ItineraryCommandRepository;
 import com.soomgil.itinerary.application.port.MapDrawingCreate;
+import com.soomgil.itinerary.application.port.MapOverlayMediaAccess;
 import com.soomgil.itinerary.domain.model.GeometryFormat;
+import com.soomgil.itinerary.domain.model.DrawingType;
+import com.soomgil.itinerary.domain.policy.MapDrawingObjectPolicy;
 import com.soomgil.trip.application.query.handler.TripAccessGuard;
 import java.time.Instant;
 import java.util.List;
@@ -21,6 +24,7 @@ import java.util.Map;
 import java.util.Objects;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.beans.factory.annotation.Autowired;
 
 /**
  * {@link CreateMapDrawingCommand}를 처리해 저장 지도 도형을 생성한다.
@@ -35,6 +39,27 @@ public class CreateMapDrawingHandler implements CommandHandler<CreateMapDrawingC
 	private final TripAccessGuard tripAccessGuard;
 	private final TimeProvider timeProvider;
 	private final ObjectMapper objectMapper;
+	private final MapDrawingObjectPolicy objectPolicy;
+	private final MapOverlayMediaAccess mediaAccess;
+
+	@Autowired
+	public CreateMapDrawingHandler(
+		ItineraryCommandRepository repository,
+		CollaborationCommandEventRepository eventRepository,
+		TripAccessGuard tripAccessGuard,
+		TimeProvider timeProvider,
+		ObjectMapper objectMapper,
+		MapDrawingObjectPolicy objectPolicy,
+		MapOverlayMediaAccess mediaAccess
+	) {
+		this.repository = Objects.requireNonNull(repository, "repository must not be null");
+		this.eventRepository = Objects.requireNonNull(eventRepository, "eventRepository must not be null");
+		this.tripAccessGuard = Objects.requireNonNull(tripAccessGuard, "tripAccessGuard must not be null");
+		this.timeProvider = Objects.requireNonNull(timeProvider, "timeProvider must not be null");
+		this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper must not be null");
+		this.objectPolicy = Objects.requireNonNull(objectPolicy, "objectPolicy must not be null");
+		this.mediaAccess = Objects.requireNonNull(mediaAccess, "mediaAccess must not be null");
+	}
 
 	public CreateMapDrawingHandler(
 		ItineraryCommandRepository repository,
@@ -43,11 +68,8 @@ public class CreateMapDrawingHandler implements CommandHandler<CreateMapDrawingC
 		TimeProvider timeProvider,
 		ObjectMapper objectMapper
 	) {
-		this.repository = Objects.requireNonNull(repository, "repository must not be null");
-		this.eventRepository = Objects.requireNonNull(eventRepository, "eventRepository must not be null");
-		this.tripAccessGuard = Objects.requireNonNull(tripAccessGuard, "tripAccessGuard must not be null");
-		this.timeProvider = Objects.requireNonNull(timeProvider, "timeProvider must not be null");
-		this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper must not be null");
+		this(repository, eventRepository, tripAccessGuard, timeProvider, objectMapper,
+			new MapDrawingObjectPolicy(), (tripId, mediaFileId) -> true);
 	}
 
 	@Override
@@ -55,6 +77,10 @@ public class CreateMapDrawingHandler implements CommandHandler<CreateMapDrawingC
 	public ItineraryMutationResult handle(CreateMapDrawingCommand command) {
 		tripAccessGuard.requireActiveMember(command.tripId(), command.actorUserId());
 		validate(command);
+		if (command.drawingType() == DrawingType.IMAGE
+			&& !mediaAccess.canUse(command.tripId(), command.mediaFileId())) {
+			throw new BusinessException(ErrorCode.MEDIA_LINK_FORBIDDEN, "Map overlay media is not linked to this trip.");
+		}
 		if (command.itineraryDayId() != null && !repository.existsDay(command.tripId(), command.itineraryDayId())) {
 			throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "Itinerary day was not found.");
 		}
@@ -71,6 +97,9 @@ public class CreateMapDrawingHandler implements CommandHandler<CreateMapDrawingC
 			toJson(command.geometry(), "Geometry is invalid."),
 			command.style() == null ? null : toJson(command.style(), "Style is invalid."),
 			normalizeText(command.label()),
+			command.mediaFileId(),
+			normalizeText(command.stickerCode()),
+			command.transform() == null ? null : toJson(command.transform(), "Transform is invalid."),
 			command.sortOrder() == null ? 0 : command.sortOrder(),
 			0,
 			command.actorUserId(),
@@ -99,6 +128,9 @@ public class CreateMapDrawingHandler implements CommandHandler<CreateMapDrawingC
 				command.geometry(),
 				command.style(),
 				drawing.label(),
+				drawing.mediaFileId(),
+				drawing.stickerCode(),
+				command.transform(),
 				drawing.sortOrder(),
 				drawing.version()
 			),
@@ -113,8 +145,29 @@ public class CreateMapDrawingHandler implements CommandHandler<CreateMapDrawingC
 		if (command.geometry() == null || command.geometry().isEmpty()) {
 			throw new BusinessException(ErrorCode.VALIDATION_FAILED, "Geometry is required.");
 		}
+		objectPolicy.validate(
+			command.drawingType(), command.mediaFileId(), normalizeText(command.stickerCode()), command.transform()
+		);
+		if ((command.drawingType() == DrawingType.STICKER || command.drawingType() == DrawingType.IMAGE)
+			&& !"Point".equals(command.geometry().get("type"))) {
+			throw new BusinessException(ErrorCode.VALIDATION_FAILED, "Map objects require Point geometry.");
+		}
+		if (command.drawingType() == DrawingType.STICKER || command.drawingType() == DrawingType.IMAGE) {
+			validatePointMatchesTransform(command.geometry(), command.transform());
+		}
 		if (command.sortOrder() != null && command.sortOrder() < 0) {
 			throw new BusinessException(ErrorCode.VALIDATION_FAILED, "Sort order must be greater than or equal to 0.");
+		}
+	}
+
+	private void validatePointMatchesTransform(Map<String, Object> geometry, Map<String, Object> transform) {
+		Object coordinatesValue = geometry.get("coordinates");
+		if (!(coordinatesValue instanceof List<?> coordinates) || coordinates.size() != 2
+			|| !(coordinates.get(0) instanceof Number longitude)
+			|| !(coordinates.get(1) instanceof Number latitude)
+			|| Math.abs(longitude.doubleValue() - ((Number) transform.get("centerLng")).doubleValue()) > 0.0000001
+			|| Math.abs(latitude.doubleValue() - ((Number) transform.get("centerLat")).doubleValue()) > 0.0000001) {
+			throw new BusinessException(ErrorCode.VALIDATION_FAILED, "Point geometry must match the map object center.");
 		}
 	}
 

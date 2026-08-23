@@ -1,6 +1,7 @@
 package com.soomgil.itinerary.application.command.handler;
 
 import com.soomgil.collaboration.application.port.CollaborationCommandEventRepository;
+import com.soomgil.collaboration.application.port.MapObjectLeaseStore;
 import com.soomgil.common.cqrs.CommandHandler;
 import com.soomgil.common.time.TimeProvider;
 import com.soomgil.global.error.BusinessException;
@@ -14,6 +15,7 @@ import java.util.List;
 import java.util.Objects;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.beans.factory.annotation.Autowired;
 
 /**
  * {@link DeleteMapDrawingCommand}를 처리해 map drawing을 soft delete한다.
@@ -25,6 +27,22 @@ public class DeleteMapDrawingHandler implements CommandHandler<DeleteMapDrawingC
 	private final CollaborationCommandEventRepository eventRepository;
 	private final TripAccessGuard tripAccessGuard;
 	private final TimeProvider timeProvider;
+	private final MapObjectLeaseStore leaseStore;
+
+	@Autowired
+	public DeleteMapDrawingHandler(
+		ItineraryCommandRepository repository,
+		CollaborationCommandEventRepository eventRepository,
+		TripAccessGuard tripAccessGuard,
+		TimeProvider timeProvider,
+		MapObjectLeaseStore leaseStore
+	) {
+		this.repository = Objects.requireNonNull(repository, "repository must not be null");
+		this.eventRepository = Objects.requireNonNull(eventRepository, "eventRepository must not be null");
+		this.tripAccessGuard = Objects.requireNonNull(tripAccessGuard, "tripAccessGuard must not be null");
+		this.timeProvider = Objects.requireNonNull(timeProvider, "timeProvider must not be null");
+		this.leaseStore = Objects.requireNonNull(leaseStore, "leaseStore must not be null");
+	}
 
 	public DeleteMapDrawingHandler(
 		ItineraryCommandRepository repository,
@@ -36,6 +54,7 @@ public class DeleteMapDrawingHandler implements CommandHandler<DeleteMapDrawingC
 		this.eventRepository = Objects.requireNonNull(eventRepository, "eventRepository must not be null");
 		this.tripAccessGuard = Objects.requireNonNull(tripAccessGuard, "tripAccessGuard must not be null");
 		this.timeProvider = Objects.requireNonNull(timeProvider, "timeProvider must not be null");
+		this.leaseStore = null;
 	}
 
 	@Override
@@ -50,6 +69,11 @@ public class DeleteMapDrawingHandler implements CommandHandler<DeleteMapDrawingC
 		}
 
 		Instant now = timeProvider.now();
+		if (leaseStore != null) {
+			leaseStore.requireOwned(
+				command.tripId(), command.drawingId(), command.actorUserId(), command.websocketSessionId(), now
+			);
+		}
 		long newVersion = repository.incrementItineraryVersion(command.tripId(), command.baseVersion(), now)
 			.orElseThrow(() -> new BusinessException(ErrorCode.CONFLICT, "Itinerary version does not match."));
 		boolean deleted = repository.softDeleteMapDrawing(

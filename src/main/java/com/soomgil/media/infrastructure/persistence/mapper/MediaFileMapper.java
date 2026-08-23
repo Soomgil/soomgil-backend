@@ -20,6 +20,9 @@ public interface MediaFileMapper {
 
 	long countAccessibleTripRecord(@Param("userId") UUID userId, @Param("recordId") UUID recordId);
 
+	/** active 여행방 소유자 또는 멤버인지 확인한다. */
+	long countAccessibleTrip(@Param("userId") UUID userId, @Param("tripId") UUID tripId);
+
 	List<MediaFileRow> findDueForPurge(@Param("now") Instant now, @Param("limit") int limit);
 
 	int markPurged(@Param("mediaFileId") UUID mediaFileId, @Param("purgedAt") Instant purgedAt);

@@ -20,6 +20,7 @@ public class SqlLinkedMediaResourceAuthorizer implements LinkedMediaResourceAuth
 		return switch (resourceType) {
 			case "USER_PROFILE" -> userId.equals(resourceId);
 			case "TRIP_RECORD" -> mapper.countAccessibleTripRecord(userId, resourceId) > 0;
+			case "TRIP" -> mapper.countAccessibleTrip(userId, resourceId) > 0;
 			default -> false;
 		};
 	}

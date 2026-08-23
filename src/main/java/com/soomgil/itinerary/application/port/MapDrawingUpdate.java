@@ -11,6 +11,7 @@ import java.util.UUID;
  * @param geometry 변경할 geometry JSON
  * @param style 변경할 style JSON
  * @param label 변경할 label
+ * @param transform 변경할 지도 오브젝트 transform JSON. 크기는 meter 단위
  * @param sortOrder 변경할 정렬 순서
  * @param expectedVersion 요청자가 본 drawing version
  * @param updatedByUserId 수정 사용자 ID
@@ -22,9 +23,23 @@ public record MapDrawingUpdate(
 	String geometry,
 	String style,
 	String label,
+	String transform,
 	Integer sortOrder,
 	Long expectedVersion,
 	UUID updatedByUserId,
 	Instant updatedAt
 ) {
+	public MapDrawingUpdate(
+		UUID tripId,
+		UUID drawingId,
+		String geometry,
+		String style,
+		String label,
+		Integer sortOrder,
+		Long expectedVersion,
+		UUID updatedByUserId,
+		Instant updatedAt
+	) {
+		this(tripId, drawingId, geometry, style, label, null, sortOrder, expectedVersion, updatedByUserId, updatedAt);
+	}
 }
