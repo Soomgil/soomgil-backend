@@ -26,7 +26,24 @@ public record MapDrawingReadModel(
 	Map<String, Object> geometry,
 	Map<String, Object> style,
 	String label,
+	UUID mediaFileId,
+	String stickerCode,
+	Map<String, Object> transform,
 	Integer sortOrder,
 	Long version
 ) {
+	public MapDrawingReadModel(
+		UUID id,
+		UUID itineraryDayId,
+		DrawingType drawingType,
+		GeometryFormat geometryFormat,
+		Map<String, Object> geometry,
+		Map<String, Object> style,
+		String label,
+		Integer sortOrder,
+		Long version
+	) {
+		this(id, itineraryDayId, drawingType, geometryFormat, geometry, style, label, null, null, null,
+			sortOrder, version);
+	}
 }

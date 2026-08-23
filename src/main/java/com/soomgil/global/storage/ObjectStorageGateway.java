@@ -22,6 +22,11 @@ public interface ObjectStorageGateway {
 		throw new UnsupportedOperationException("Object read is not implemented.");
 	}
 
+	/** 검증·정제한 bytes로 기존 object를 교체한다. */
+	default void replace(StorageObjectKey objectKey, byte[] bytes, String contentType) {
+		throw new UnsupportedOperationException("Object replace is not implemented.");
+	}
+
 	/** object storage에서 key를 멱등 삭제한다. */
 	void delete(StorageObjectKey objectKey);
 }

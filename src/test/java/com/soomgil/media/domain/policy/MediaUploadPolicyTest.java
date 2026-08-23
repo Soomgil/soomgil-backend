@@ -17,6 +17,7 @@ class MediaUploadPolicyTest {
 		policy.validate(MediaPurpose.PROFILE_IMAGE, "image/jpeg", 5 * 1024 * 1024L);
 		policy.validate(MediaPurpose.TRIP_RECORD, "video/mp4", 100 * 1024 * 1024L);
 		policy.validate(MediaPurpose.COMMUNITY_POST, "image/png", 10 * 1024 * 1024L);
+		policy.validate(MediaPurpose.MAP_OVERLAY, "image/webp", 10 * 1024 * 1024L);
 	}
 
 	@Test
@@ -36,6 +37,13 @@ class MediaUploadPolicyTest {
 			MediaPurpose.PROFILE_IMAGE,
 			"image/jpeg",
 			5 * 1024 * 1024L + 1
+		)).isInstanceOfSatisfying(BusinessException.class, exception ->
+			assertThat(exception.errorCode()).isEqualTo(ErrorCode.MEDIA_SIZE_LIMIT_EXCEEDED));
+
+		assertThatThrownBy(() -> policy.validate(
+			MediaPurpose.MAP_OVERLAY,
+			"image/webp",
+			10 * 1024 * 1024L + 1
 		)).isInstanceOfSatisfying(BusinessException.class, exception ->
 			assertThat(exception.errorCode()).isEqualTo(ErrorCode.MEDIA_SIZE_LIMIT_EXCEEDED));
 	}

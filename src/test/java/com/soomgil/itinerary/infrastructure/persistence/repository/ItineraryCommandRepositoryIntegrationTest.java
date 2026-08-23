@@ -34,6 +34,7 @@ class ItineraryCommandRepositoryIntegrationTest {
 	private static final UUID ORIGIN_ID = UUID.fromString("40000000-0000-0000-0000-000000000021");
 	private static final UUID DESTINATION_ID = UUID.fromString("40000000-0000-0000-0000-000000000022");
 	private static final UUID DRAWING_ID = UUID.fromString("50000000-0000-0000-0000-000000000021");
+	private static final UUID STICKER_ID = UUID.fromString("50000000-0000-0000-0000-000000000022");
 	private static final UUID ROUTE_ID = UUID.fromString("60000000-0000-0000-0000-000000000021");
 	private static final Instant NOW = Instant.parse("2026-06-18T00:00:00Z");
 
@@ -67,6 +68,25 @@ class ItineraryCommandRepositoryIntegrationTest {
 			NOW,
 			NOW
 		));
+		repository.insertMapDrawing(new MapDrawingCreate(
+			STICKER_ID,
+			TRIP_ID,
+			null,
+			DrawingType.STICKER,
+			GeometryFormat.GEOJSON,
+			"{\"type\":\"Point\",\"coordinates\":[127.0,37.0]}",
+			null,
+			"좋아요",
+			null,
+			"HEART",
+			"{\"centerLng\":127.0,\"centerLat\":37.0,\"widthMeters\":120,\"heightMeters\":120,\"rotationDeg\":0}",
+			1,
+			0,
+			USER_ID,
+			USER_ID,
+			NOW,
+			NOW
+		));
 		repository.insertRouteSegment(new RouteSegmentCreate(
 			ROUTE_ID,
 			TRIP_ID,
@@ -89,6 +109,9 @@ class ItineraryCommandRepositoryIntegrationTest {
 		assertThat(repository.findDay(TRIP_ID, DAY_ID)).isPresent();
 		assertThat(repository.findItem(TRIP_ID, ORIGIN_ID).orElseThrow().placeName()).isEqualTo("출발지");
 		assertThat(repository.findMapDrawing(TRIP_ID, DRAWING_ID)).isPresent();
+		var sticker = repository.findMapDrawing(TRIP_ID, STICKER_ID).orElseThrow();
+		assertThat(sticker.stickerCode()).isEqualTo("HEART");
+		assertThat(sticker.transform()).contains("widthMeters");
 		assertThat(repository.findRouteSegment(TRIP_ID, ROUTE_ID)).isPresent();
 		assertThat(repository.incrementItineraryVersion(TRIP_ID, 0, NOW)).hasValue(1L);
 		assertThat(repository.incrementItineraryVersion(TRIP_ID, 0, NOW)).isEmpty();

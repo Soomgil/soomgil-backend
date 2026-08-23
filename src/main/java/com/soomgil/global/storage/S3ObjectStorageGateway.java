@@ -12,6 +12,7 @@ import java.util.Map;
 import javax.imageio.ImageIO;
 import org.springframework.stereotype.Component;
 import software.amazon.awssdk.core.ResponseBytes;
+import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.core.exception.SdkException;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
@@ -149,6 +150,21 @@ public class S3ObjectStorageGateway implements ObjectStorageGateway {
 		}
 		catch (SdkException exception) {
 			throw new IllegalStateException("Object storage read failed.", exception);
+		}
+	}
+
+	@Override
+	public void replace(StorageObjectKey objectKey, byte[] bytes, String contentType) {
+		try {
+			client.putObject(PutObjectRequest.builder()
+				.bucket(properties.bucket())
+				.key(objectKey.value())
+				.contentType(contentType)
+				.contentLength((long) bytes.length)
+				.build(), RequestBody.fromBytes(bytes));
+		}
+		catch (SdkException exception) {
+			throw new IllegalStateException("Object storage replacement failed.", exception);
 		}
 	}
 

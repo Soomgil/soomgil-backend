@@ -11,6 +11,8 @@ import com.soomgil.global.storage.StoredObject;
 import com.soomgil.media.application.command.dto.CreateMediaFileCommand;
 import com.soomgil.media.application.port.LinkedMediaResourceAuthorizer;
 import com.soomgil.media.application.port.MediaFileRepository;
+import com.soomgil.media.application.service.MapOverlayImageProcessor;
+import com.soomgil.media.application.service.ProcessedMapOverlay;
 import com.soomgil.media.domain.model.MediaFileMetadata;
 import com.soomgil.media.domain.model.MediaPurpose;
 import com.soomgil.media.domain.policy.MediaObjectKeyPolicy;
@@ -39,6 +41,7 @@ public class CreateMediaFileCommandHandler implements CommandHandler<CreateMedia
 	private final TimeProvider timeProvider;
 	private final Supplier<UUID> idGenerator;
 	private final MediaUploadIntentMapper uploadIntentMapper;
+	private final MapOverlayImageProcessor mapOverlayImageProcessor;
 
 	@Autowired
 	public CreateMediaFileCommandHandler(
@@ -48,9 +51,13 @@ public class CreateMediaFileCommandHandler implements CommandHandler<CreateMedia
 		MediaUploadPolicy uploadPolicy,
 		MediaObjectKeyPolicy keyPolicy,
 		TimeProvider timeProvider,
-		MediaUploadIntentMapper uploadIntentMapper
+		MediaUploadIntentMapper uploadIntentMapper,
+		MapOverlayImageProcessor mapOverlayImageProcessor
 	) {
-		this(storage, repository, resourceAuthorizer, uploadPolicy, keyPolicy, timeProvider, uploadIntentMapper, Ids::newUuid);
+		this(
+			storage, repository, resourceAuthorizer, uploadPolicy, keyPolicy, timeProvider, uploadIntentMapper,
+			mapOverlayImageProcessor, Ids::newUuid
+		);
 	}
 
 	CreateMediaFileCommandHandler(
@@ -63,6 +70,23 @@ public class CreateMediaFileCommandHandler implements CommandHandler<CreateMedia
 		MediaUploadIntentMapper uploadIntentMapper,
 		Supplier<UUID> idGenerator
 	) {
+		this(
+			storage, repository, resourceAuthorizer, uploadPolicy, keyPolicy, timeProvider, uploadIntentMapper,
+			new MapOverlayImageProcessor(), idGenerator
+		);
+	}
+
+	CreateMediaFileCommandHandler(
+		ObjectStorageGateway storage,
+		MediaFileRepository repository,
+		LinkedMediaResourceAuthorizer resourceAuthorizer,
+		MediaUploadPolicy uploadPolicy,
+		MediaObjectKeyPolicy keyPolicy,
+		TimeProvider timeProvider,
+		MediaUploadIntentMapper uploadIntentMapper,
+		MapOverlayImageProcessor mapOverlayImageProcessor,
+		Supplier<UUID> idGenerator
+	) {
 		this.storage = storage;
 		this.repository = repository;
 		this.resourceAuthorizer = resourceAuthorizer;
@@ -71,6 +95,7 @@ public class CreateMediaFileCommandHandler implements CommandHandler<CreateMedia
 		this.timeProvider = timeProvider;
 		this.idGenerator = idGenerator;
 		this.uploadIntentMapper = uploadIntentMapper;
+		this.mapOverlayImageProcessor = mapOverlayImageProcessor;
 	}
 
 	@Transactional
@@ -86,10 +111,13 @@ public class CreateMediaFileCommandHandler implements CommandHandler<CreateMedia
 		uploadPolicy.validate(purpose, command.mimeType(), command.byteSize());
 		validateLink(command, purpose);
 
-		StoredObject object = storage.inspect(key);
-		if (!metadataMatches(command, object)) {
+		StoredObject uploadedObject = storage.inspect(key);
+		if (!metadataMatches(command, uploadedObject)) {
 			throw new BusinessException(ErrorCode.MEDIA_METADATA_MISMATCH);
 		}
+		StoredObject object = purpose == MediaPurpose.MAP_OVERLAY
+			? sanitizeMapOverlay(key, uploadedObject)
+			: uploadedObject;
 
 		UUID mediaFileId = idGenerator.get();
 		MediaFileMetadata mediaFile = new MediaFileMetadata(
@@ -102,6 +130,28 @@ public class CreateMediaFileCommandHandler implements CommandHandler<CreateMedia
 		repository.save(mediaFile);
 		uploadIntentMapper.markCompleted(intent.id(), mediaFile.id(), createdAt);
 		return mediaFile;
+	}
+
+	private StoredObject sanitizeMapOverlay(StorageObjectKey key, StoredObject uploadedObject) {
+		try {
+			ProcessedMapOverlay processed = mapOverlayImageProcessor.process(
+				storage.read(key), uploadedObject.detectedContentType()
+			);
+			storage.replace(key, processed.bytes(), processed.mimeType());
+			StoredObject sanitized = storage.inspect(key);
+			if (!processed.mimeType().equals(sanitized.metadata().contentType())
+				|| !processed.mimeType().equals(sanitized.detectedContentType())
+				|| sanitized.metadata().sizeBytes() != processed.bytes().length
+				|| !Objects.equals(sanitized.width(), processed.width())
+				|| !Objects.equals(sanitized.height(), processed.height())) {
+				throw new BusinessException(ErrorCode.MEDIA_METADATA_MISMATCH, "Sanitized map overlay verification failed.");
+			}
+			return sanitized;
+		}
+		catch (RuntimeException exception) {
+			storage.delete(key);
+			throw exception;
+		}
 	}
 
 	private void validateLink(CreateMediaFileCommand command, MediaPurpose purpose) {
@@ -124,6 +174,7 @@ public class CreateMediaFileCommandHandler implements CommandHandler<CreateMedia
 		return switch (purpose) {
 			case PROFILE_IMAGE -> "USER_PROFILE".equals(resourceType);
 			case TRIP_RECORD -> "TRIP_RECORD".equals(resourceType);
+			case MAP_OVERLAY -> "TRIP".equals(resourceType);
 			case COMMUNITY_POST -> "COMMUNITY_POST".equals(resourceType);
 		};
 	}

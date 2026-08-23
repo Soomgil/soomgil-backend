@@ -8,6 +8,7 @@ package com.soomgil.media.domain.model;
 public enum MediaPurpose {
 	PROFILE_IMAGE("profile-image", true),
 	TRIP_RECORD("trip-record", false),
+	MAP_OVERLAY("map-overlay", false),
 	COMMUNITY_POST("community-post", true);
 
 	private final String keySegment;

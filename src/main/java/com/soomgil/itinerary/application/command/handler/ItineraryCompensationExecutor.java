@@ -145,6 +145,8 @@ public class ItineraryCompensationExecutor implements CollaborationCompensationE
 			command.path("geometry").toString(),
 			command.path("style").isNull() ? null : command.path("style").toString(),
 			nullableText(command, "label"),
+			command.path("transform").isMissingNode() || command.path("transform").isNull()
+				? null : command.path("transform").toString(),
 			command.path("sortOrder").asInt(),
 			actorUserId,
 			executedAt

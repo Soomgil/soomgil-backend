@@ -72,6 +72,9 @@
       geometry::text AS geometry,
       style::text AS style,
       label,
+      media_file_id,
+      sticker_code,
+      transform::text AS transform,
       sort_order,
       version
     FROM itinerary.map_drawings

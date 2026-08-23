@@ -116,6 +116,9 @@ public class MyBatisItineraryQueryRepository implements ItineraryQueryRepository
 			toMap(row.geometry()),
 			row.style() == null ? null : toMap(row.style()),
 			row.label(),
+			row.mediaFileId(),
+			row.stickerCode(),
+			row.transform() == null ? null : toMap(row.transform()),
 			row.sortOrder(),
 			row.version()
 		);

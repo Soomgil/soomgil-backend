@@ -9,6 +9,7 @@ import java.util.UUID;
  * 저장된 지도 도형 생성을 요청하는 command.
  *
  * <p>실시간 preview stroke는 저장하지 않고, 사용자가 명시적으로 저장한 geometry만 처리한다.
+ * STICKER와 IMAGE의 transform 크기는 meter 단위이며 Point geometry 중심과 일치해야 한다.
  */
 public record CreateMapDrawingCommand(
 	UUID tripId,
@@ -19,6 +20,23 @@ public record CreateMapDrawingCommand(
 	Map<String, Object> geometry,
 	Map<String, Object> style,
 	String label,
+	UUID mediaFileId,
+	String stickerCode,
+	Map<String, Object> transform,
 	Integer sortOrder
 ) implements Command<ItineraryMutationResult> {
+	public CreateMapDrawingCommand(
+		UUID tripId,
+		UUID actorUserId,
+		long baseVersion,
+		UUID itineraryDayId,
+		DrawingType drawingType,
+		Map<String, Object> geometry,
+		Map<String, Object> style,
+		String label,
+		Integer sortOrder
+	) {
+		this(tripId, actorUserId, baseVersion, itineraryDayId, drawingType, geometry, style, label,
+			null, null, null, sortOrder);
+	}
 }

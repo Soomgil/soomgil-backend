@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -13,6 +14,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.soomgil.common.cqrs.NoResult;
 import com.soomgil.global.storage.StorageObjectKey;
+import com.soomgil.global.storage.ObjectStorageGateway;
+import com.soomgil.media.application.port.MediaFileRepository;
+import com.soomgil.media.application.port.LinkedMediaResourceAuthorizer;
+import com.soomgil.media.domain.policy.MediaObjectKeyPolicy;
 import com.soomgil.media.api.dto.CreateMediaFileRequest;
 import com.soomgil.media.api.dto.CreateUploadUrlRequest;
 import com.soomgil.media.application.command.dto.CreateMediaFileCommand;
@@ -113,6 +118,31 @@ class MediaControllerTest {
 
 		assertThat(captured.get().userId()).isEqualTo(USER_ID);
 		assertThat(captured.get().mediaFileId()).isEqualTo(MEDIA_ID);
+	}
+
+	@Test
+	void servesPrivateMapOverlayOnlyToActiveTripMember() {
+		UUID tripId = UUID.randomUUID();
+		MediaFileRepository repository = mock(MediaFileRepository.class);
+		ObjectStorageGateway storage = mock(ObjectStorageGateway.class);
+		LinkedMediaResourceAuthorizer authorizer = mock(LinkedMediaResourceAuthorizer.class);
+		StorageObjectKey key = new StorageObjectKey("media/" + USER_ID + "/map-overlay/file.png");
+		MediaFileMetadata metadata = new MediaFileMetadata(
+			MEDIA_ID, USER_ID, "S3_COMPATIBLE", "bucket", key, null, "image/png", 3L,
+			10, 10, "TRIP", tripId, "ACTIVE", OffsetDateTime.parse("2026-06-20T12:00:00Z"), null, null
+		);
+		when(repository.findById(MEDIA_ID)).thenReturn(metadata);
+		when(authorizer.canLink(USER_ID, "TRIP", tripId)).thenReturn(true);
+		when(storage.read(key)).thenReturn(new byte[] { 1, 2, 3 });
+		MediaController controller = new MediaController(
+			uploadHandler, createHandler, deleteHandler, repository, storage,
+			new MediaObjectKeyPolicy(), authorizer
+		);
+
+		var response = controller.getContent(MEDIA_ID, principal());
+
+		assertThat(response.getBody()).containsExactly(1, 2, 3);
+		verify(authorizer).canLink(USER_ID, "TRIP", tripId);
 	}
 
 	private Principal principal() {

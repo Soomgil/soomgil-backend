@@ -133,7 +133,7 @@ class TripSubscriptionInterceptorTest {
 		Message<?> connect = message(StompCommand.CONNECT, null, true, "session-1");
 		Message<?> subscribe = message(
 			StompCommand.SUBSCRIBE,
-			"/topic/trips/" + TRIP_ID + "/collaboration",
+			"/topic/trips/" + TRIP_ID + "/presence",
 			false,
 			"session-1"
 		);
@@ -143,7 +143,7 @@ class TripSubscriptionInterceptorTest {
 
 		ArgumentCaptor<TripPresenceEvent> eventCaptor = ArgumentCaptor.forClass(TripPresenceEvent.class);
 		verify(messagingTemplate).convertAndSend(
-			org.mockito.ArgumentMatchers.eq("/topic/trips/" + TRIP_ID + "/collaboration"),
+			org.mockito.ArgumentMatchers.eq("/topic/trips/" + TRIP_ID + "/presence"),
 			eventCaptor.capture()
 		);
 		assertThat(eventCaptor.getValue().eventType()).isEqualTo("presence.snapshot");

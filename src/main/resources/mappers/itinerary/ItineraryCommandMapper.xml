@@ -217,6 +217,9 @@
       geometry,
       style,
       label,
+      media_file_id,
+      sticker_code,
+      transform,
       sort_order,
       version,
       created_by_user_id,
@@ -233,6 +236,9 @@
       #{drawing.geometry}::jsonb,
       #{drawing.style}::jsonb,
       #{drawing.label},
+      #{drawing.mediaFileId},
+      #{drawing.stickerCode},
+      #{drawing.transform,jdbcType=VARCHAR}::jsonb,
       #{drawing.sortOrder},
       #{drawing.version},
       #{drawing.createdByUserId},
@@ -561,6 +567,7 @@
       geometry = COALESCE(#{update.geometry,jdbcType=VARCHAR}::jsonb, geometry),
       style = COALESCE(#{update.style,jdbcType=VARCHAR}::jsonb, style),
       label = COALESCE(#{update.label,jdbcType=VARCHAR}, label),
+      transform = COALESCE(#{update.transform,jdbcType=VARCHAR}::jsonb, transform),
       sort_order = COALESCE(#{update.sortOrder,jdbcType=INTEGER}, sort_order),
       version = version + 1,
       updated_by_user_id = #{update.updatedByUserId},
@@ -579,6 +586,9 @@
       geometry::text AS geometry,
       style::text AS style,
       label,
+      media_file_id,
+      sticker_code,
+      transform::text AS transform,
       sort_order,
       version
   </select>
@@ -592,6 +602,9 @@
       geometry::text AS geometry,
       style::text AS style,
       label,
+      media_file_id,
+      sticker_code,
+      transform::text AS transform,
       sort_order,
       version
     FROM itinerary.map_drawings
@@ -606,6 +619,7 @@
       geometry = #{update.geometry}::jsonb,
       style = #{update.style,jdbcType=VARCHAR}::jsonb,
       label = #{update.label,jdbcType=VARCHAR},
+      transform = #{update.transform,jdbcType=VARCHAR}::jsonb,
       sort_order = #{update.sortOrder},
       version = version + 1,
       updated_by_user_id = #{update.updatedByUserId},
@@ -615,6 +629,7 @@
       AND deleted_at IS NULL
     RETURNING
       id, itinerary_day_id, drawing_type, geometry_format, geometry::text AS geometry,
-      style::text AS style, label, sort_order, version
+      style::text AS style, label, media_file_id, sticker_code, transform::text AS transform,
+      sort_order, version
   </select>
 </mapper>

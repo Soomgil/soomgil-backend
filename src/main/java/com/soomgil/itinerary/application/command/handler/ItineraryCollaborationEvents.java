@@ -426,6 +426,7 @@ final class ItineraryCollaborationEvents {
 			+ "\",\"geometry\":" + drawing.geometry()
 			+ ",\"style\":" + (drawing.style() == null ? "null" : drawing.style())
 			+ ",\"label\":" + quoted(drawing.label())
+			+ ",\"transform\":" + (drawing.transform() == null ? "null" : drawing.transform())
 			+ ",\"sortOrder\":" + drawing.sortOrder() + "}";
 	}
 
