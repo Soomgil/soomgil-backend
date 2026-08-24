@@ -59,12 +59,14 @@ public class MapDrawingController {
 	@ResponseStatus(HttpStatus.CREATED)
 	public ItineraryMutationResponse create(
 		@PathVariable UUID tripId,
+		@RequestHeader(name = HttpCollaborationSessionIdProvider.SESSION_HEADER) String websocketSessionId,
 		@Valid @RequestBody CreateMapDrawingRequest request,
 		Principal principal
 	) {
+		UUID userId = currentUserId(principal);
 		return toResponse(createHandler.handle(new CreateMapDrawingCommand(
 			tripId,
-			currentUserId(principal),
+			userId,
 			request.baseVersion(),
 			request.itineraryDayId(),
 			com.soomgil.itinerary.domain.model.DrawingType.valueOf(request.drawingType().name()),
@@ -74,7 +76,8 @@ public class MapDrawingController {
 			request.mediaFileId(),
 			request.stickerCode(),
 			request.transform(),
-			request.sortOrder()
+			request.sortOrder(),
+			sessionIdProvider.requireOwnedSession(websocketSessionId, principal)
 		)));
 	}
 

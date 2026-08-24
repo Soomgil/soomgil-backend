@@ -112,6 +112,7 @@ public class CreateMapDrawingHandler implements CommandHandler<CreateMapDrawingC
 			drawing,
 			command.baseVersion(),
 			newVersion,
+			command.websocketSessionId(),
 			now
 		));
 		return new ItineraryMutationResult(

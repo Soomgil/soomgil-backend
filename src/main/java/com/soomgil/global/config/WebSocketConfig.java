@@ -1,6 +1,6 @@
 package com.soomgil.global.config;
 
-import com.soomgil.collaboration.infrastructure.websocket.CollaborationSessionHeaderInterceptor;
+import com.soomgil.collaboration.infrastructure.websocket.CollaborationSessionHeaderWebSocketDecoratorFactory;
 import com.soomgil.collaboration.infrastructure.websocket.TripSubscriptionInterceptor;
 import com.soomgil.collaboration.infrastructure.websocket.WebSocketJwtAuthenticationInterceptor;
 import java.util.Objects;
@@ -10,6 +10,7 @@ import org.springframework.messaging.simp.config.MessageBrokerRegistry;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
+import org.springframework.web.socket.config.annotation.WebSocketTransportRegistration;
 
 /**
  * STOMP over WebSocket 협업 broadcast 채널을 구성한다.
@@ -21,13 +22,13 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 	private final CorsProperties corsProperties;
 	private final WebSocketJwtAuthenticationInterceptor authenticationInterceptor;
 	private final TripSubscriptionInterceptor subscriptionInterceptor;
-	private final CollaborationSessionHeaderInterceptor sessionHeaderInterceptor;
+	private final CollaborationSessionHeaderWebSocketDecoratorFactory sessionHeaderDecoratorFactory;
 
 	public WebSocketConfig(
 		CorsProperties corsProperties,
 		WebSocketJwtAuthenticationInterceptor authenticationInterceptor,
 		TripSubscriptionInterceptor subscriptionInterceptor,
-		CollaborationSessionHeaderInterceptor sessionHeaderInterceptor
+		CollaborationSessionHeaderWebSocketDecoratorFactory sessionHeaderDecoratorFactory
 	) {
 		this.corsProperties = Objects.requireNonNull(corsProperties, "corsProperties must not be null");
 		this.authenticationInterceptor = Objects.requireNonNull(
@@ -38,9 +39,9 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 			subscriptionInterceptor,
 			"subscriptionInterceptor must not be null"
 		);
-		this.sessionHeaderInterceptor = Objects.requireNonNull(
-			sessionHeaderInterceptor,
-			"sessionHeaderInterceptor must not be null"
+		this.sessionHeaderDecoratorFactory = Objects.requireNonNull(
+			sessionHeaderDecoratorFactory,
+			"sessionHeaderDecoratorFactory must not be null"
 		);
 	}
 
@@ -66,7 +67,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 	}
 
 	@Override
-	public void configureClientOutboundChannel(ChannelRegistration registration) {
-		registration.interceptors(sessionHeaderInterceptor);
+	public void configureWebSocketTransport(WebSocketTransportRegistration registration) {
+		registration.addDecoratorFactory(sessionHeaderDecoratorFactory);
 	}
 }

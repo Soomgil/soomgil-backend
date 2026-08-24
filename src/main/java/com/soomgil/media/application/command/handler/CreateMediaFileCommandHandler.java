@@ -8,6 +8,8 @@ import com.soomgil.global.error.ErrorCode;
 import com.soomgil.global.storage.ObjectStorageGateway;
 import com.soomgil.global.storage.StorageObjectKey;
 import com.soomgil.global.storage.StoredObject;
+import com.soomgil.global.storage.StoredObjectContent;
+import com.soomgil.global.storage.StorageObjectMetadata;
 import com.soomgil.media.application.command.dto.CreateMediaFileCommand;
 import com.soomgil.media.application.port.LinkedMediaResourceAuthorizer;
 import com.soomgil.media.application.port.MediaFileRepository;
@@ -111,12 +113,14 @@ public class CreateMediaFileCommandHandler implements CommandHandler<CreateMedia
 		uploadPolicy.validate(purpose, command.mimeType(), command.byteSize());
 		validateLink(command, purpose);
 
-		StoredObject uploadedObject = storage.inspect(key);
+		StoredObjectContent uploadedContent = purpose == MediaPurpose.MAP_OVERLAY
+			? storage.readAndInspect(key) : null;
+		StoredObject uploadedObject = uploadedContent == null ? storage.inspect(key) : uploadedContent.object();
 		if (!metadataMatches(command, uploadedObject)) {
 			throw new BusinessException(ErrorCode.MEDIA_METADATA_MISMATCH);
 		}
 		StoredObject object = purpose == MediaPurpose.MAP_OVERLAY
-			? sanitizeMapOverlay(key, uploadedObject)
+			? sanitizeMapOverlay(key, uploadedObject, uploadedContent.bytes())
 			: uploadedObject;
 
 		UUID mediaFileId = idGenerator.get();
@@ -132,21 +136,16 @@ public class CreateMediaFileCommandHandler implements CommandHandler<CreateMedia
 		return mediaFile;
 	}
 
-	private StoredObject sanitizeMapOverlay(StorageObjectKey key, StoredObject uploadedObject) {
+	private StoredObject sanitizeMapOverlay(StorageObjectKey key, StoredObject uploadedObject, byte[] uploadedBytes) {
 		try {
 			ProcessedMapOverlay processed = mapOverlayImageProcessor.process(
-				storage.read(key), uploadedObject.detectedContentType()
+				uploadedBytes, uploadedObject.detectedContentType()
 			);
 			storage.replace(key, processed.bytes(), processed.mimeType());
-			StoredObject sanitized = storage.inspect(key);
-			if (!processed.mimeType().equals(sanitized.metadata().contentType())
-				|| !processed.mimeType().equals(sanitized.detectedContentType())
-				|| sanitized.metadata().sizeBytes() != processed.bytes().length
-				|| !Objects.equals(sanitized.width(), processed.width())
-				|| !Objects.equals(sanitized.height(), processed.height())) {
-				throw new BusinessException(ErrorCode.MEDIA_METADATA_MISMATCH, "Sanitized map overlay verification failed.");
-			}
-			return sanitized;
+			return new StoredObject(new StorageObjectMetadata(
+				uploadedObject.metadata().bucket(), key, processed.mimeType(), processed.bytes().length, null,
+				uploadedObject.metadata().publicUrl()
+			), processed.mimeType(), processed.width(), processed.height());
 		}
 		catch (RuntimeException exception) {
 			storage.delete(key);

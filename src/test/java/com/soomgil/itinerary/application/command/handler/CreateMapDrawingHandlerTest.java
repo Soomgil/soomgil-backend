@@ -57,7 +57,11 @@ class CreateMapDrawingHandlerTest {
 			Map.of("type", "Polygon", "coordinates", List.of()),
 			Map.of("fill", "#ffaa00"),
 			"메모 영역",
-			4
+			null,
+			null,
+			null,
+			4,
+			"session-1"
 		));
 
 		assertThat(result.itineraryVersion()).isEqualTo(1);
@@ -66,6 +70,7 @@ class CreateMapDrawingHandlerTest {
 		assertThat(repository.insertedDrawing.geometry()).contains("\"Polygon\"");
 		assertThat(repository.insertedDrawing.sortOrder()).isEqualTo(4);
 		assertThat(eventRepository.lastEvent.commandType()).isEqualTo("CREATE_MAP_DRAWING");
+		assertThat(eventRepository.lastEvent.websocketSessionId()).isEqualTo("session-1");
 		assertThat(eventRepository.lastEvent.aggregateId()).isEqualTo(repository.insertedDrawing.id());
 	}
 
