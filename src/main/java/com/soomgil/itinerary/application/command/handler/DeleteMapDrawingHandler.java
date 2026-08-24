@@ -91,6 +91,7 @@ public class DeleteMapDrawingHandler implements CommandHandler<DeleteMapDrawingC
 			command.actorUserId(),
 			command.baseVersion(),
 			newVersion,
+			command.websocketSessionId(),
 			now
 		));
 		return new ItineraryMutationResult(

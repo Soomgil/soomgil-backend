@@ -41,7 +41,7 @@ class S3ObjectStorageGatewayMinioIntegrationTest {
 	static void setUpStorage() {
 		URI endpoint = URI.create("http://" + MINIO.getHost() + ":" + MINIO.getMappedPort(9000));
 		S3StorageProperties properties = new S3StorageProperties(
-			endpoint, "ap-northeast-2", BUCKET, ACCESS_KEY, SECRET_KEY, null
+			endpoint, endpoint, "ap-northeast-2", BUCKET, ACCESS_KEY, SECRET_KEY, null
 		);
 		S3StorageConfig config = new S3StorageConfig();
 		client = config.s3Client(properties);

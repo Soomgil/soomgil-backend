@@ -260,6 +260,7 @@ class ItineraryControllerTest {
 
 		ItineraryMutationResponse result = controller.create(
 			TRIP_ID,
+			"session-1",
 			new CreateMapDrawingRequest(
 				0L,
 				DAY_ID,

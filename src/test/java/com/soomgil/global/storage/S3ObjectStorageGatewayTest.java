@@ -3,6 +3,8 @@ package com.soomgil.global.storage;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.awt.image.BufferedImage;
@@ -22,7 +24,8 @@ import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 class S3ObjectStorageGatewayTest {
 
 	private final S3StorageProperties properties = new S3StorageProperties(
-		URI.create("http://localhost:9000"), "ap-northeast-2", "soomgil-media",
+		URI.create("http://minio:9000"), URI.create("http://localhost:9000"),
+		"ap-northeast-2", "soomgil-media",
 		"access-key", "secret-key", URI.create("https://cdn.example.com")
 	);
 
@@ -41,6 +44,7 @@ class S3ObjectStorageGatewayTest {
 
 			assertThat(upload.method()).isEqualTo("PUT");
 			assertThat(upload.uploadUrl().getQuery()).contains("X-Amz-Signature=");
+			assertThat(upload.uploadUrl().getHost()).isEqualTo("localhost");
 			assertThat(upload.uploadUrl().getPath()).endsWith("/soomgil-media/media/user/profile-image/file.jpg");
 		}
 	}
@@ -85,6 +89,31 @@ class S3ObjectStorageGatewayTest {
 			assertThat(object.height()).isEqualTo(2);
 			assertThat(object.metadata().publicUrl())
 				.hasToString("https://cdn.example.com/media/user/trip-record/file.png");
+		}
+	}
+
+	@Test
+	void readsAndInspectsImageWithOneObjectDownload() throws Exception {
+		byte[] png = png(3, 2);
+		S3Client client = mock(S3Client.class);
+		when(client.headObject(any(HeadObjectRequest.class))).thenReturn(HeadObjectResponse.builder()
+			.contentType("image/png").contentLength((long) png.length).checksumSHA256("checksum").build());
+		when(client.getObjectAsBytes(any(GetObjectRequest.class))).thenReturn(
+			ResponseBytes.fromByteArray(GetObjectResponse.builder().build(), png)
+		);
+		S3StorageConfig config = new S3StorageConfig();
+		try (S3Presigner presigner = config.s3Presigner(properties)) {
+			S3ObjectStorageGateway gateway = new S3ObjectStorageGateway(
+				client, presigner, properties, new MediaContentInspector()
+			);
+
+			StoredObjectContent content = gateway.readAndInspect(
+				new StorageObjectKey("media/user/map-overlay/file.png")
+			);
+
+			assertThat(content.bytes()).isEqualTo(png);
+			assertThat(content.object().width()).isEqualTo(3);
+			verify(client, times(1)).getObjectAsBytes(any(GetObjectRequest.class));
 		}
 	}
 

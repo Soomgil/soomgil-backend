@@ -18,6 +18,11 @@ public interface ObjectStorageGateway {
 
 	StoredObject inspect(StorageObjectKey objectKey);
 
+	/** object를 한 번 읽어 내용 검사 결과와 binary를 함께 반환한다. */
+	default StoredObjectContent readAndInspect(StorageObjectKey objectKey) {
+		return new StoredObjectContent(inspect(objectKey), read(objectKey));
+	}
+
 	default byte[] read(StorageObjectKey objectKey) {
 		throw new UnsupportedOperationException("Object read is not implemented.");
 	}

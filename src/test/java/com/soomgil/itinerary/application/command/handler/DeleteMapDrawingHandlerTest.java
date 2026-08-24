@@ -42,13 +42,15 @@ class DeleteMapDrawingHandlerTest {
 
 	@Test
 	void softDeletesMapDrawingAndRecordsEvent() {
-		ItineraryMutationResult result = handler.handle(new DeleteMapDrawingCommand(TRIP_ID, USER_ID, 0, DRAWING_ID));
+		ItineraryMutationResult result = handler.handle(new DeleteMapDrawingCommand(
+			TRIP_ID, USER_ID, 0, DRAWING_ID, "session-1"));
 
 		assertThat(result.itineraryVersion()).isEqualTo(1);
 		assertThat(result.affectedRouteIds()).isEmpty();
 		assertThat(repository.deletedDrawingId).isEqualTo(DRAWING_ID);
 		assertThat(repository.deletedByUserId).isEqualTo(USER_ID);
 		assertThat(eventRepository.lastEvent.commandType()).isEqualTo("DELETE_MAP_DRAWING");
+		assertThat(eventRepository.lastEvent.websocketSessionId()).isEqualTo("session-1");
 		assertThat(eventRepository.lastEvent.aggregateId()).isEqualTo(DRAWING_ID);
 		assertThat(eventRepository.lastEvent.inversePayload()).contains("RESTORE_MAP_DRAWING");
 		assertThat(eventRepository.lastEvent.redoPayload()).contains("DELETE_MAP_DRAWING");

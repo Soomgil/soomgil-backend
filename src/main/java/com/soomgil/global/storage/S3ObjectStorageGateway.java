@@ -154,6 +154,46 @@ public class S3ObjectStorageGateway implements ObjectStorageGateway {
 	}
 
 	@Override
+	public StoredObjectContent readAndInspect(StorageObjectKey objectKey) {
+		try {
+			HeadObjectResponse head = client.headObject(HeadObjectRequest.builder()
+				.bucket(properties.bucket()).key(objectKey.value()).build());
+			byte[] bytes = client.getObjectAsBytes(GetObjectRequest.builder()
+				.bucket(properties.bucket()).key(objectKey.value()).build()).asByteArray();
+			String detectedType = contentInspector.detect(bytes);
+			Integer width = null;
+			Integer height = null;
+			if (detectedType != null && detectedType.startsWith("image/")) {
+				BufferedImage image = ImageIO.read(new ByteArrayInputStream(bytes));
+				if (image != null) {
+					width = image.getWidth();
+					height = image.getHeight();
+				}
+			}
+			StoredObject object = new StoredObject(new StorageObjectMetadata(
+				properties.bucket(), objectKey, head.contentType(), head.contentLength(), head.checksumSHA256(),
+				publicUrl(objectKey)
+			), detectedType, width, height);
+			return new StoredObjectContent(object, bytes);
+		}
+		catch (NoSuchKeyException exception) {
+			throw new BusinessException(ErrorCode.OBJECT_NOT_FOUND);
+		}
+		catch (S3Exception exception) {
+			if (exception.statusCode() == 404) {
+				throw new BusinessException(ErrorCode.OBJECT_NOT_FOUND);
+			}
+			throw new IllegalStateException("Object storage inspection failed.", exception);
+		}
+		catch (SdkException exception) {
+			throw new IllegalStateException("Object storage inspection failed.", exception);
+		}
+		catch (Exception exception) {
+			throw new IllegalStateException("Stored media content could not be inspected.", exception);
+		}
+	}
+
+	@Override
 	public void replace(StorageObjectKey objectKey, byte[] bytes, String contentType) {
 		try {
 			client.putObject(PutObjectRequest.builder()

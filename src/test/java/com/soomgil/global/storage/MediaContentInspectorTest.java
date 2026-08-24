@@ -16,6 +16,8 @@ class MediaContentInspectorTest {
 			.isEqualTo("image/jpeg");
 		assertThat(inspector.detect(new byte[] {(byte) 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a}))
 			.isEqualTo("image/png");
+		assertThat(inspector.detect("RIFF0000WEBPVP8 ".getBytes(StandardCharsets.US_ASCII)))
+			.isEqualTo("image/webp");
 		assertThat(inspector.detect("0000ftypisom".getBytes(StandardCharsets.US_ASCII)))
 			.isEqualTo("video/mp4");
 	}

@@ -126,6 +126,7 @@ public class UpdateMapDrawingHandler implements CommandHandler<UpdateMapDrawingC
 			newVersion,
 			current,
 			drawing,
+			command.websocketSessionId(),
 			now
 		));
 		return new ItineraryMutationResult(

@@ -31,7 +31,8 @@ public class S3StorageConfig {
 	@Bean
 	S3Presigner s3Presigner(S3StorageProperties properties) {
 		return S3Presigner.builder()
-			.endpointOverride(properties.endpoint())
+			.endpointOverride(Objects.requireNonNull(
+				properties.effectivePresignEndpoint(), "S3 presign endpoint is required"))
 			.region(Region.of(properties.region()))
 			.credentialsProvider(credentials(properties))
 			.serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build())

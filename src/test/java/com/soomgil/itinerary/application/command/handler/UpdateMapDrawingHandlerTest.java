@@ -57,8 +57,10 @@ class UpdateMapDrawingHandlerTest {
 			Map.of("type", "LineString"),
 			Map.of("color", "#222222"),
 			"수정된 선",
+			null,
 			3,
-			0L
+			0L,
+			"session-1"
 		));
 
 		assertThat(result.itineraryVersion()).isEqualTo(1);
@@ -67,6 +69,7 @@ class UpdateMapDrawingHandlerTest {
 		assertThat(result.drawing().label()).isEqualTo("수정된 선");
 		assertThat(repository.lastUpdate.expectedVersion()).isEqualTo(0L);
 		assertThat(eventRepository.lastEvent.commandType()).isEqualTo("UPDATE_MAP_DRAWING");
+		assertThat(eventRepository.lastEvent.websocketSessionId()).isEqualTo("session-1");
 		assertThat(eventRepository.lastEvent.inversePayload()).contains("UPDATE_MAP_DRAWING", "기존 선");
 		assertThat(eventRepository.lastEvent.redoPayload()).contains("UPDATE_MAP_DRAWING", "수정된 선");
 	}

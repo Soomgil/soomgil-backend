@@ -23,7 +23,7 @@ class MinioComposeConfigurationTest {
 
 		assertThat(minio).containsKey("healthcheck");
 		assertThat(minioDependency).containsEntry("condition", "service_healthy");
-		assertThat(environment.get("S3_BUCKET")).isEqualTo("${S3_BUCKET:-soomgil-local}");
+		assertThat(environment.get("S3_BUCKET")).isEqualTo("${MINIO_BUCKET:-soomgil-local}");
 		assertThat(initializer.get("entrypoint").toString())
 			.contains("mc alias set local http://minio:9000")
 			.contains("mc mb --ignore-existing local/$$S3_BUCKET");

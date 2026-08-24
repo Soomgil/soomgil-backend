@@ -23,9 +23,9 @@ class MinioComposeSmokeTest {
 		List<String> compose = composeCommand();
 		String project = "soomgil-minio-smoke-" + UUID.randomUUID().toString().substring(0, 8);
 		Map<String, String> environment = Map.of(
-			"S3_ACCESS_KEY", "smoke-access",
-			"S3_SECRET_KEY", "smoke-secret-key",
-			"S3_BUCKET", "smoke-bucket",
+			"MINIO_ROOT_USER", "smoke-access",
+			"MINIO_ROOT_PASSWORD", "smoke-secret-key",
+			"MINIO_BUCKET", "smoke-bucket",
 			"S3_PORT", "0",
 			"S3_CONSOLE_PORT", "0"
 		);
@@ -35,7 +35,8 @@ class MinioComposeSmokeTest {
 			String portOutput = run(compose, project, environment, List.of("port", "minio", "9000")).trim();
 			int port = Integer.parseInt(portOutput.substring(portOutput.lastIndexOf(':') + 1));
 			S3StorageProperties properties = new S3StorageProperties(
-				URI.create("http://localhost:" + port), "ap-northeast-2", "smoke-bucket",
+				URI.create("http://localhost:" + port), URI.create("http://localhost:" + port),
+				"ap-northeast-2", "smoke-bucket",
 				"smoke-access", "smoke-secret-key", null
 			);
 			try (S3Client client = new S3StorageConfig().s3Client(properties)) {

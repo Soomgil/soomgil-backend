@@ -25,6 +25,11 @@ public class MediaContentInspector {
 		if (content.length >= PNG.length && Arrays.equals(PNG, Arrays.copyOf(content, PNG.length))) {
 			return "image/png";
 		}
+		if (content.length >= 12
+			&& "RIFF".equals(new String(content, 0, 4, StandardCharsets.US_ASCII))
+			&& "WEBP".equals(new String(content, 8, 4, StandardCharsets.US_ASCII))) {
+			return "image/webp";
+		}
 		if (content.length >= 8
 			&& "ftyp".equals(new String(content, 4, 4, StandardCharsets.US_ASCII))) {
 			return "video/mp4";

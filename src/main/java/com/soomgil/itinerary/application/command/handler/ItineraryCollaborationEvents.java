@@ -210,12 +210,13 @@ final class ItineraryCollaborationEvents {
 		MapDrawingCreate drawing,
 		long versionBefore,
 		long versionAfter,
+		String websocketSessionId,
 		Instant createdAt
 	) {
 		return new CollaborationCommandEvent(
 			drawing.tripId(),
 			drawing.createdByUserId(),
-			null,
+			websocketSessionId,
 			SOURCE_USER,
 			"CREATE_MAP_DRAWING",
 			AGGREGATE_DRAWING,
@@ -235,12 +236,13 @@ final class ItineraryCollaborationEvents {
 		UUID actorUserId,
 		long versionBefore,
 		long versionAfter,
+		String websocketSessionId,
 		Instant deletedAt
 	) {
 		return new CollaborationCommandEvent(
 			tripId,
 			actorUserId,
-			null,
+			websocketSessionId,
 			SOURCE_USER,
 			"DELETE_MAP_DRAWING",
 			AGGREGATE_DRAWING,
@@ -262,12 +264,13 @@ final class ItineraryCollaborationEvents {
 		long versionAfter,
 		MapDrawingUpdateResult before,
 		MapDrawingUpdateResult after,
+		String websocketSessionId,
 		Instant updatedAt
 	) {
 		return new CollaborationCommandEvent(
 			tripId,
 			actorUserId,
-			null,
+			websocketSessionId,
 			SOURCE_USER,
 			"UPDATE_MAP_DRAWING",
 			AGGREGATE_DRAWING,
