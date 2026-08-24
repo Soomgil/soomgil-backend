@@ -95,7 +95,7 @@ class MapDrawingPreviewControllerTest {
 	@Test
 	void rejectsOversizedCoordinatePayload() {
 		Map<String, Object> payload = new java.util.HashMap<>(validPayload());
-		payload.put("coordinates", java.util.stream.IntStream.range(0, 33)
+		payload.put("coordinates", java.util.stream.IntStream.range(0, 101)
 			.mapToObj(index -> Map.of("lng", 126.0, "lat", 33.0))
 			.toList());
 
@@ -117,11 +117,19 @@ class MapDrawingPreviewControllerTest {
 			org.mockito.ArgumentMatchers.any(Map.class)
 		);
 
+		Map<String, Object> endPayload = new java.util.HashMap<>(validPayload());
+		endPayload.put("phase", "END");
+		throttledController.preview(TRIP_ID, endPayload, () -> USER_ID.toString(), "session-1");
+		verify(messagingTemplate, times(2)).convertAndSend(
+			org.mockito.ArgumentMatchers.eq("/topic/trips/" + TRIP_ID + "/map-drawings"),
+			org.mockito.ArgumentMatchers.any(Map.class)
+		);
+
 		SessionDisconnectEvent disconnectEvent = mock(SessionDisconnectEvent.class);
 		when(disconnectEvent.getSessionId()).thenReturn("session-1");
 		throttledController.handleDisconnect(disconnectEvent);
 		throttledController.preview(TRIP_ID, validPayload(), () -> USER_ID.toString(), "session-1");
-		verify(messagingTemplate, times(2)).convertAndSend(
+		verify(messagingTemplate, times(3)).convertAndSend(
 			org.mockito.ArgumentMatchers.eq("/topic/trips/" + TRIP_ID + "/map-drawings"),
 			org.mockito.ArgumentMatchers.any(Map.class)
 		);
