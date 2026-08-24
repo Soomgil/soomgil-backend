@@ -95,7 +95,7 @@ class MapDrawingPreviewControllerTest {
 	@Test
 	void rejectsOversizedCoordinatePayload() {
 		Map<String, Object> payload = new java.util.HashMap<>(validPayload());
-		payload.put("coordinates", java.util.stream.IntStream.range(0, 33)
+		payload.put("coordinates", java.util.stream.IntStream.range(0, 101)
 			.mapToObj(index -> Map.of("lng", 126.0, "lat", 33.0))
 			.toList());
 
