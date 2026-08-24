@@ -82,7 +82,7 @@ public class MapDrawingPreviewController {
 		catch (BusinessException exception) {
 			throw new AccessDeniedException("Trip member preview is required.", exception);
 		}
-		if (!allow(sessionId)) {
+		if ("UPDATE".equals(payload.get("phase")) && !allow(sessionId)) {
 			return;
 		}
 		Map<String, Object> message = new LinkedHashMap<>(payload);
