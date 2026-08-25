@@ -61,7 +61,21 @@ public enum ErrorCode {
 	PLANNING_ITEM_NOT_FOUND(HttpStatus.NOT_FOUND, "PLANNING_ITEM_NOT_FOUND", "Planning checklist item was not found."),
 	PLANNING_VERSION_CONFLICT(HttpStatus.CONFLICT, "PLANNING_VERSION_CONFLICT", "Planning resource version has changed since last read."),
 	PLANNING_SCOPE_DAY_MISMATCH(HttpStatus.UNPROCESSABLE_ENTITY, "PLANNING_SCOPE_DAY_MISMATCH", "Scope type and itinerary day id are inconsistent."),
-	AI_PROVIDER_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "AI_PROVIDER_UNAVAILABLE", "AI guide is temporarily unavailable.");
+	AI_PROVIDER_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "AI_PROVIDER_UNAVAILABLE", "AI guide is temporarily unavailable."),
+	THREAD_NOT_FOUND(HttpStatus.NOT_FOUND, "THREAD_NOT_FOUND", "Community thread was not found."),
+	THREAD_AUTHOR_REQUIRED(HttpStatus.FORBIDDEN, "THREAD_AUTHOR_REQUIRED", "Only the author can perform this action."),
+	THREAD_MEDIA_LIMIT_EXCEEDED(HttpStatus.UNPROCESSABLE_ENTITY, "THREAD_MEDIA_LIMIT_EXCEEDED", "Thread image limit was exceeded."),
+	THREAD_REPLY_NOT_FOUND(HttpStatus.NOT_FOUND, "THREAD_REPLY_NOT_FOUND", "Thread reply was not found."),
+	THREAD_REPLY_DEPTH_EXCEEDED(HttpStatus.UNPROCESSABLE_ENTITY, "THREAD_REPLY_DEPTH_EXCEEDED", "Reply nesting is limited to one level."),
+	VOTE_SESSION_NOT_FOUND(HttpStatus.NOT_FOUND, "VOTE_SESSION_NOT_FOUND", "Vote session was not found."),
+	VOTE_SESSION_ALREADY_OPEN(HttpStatus.CONFLICT, "VOTE_SESSION_ALREADY_OPEN", "Trip already has an active vote session."),
+	VOTE_SESSION_CLOSED(HttpStatus.CONFLICT, "VOTE_SESSION_CLOSED", "Vote session is already completed."),
+	VOTE_NOT_PARTICIPANT(HttpStatus.FORBIDDEN, "VOTE_NOT_PARTICIPANT", "Only confirmed vote participants can perform this action."),
+	VOTE_ALREADY_SUBMITTED(HttpStatus.CONFLICT, "VOTE_ALREADY_SUBMITTED", "Vote was already submitted and cannot be changed."),
+	VOTE_STICKER_ALLOWANCE_EXCEEDED(HttpStatus.UNPROCESSABLE_ENTITY, "VOTE_STICKER_ALLOWANCE_EXCEEDED", "Used stickers exceed the granted allowance."),
+	VOTE_CANDIDATE_NOT_FOUND(HttpStatus.UNPROCESSABLE_ENTITY, "VOTE_CANDIDATE_NOT_FOUND", "Vote candidate does not belong to this session."),
+	VOTE_CANDIDATE_POOL_INSUFFICIENT(HttpStatus.UNPROCESSABLE_ENTITY, "VOTE_CANDIDATE_POOL_INSUFFICIENT", "Recommendation could not build enough vote candidates."),
+	VOTE_UNVOTED_PARTICIPANTS_NOT_ACKNOWLEDGED(HttpStatus.UNPROCESSABLE_ENTITY, "VOTE_UNVOTED_PARTICIPANTS_NOT_ACKNOWLEDGED", "Owner must acknowledge participants who have not voted.");
 
 	private final HttpStatus status;
 	private final String code;

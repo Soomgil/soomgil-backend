@@ -243,4 +243,11 @@
       created_at DESC
     LIMIT 1
   </select>
+
+  <select id="findTripRegionCodes" resultType="java.lang.String">
+    SELECT legal_region_code
+    FROM trip.trip_regions
+    WHERE trip_id = CAST(#{tripId} AS uuid)
+    ORDER BY sort_order, legal_region_code
+  </select>
 </mapper>
