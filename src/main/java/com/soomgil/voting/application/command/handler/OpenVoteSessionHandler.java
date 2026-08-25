@@ -8,6 +8,9 @@ import com.soomgil.global.error.ErrorCode;
 import com.soomgil.preference.application.query.dto.ListTripVoteCandidatesQuery;
 import com.soomgil.preference.application.query.dto.TripVoteCandidateView;
 import com.soomgil.preference.application.query.handler.ListTripVoteCandidatesQueryHandler;
+import com.soomgil.trip.application.query.dto.FindTripDetailQuery;
+import com.soomgil.trip.application.query.dto.TripDetailView;
+import com.soomgil.trip.application.query.handler.FindTripDetailHandler;
 import com.soomgil.trip.application.query.handler.TripAccessGuard;
 import com.soomgil.voting.api.dto.TripVoteSessionDetail;
 import com.soomgil.voting.application.command.dto.OpenVoteSessionCommand;
@@ -46,6 +49,7 @@ public class OpenVoteSessionHandler implements CommandHandler<OpenVoteSessionCom
 	private final VoteSessionRepository repository;
 	private final TripAccessGuard tripAccessGuard;
 	private final ListTripMembersHandler membersHandler;
+	private final FindTripDetailHandler tripDetailHandler;
 	private final ListTripVoteCandidatesQueryHandler candidatesHandler;
 	private final VoteSessionAssembler assembler;
 	private final TimeProvider timeProvider;
@@ -54,6 +58,7 @@ public class OpenVoteSessionHandler implements CommandHandler<OpenVoteSessionCom
 		VoteSessionRepository repository,
 		TripAccessGuard tripAccessGuard,
 		ListTripMembersHandler membersHandler,
+		FindTripDetailHandler tripDetailHandler,
 		ListTripVoteCandidatesQueryHandler candidatesHandler,
 		VoteSessionAssembler assembler,
 		TimeProvider timeProvider
@@ -61,6 +66,7 @@ public class OpenVoteSessionHandler implements CommandHandler<OpenVoteSessionCom
 		this.repository = Objects.requireNonNull(repository, "repository must not be null");
 		this.tripAccessGuard = Objects.requireNonNull(tripAccessGuard, "tripAccessGuard must not be null");
 		this.membersHandler = Objects.requireNonNull(membersHandler, "membersHandler must not be null");
+		this.tripDetailHandler = Objects.requireNonNull(tripDetailHandler, "tripDetailHandler must not be null");
 		this.candidatesHandler = Objects.requireNonNull(candidatesHandler, "candidatesHandler must not be null");
 		this.assembler = Objects.requireNonNull(assembler, "assembler must not be null");
 		this.timeProvider = Objects.requireNonNull(timeProvider, "timeProvider must not be null");
@@ -87,8 +93,12 @@ public class OpenVoteSessionHandler implements CommandHandler<OpenVoteSessionCom
 		int requestedCandidateCount = command.candidateCount() == null
 			? VoteSessionPolicy.DEFAULT_CANDIDATE_COUNT
 			: command.candidateCount();
+		// 여행방에 등록된 지역이 없을 때를 대비해 대표 목적지를 대체 검색어로 함께 넘긴다.
+		TripDetailView trip = tripDetailHandler.handle(
+			new FindTripDetailQuery(command.tripId(), command.actorUserId())
+		);
 		List<TripVoteCandidateView> candidateViews = candidatesHandler.handle(new ListTripVoteCandidatesQuery(
-			command.tripId(), command.actorUserId(), requestedCandidateCount
+			command.tripId(), command.actorUserId(), requestedCandidateCount, trip.displayDestination()
 		));
 		int candidateCount = candidateViews.size();
 		if (candidateCount < command.selectionCount() || candidateCount < 1) {

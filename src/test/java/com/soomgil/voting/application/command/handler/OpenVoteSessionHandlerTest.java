@@ -14,13 +14,17 @@ import com.soomgil.place.api.dto.PlaceProvider;
 import com.soomgil.preference.application.query.dto.ListTripVoteCandidatesQuery;
 import com.soomgil.preference.application.query.dto.TripVoteCandidateView;
 import com.soomgil.preference.application.query.handler.ListTripVoteCandidatesQueryHandler;
+import com.soomgil.trip.application.query.dto.FindTripDetailQuery;
 import com.soomgil.trip.application.query.dto.ListTripMembersQuery;
+import com.soomgil.trip.application.query.dto.TripDetailView;
 import com.soomgil.trip.application.query.dto.TripMemberView;
+import com.soomgil.trip.application.query.handler.FindTripDetailHandler;
 import com.soomgil.trip.application.query.handler.ListTripMembersHandler;
 import com.soomgil.trip.application.query.handler.TripAccessGuard;
 import com.soomgil.trip.domain.model.TripAccessRole;
 import com.soomgil.trip.domain.model.TripMemberRole;
 import com.soomgil.trip.domain.model.TripMemberStatus;
+import com.soomgil.trip.domain.model.TripStatus;
 import com.soomgil.voting.api.dto.TripVoteSessionDetail;
 import com.soomgil.voting.application.command.dto.OpenVoteSessionCommand;
 import com.soomgil.voting.application.port.VoteCandidateRecord;
@@ -49,9 +53,11 @@ class OpenVoteSessionHandlerTest {
 	private final ListTripMembersHandler membersHandler = mock(ListTripMembersHandler.class);
 	private final ListTripVoteCandidatesQueryHandler candidatesHandler =
 		mock(ListTripVoteCandidatesQueryHandler.class);
+	private final FindTripDetailHandler tripDetailHandler = mock(FindTripDetailHandler.class);
 
 	private final OpenVoteSessionHandler handler = new OpenVoteSessionHandler(
-		repository, tripAccessGuard, membersHandler, candidatesHandler, new VoteSessionAssembler(), () -> NOW
+		repository, tripAccessGuard, membersHandler, tripDetailHandler, candidatesHandler,
+		new VoteSessionAssembler(), () -> NOW
 	);
 
 	private final UUID tripId = UUID.randomUUID();
@@ -64,6 +70,7 @@ class OpenVoteSessionHandlerTest {
 		when(membersHandler.handle(any(ListTripMembersQuery.class)))
 			.thenReturn(List.of(member(ownerId), member(memberId)));
 		when(candidatesHandler.handle(any(ListTripVoteCandidatesQuery.class))).thenReturn(candidates(10));
+		when(tripDetailHandler.handle(any(FindTripDetailQuery.class))).thenReturn(tripDetail("제주"));
 	}
 
 	@Test
@@ -189,6 +196,37 @@ class OpenVoteSessionHandlerTest {
 		assertThat(captor.getValue().status()).isNotEqualTo(VoteSessionStatus.DRAFT);
 		assertThat(captor.getValue().stickerAllowance()).isEqualTo(5);
 		assertThat(captor.getValue().selectionCount()).isEqualTo(3);
+	}
+
+	@Test
+	@DisplayName("여행방 대표 목적지를 후보 생성 query에 대체 검색어로 전달한다")
+	void passesDisplayDestinationAsCandidateKeyword() {
+		handler.handle(new OpenVoteSessionCommand(tripId, ownerId, 5, 3, null));
+
+		ArgumentCaptor<ListTripVoteCandidatesQuery> captor =
+			ArgumentCaptor.forClass(ListTripVoteCandidatesQuery.class);
+		verify(candidatesHandler).handle(captor.capture());
+		assertThat(captor.getValue().destinationKeyword()).isEqualTo("제주");
+	}
+
+	@Test
+	@DisplayName("대표 목적지가 없으면 대체 검색어 없이 후보를 만든다")
+	void passesNullKeywordWhenDestinationIsMissing() {
+		when(tripDetailHandler.handle(any(FindTripDetailQuery.class))).thenReturn(tripDetail(null));
+
+		handler.handle(new OpenVoteSessionCommand(tripId, ownerId, 5, 3, null));
+
+		ArgumentCaptor<ListTripVoteCandidatesQuery> captor =
+			ArgumentCaptor.forClass(ListTripVoteCandidatesQuery.class);
+		verify(candidatesHandler).handle(captor.capture());
+		assertThat(captor.getValue().destinationKeyword()).isNull();
+	}
+
+	private TripDetailView tripDetail(String displayDestination) {
+		return new TripDetailView(
+			tripId, "제주 여행", displayDestination, TripStatus.ACTIVE, TripAccessRole.OWNER,
+			0L, NOW, ownerId, List.of(), null
+		);
 	}
 
 	private TripMemberView member(UUID userId) {
