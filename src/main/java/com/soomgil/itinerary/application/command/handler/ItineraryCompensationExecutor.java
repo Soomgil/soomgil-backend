@@ -37,10 +37,12 @@ public class ItineraryCompensationExecutor implements CollaborationCompensationE
 		"DELETE_ITINERARY_DAY",
 		"DELETE_ITINERARY_ITEM",
 		"DELETE_MAP_DRAWING",
+		"DELETE_MAP_DRAWINGS",
 		"DELETE_ROUTE_SEGMENT",
 		"RESTORE_ITINERARY_DAY",
 		"RESTORE_ITINERARY_ITEM",
 		"RESTORE_MAP_DRAWING",
+		"RESTORE_MAP_DRAWINGS",
 		"RESTORE_ROUTE_SEGMENT",
 		"UPDATE_ITINERARY_DAY",
 		"UPDATE_ITINERARY_ITEM",
@@ -76,12 +78,14 @@ public class ItineraryCompensationExecutor implements CollaborationCompensationE
 			case "DELETE_ITINERARY_ITEM" -> deleteItem(tripId, actorUserId, command, executedAt);
 			case "DELETE_MAP_DRAWING" -> repository.softDeleteMapDrawing(
 				tripId, uuid(command, "drawingId"), actorUserId, executedAt);
+			case "DELETE_MAP_DRAWINGS" -> deleteMapDrawings(tripId, actorUserId, command, executedAt);
 			case "DELETE_ROUTE_SEGMENT" -> repository.softDeleteRouteSegment(
 				tripId, uuid(command, "routeId"), actorUserId, executedAt);
 			case "RESTORE_ITINERARY_DAY" -> restoreDay(tripId, command, executedAt);
 			case "RESTORE_ITINERARY_ITEM" -> restoreItem(tripId, actorUserId, command, executedAt);
 			case "RESTORE_MAP_DRAWING" -> repository.restoreMapDrawing(
 				tripId, uuid(command, "drawingId"), actorUserId, executedAt);
+			case "RESTORE_MAP_DRAWINGS" -> restoreMapDrawings(tripId, actorUserId, command, executedAt);
 			case "RESTORE_ROUTE_SEGMENT" -> repository.restoreRouteSegment(
 				tripId, uuid(command, "routeId"), actorUserId, executedAt);
 			case "UPDATE_ITINERARY_DAY" -> updateDay(tripId, command, executedAt);
@@ -94,6 +98,28 @@ public class ItineraryCompensationExecutor implements CollaborationCompensationE
 		if (!applied) {
 			throw new BusinessException(ErrorCode.CONFLICT, "Compensation target has changed or no longer exists.");
 		}
+	}
+
+	private boolean deleteMapDrawings(UUID tripId, UUID actorUserId, JsonNode command, Instant executedAt) {
+		for (JsonNode drawingId : command.path("drawingIds")) {
+			if (!repository.softDeleteMapDrawing(
+				tripId, UUID.fromString(drawingId.asText()), actorUserId, executedAt
+			)) {
+				return false;
+			}
+		}
+		return command.path("drawingIds").size() > 0;
+	}
+
+	private boolean restoreMapDrawings(UUID tripId, UUID actorUserId, JsonNode command, Instant executedAt) {
+		for (JsonNode drawingId : command.path("drawingIds")) {
+			if (!repository.restoreMapDrawing(
+				tripId, UUID.fromString(drawingId.asText()), actorUserId, executedAt
+			)) {
+				return false;
+			}
+		}
+		return command.path("drawingIds").size() > 0;
 	}
 
 	private boolean reorder(UUID tripId, UUID actorUserId, JsonNode command, Instant executedAt) {

@@ -256,6 +256,36 @@ final class ItineraryCollaborationEvents {
 		);
 	}
 
+	static CollaborationCommandEvent mapDrawingsDeleted(
+		UUID tripId,
+		List<UUID> drawingIds,
+		UUID actorUserId,
+		long versionBefore,
+		long versionAfter,
+		String websocketSessionId,
+		Instant deletedAt
+	) {
+		String ids = drawingIds.stream()
+			.map(drawingId -> "\"" + drawingId + "\"")
+			.collect(java.util.stream.Collectors.joining(","));
+		String eventPayload = "{\"drawingIds\":[" + ids + "]}";
+		return new CollaborationCommandEvent(
+			tripId,
+			actorUserId,
+			websocketSessionId,
+			SOURCE_USER,
+			"DELETE_MAP_DRAWINGS",
+			AGGREGATE_DRAWING,
+			drawingIds.get(0),
+			versionBefore,
+			versionAfter,
+			eventPayload,
+			"{\"action\":\"RESTORE_MAP_DRAWINGS\",\"drawingIds\":[" + ids + "]}",
+			"{\"action\":\"DELETE_MAP_DRAWINGS\",\"drawingIds\":[" + ids + "]}",
+			deletedAt
+		);
+	}
+
 	static CollaborationCommandEvent mapDrawingUpdated(
 		UUID tripId,
 		UUID drawingId,
