@@ -8,6 +8,7 @@ import com.soomgil.collaboration.application.port.CollaborationCommandEventRepos
 import com.soomgil.global.error.BusinessException;
 import com.soomgil.global.error.ErrorCode;
 import com.soomgil.itinerary.application.command.dto.DeleteMapDrawingCommand;
+import com.soomgil.itinerary.application.command.dto.DeleteMapDrawingsCommand;
 import com.soomgil.itinerary.application.command.dto.ItineraryMutationResult;
 import com.soomgil.itinerary.application.port.ItineraryCommandRepository;
 import com.soomgil.itinerary.application.port.ItineraryDayCreate;
@@ -20,8 +21,12 @@ import com.soomgil.itinerary.application.port.RouteMatchRequestLog;
 import com.soomgil.itinerary.application.port.RouteSegmentCreate;
 import com.soomgil.trip.application.query.handler.TripAccessGuard;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Optional;
 import java.util.OptionalLong;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
@@ -30,6 +35,7 @@ class DeleteMapDrawingHandlerTest {
 	private static final UUID TRIP_ID = UUID.fromString("10000000-0000-0000-0000-000000000001");
 	private static final UUID USER_ID = UUID.fromString("20000000-0000-0000-0000-000000000001");
 	private static final UUID DRAWING_ID = UUID.fromString("60000000-0000-0000-0000-000000000001");
+	private static final UUID SECOND_DRAWING_ID = UUID.fromString("60000000-0000-0000-0000-000000000002");
 
 	private final CapturingItineraryCommandRepository repository = new CapturingItineraryCommandRepository();
 	private final CapturingEventRepository eventRepository = new CapturingEventRepository();
@@ -58,7 +64,7 @@ class DeleteMapDrawingHandlerTest {
 
 	@Test
 	void rejectsMissingMapDrawing() {
-		repository.drawingExists = false;
+		repository.activeDrawingIds.remove(DRAWING_ID);
 
 		assertThatThrownBy(() -> handler.handle(new DeleteMapDrawingCommand(TRIP_ID, USER_ID, 0, DRAWING_ID)))
 			.isInstanceOfSatisfying(BusinessException.class, exception ->
@@ -67,10 +73,24 @@ class DeleteMapDrawingHandlerTest {
 		assertThat(repository.currentVersion).isZero();
 	}
 
+	@Test
+	void deletesEraserBatchAsSingleUndoableEvent() {
+		ItineraryMutationResult result = handler.handle(new DeleteMapDrawingsCommand(
+			TRIP_ID, USER_ID, 0, List.of(DRAWING_ID, SECOND_DRAWING_ID), "session-1"));
+
+		assertThat(result.itineraryVersion()).isEqualTo(1);
+		assertThat(repository.deletedDrawingIds).containsExactly(DRAWING_ID, SECOND_DRAWING_ID);
+		assertThat(eventRepository.lastEvent.commandType()).isEqualTo("DELETE_MAP_DRAWINGS");
+		assertThat(eventRepository.lastEvent.inversePayload())
+			.contains("RESTORE_MAP_DRAWINGS", DRAWING_ID.toString(), SECOND_DRAWING_ID.toString());
+		assertThat(eventRepository.lastEvent.redoPayload()).contains("DELETE_MAP_DRAWINGS");
+	}
+
 	private static class CapturingItineraryCommandRepository implements ItineraryCommandRepository {
 
 		private long currentVersion;
-		private boolean drawingExists = true;
+		private final Set<UUID> activeDrawingIds = new HashSet<>(Set.of(DRAWING_ID, SECOND_DRAWING_ID));
+		private final List<UUID> deletedDrawingIds = new ArrayList<>();
 		private UUID deletedDrawingId;
 		private UUID deletedByUserId;
 
@@ -165,17 +185,17 @@ class DeleteMapDrawingHandlerTest {
 
 		@Override
 		public boolean existsActiveMapDrawing(UUID tripId, UUID drawingId) {
-			return drawingExists;
+			return activeDrawingIds.contains(drawingId);
 		}
 
 		@Override
 		public boolean softDeleteMapDrawing(UUID tripId, UUID drawingId, UUID deletedByUserId, Instant deletedAt) {
-			if (!drawingExists) {
+			if (!activeDrawingIds.remove(drawingId)) {
 				return false;
 			}
 			this.deletedDrawingId = drawingId;
+			this.deletedDrawingIds.add(drawingId);
 			this.deletedByUserId = deletedByUserId;
-			drawingExists = false;
 			return true;
 		}
 
