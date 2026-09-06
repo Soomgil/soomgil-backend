@@ -467,6 +467,7 @@ final class ItineraryCollaborationEvents {
 		return "{\"action\":\"UPDATE_ROUTE_SEGMENT\",\"routeId\":\"" + route.id()
 			+ "\",\"mode\":\"" + route.mode().name()
 			+ "\",\"providerProfile\":" + quoted(route.providerProfile())
+			+ ",\"provider\":" + quoted(route.provider())
 			+ ",\"geometry\":" + route.geometry()
 			+ ",\"distanceMeters\":" + nullable(route.distanceMeters())
 			+ ",\"durationSeconds\":" + nullable(route.durationSeconds())

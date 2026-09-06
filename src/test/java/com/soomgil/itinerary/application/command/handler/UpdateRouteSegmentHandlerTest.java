@@ -47,12 +47,15 @@ class UpdateRouteSegmentHandlerTest {
 
 	private final CapturingItineraryCommandRepository repository = new CapturingItineraryCommandRepository();
 	private final CapturingEventRepository eventRepository = new CapturingEventRepository();
+	private final com.soomgil.itinerary.application.port.MapMatchingClient routingClient =
+		org.mockito.Mockito.mock(com.soomgil.itinerary.application.port.MapMatchingClient.class);
 	private final UpdateRouteSegmentHandler handler = new UpdateRouteSegmentHandler(
 		repository,
 		eventRepository,
 		new TripAccessGuard(new CreateItineraryDayHandlerTest.StubTripQueryRepository()),
 		() -> Instant.parse("2026-06-17T00:00:00Z"),
-		new ObjectMapper()
+		new ObjectMapper(),
+		routingClient
 	);
 
 	@Test
@@ -97,6 +100,38 @@ class UpdateRouteSegmentHandlerTest {
 		);
 	}
 
+	@org.junit.jupiter.params.ParameterizedTest
+	@org.junit.jupiter.params.provider.EnumSource(RouteMode.class)
+	void modeOnlyUpdateRecalculatesGeometryAndRecordsUndo(RouteMode mode) {
+		Map<String, Object> geometry = Map.of("type", "LineString", "coordinates",
+			List.of(List.of(127.0, 37.0), List.of(127.05, 37.03), List.of(127.1, 37.1)));
+		org.mockito.Mockito.when(routingClient.match(org.mockito.ArgumentMatchers.any())).thenAnswer(invocation -> {
+			var request = (com.soomgil.itinerary.application.port.MapMatchClientRequest) invocation.getArgument(0);
+			assertThat(request.providerProfile()).isEqualTo("mapbox/" + mode.name().toLowerCase(java.util.Locale.ROOT));
+			assertThat(request.coordinates()).hasSize(2);
+			return new com.soomgil.itinerary.application.port.MapMatchClientResult(geometry, List.of(), Map.of(), 500.0, 150.0, null);
+		});
+		var result = handler.handle(new UpdateRouteSegmentCommand(TRIP_ID, USER_ID, 0, ROUTE_ID, mode, null, null, null, null));
+		assertThat(result.route().geometry()).isEqualTo(geometry);
+		assertThat(result.route().distanceMeters()).isEqualTo(500.0);
+		assertThat(result.route().durationSeconds()).isEqualTo(150.0);
+		assertThat(repository.lastUpdate.provider()).isEqualTo("MAPBOX");
+		assertThat(eventRepository.lastEvent.inversePayload()).contains("DRIVING", "100.0");
+		assertThat(eventRepository.lastEvent.redoPayload()).contains(mode.name(), "500.0");
+	}
+
+	@Test
+	void failedRecalculationPreservesRouteAndVersion() {
+		var original = repository.current;
+		org.mockito.Mockito.when(routingClient.match(org.mockito.ArgumentMatchers.any()))
+			.thenThrow(new com.soomgil.itinerary.application.port.MapMatchingException("NoRoute", "Unavailable"));
+		assertThatThrownBy(() -> handler.handle(new UpdateRouteSegmentCommand(TRIP_ID, USER_ID, 0, ROUTE_ID, RouteMode.CYCLING, null, null, null, null)))
+			.isInstanceOfSatisfying(BusinessException.class, error -> assertThat(error.errorCode()).isEqualTo(ErrorCode.ROUTE_CALCULATION_FAILED));
+		assertThat(repository.current).isEqualTo(original);
+		assertThat(repository.currentVersion).isZero();
+		assertThat(eventRepository.lastEvent).isNull();
+	}
+
 	@Test
 	void rejectsMissingRoute() {
 		repository.existsRoute = false;
@@ -123,7 +158,7 @@ class UpdateRouteSegmentHandlerTest {
 		private RouteSegmentUpdate lastUpdate;
 		private RouteSegmentUpdateResult current = new RouteSegmentUpdateResult(
 			ROUTE_ID, ORIGIN_ITEM_ID, DESTINATION_ITEM_ID, RouteMode.DRIVING, "MAPBOX", "mapbox/driving",
-			GeometryFormat.GEOJSON, "{\"type\":\"LineString\"}", 100.0, 60.0, 0.8);
+			GeometryFormat.GEOJSON, "{\"type\":\"LineString\",\"coordinates\":[[127.0,37.0],[127.1,37.1]]}", 100.0, 60.0, 0.8);
 
 		@Override
 		public Optional<RouteSegmentUpdateResult> findRouteSegment(UUID tripId, UUID routeId) {

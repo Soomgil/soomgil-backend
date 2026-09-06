@@ -85,22 +85,16 @@ class MapMatchRouteHandlerTest {
 	}
 
 	@Test
-	void fallsBackToRawTraceWhenProviderCannotMatch() {
+	void providerFailureDoesNotSaveRawTraceOrChangeVersion() {
 		MapMatchRouteHandler handler = handler(request -> {
-			throw new MapMatchingException("NoMatch", "No matching route found.");
+			throw new MapMatchingException("NoRoute", "No route found.");
 		});
-
-		MapMatchRouteResult result = handler.handle(command());
-
-		assertThat(result.matchRequestId()).isEqualTo(11L);
-		assertThat(result.mutation().route().provider()).isEqualTo("USER_TRACE");
-		assertThat(result.mutation().route().providerProfile()).isEqualTo("user-trace/walking");
-		assertThat(result.mutation().route().geometry()).containsEntry("type", "LineString");
-		assertThat(repository.insertedRoute).isNotNull();
-		assertThat(repository.insertedLog.status()).isEqualTo("FAILED");
-		assertThat(repository.insertedLog.tripRouteId()).isEqualTo(repository.insertedRoute.id());
-		assertThat(repository.insertedLog.errorCode()).isEqualTo("NoMatch");
-		assertThat(result.matchingsMetadata()).containsEntry("code", "FALLBACK");
+		org.assertj.core.api.Assertions.assertThatThrownBy(() -> handler.handle(command()))
+			.isInstanceOfSatisfying(com.soomgil.global.error.BusinessException.class, error ->
+				assertThat(error.errorCode()).isEqualTo(com.soomgil.global.error.ErrorCode.ROUTE_CALCULATION_FAILED));
+		assertThat(repository.insertedRoute).isNull();
+		assertThat(repository.currentVersion).isZero();
+		assertThat(eventRepository.lastEvent).isNull();
 	}
 
 	private MapMatchRouteHandler handler(MapMatchingClient client) {
@@ -291,9 +285,11 @@ class MapMatchRouteHandlerTest {
 	}
 
 	private static class CapturingEventRepository implements CollaborationCommandEventRepository {
+		private CollaborationCommandEvent lastEvent;
 
 		@Override
 		public void save(CollaborationCommandEvent event) {
+			lastEvent = event;
 		}
 	}
 }
