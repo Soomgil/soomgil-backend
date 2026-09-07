@@ -126,6 +126,10 @@ class DeleteTripHandlerTest {
 		@Override
 		public void removeTripMember(UUID tripId, UUID userId, UUID removedByUserId, Instant removedAt) {
 		}
+
+		@Override
+		public void departUserForAccountDeletion(UUID userId, Instant departedAt) {
+		}
 	}
 
 	private static class StubTripQueryRepository implements TripQueryRepository {

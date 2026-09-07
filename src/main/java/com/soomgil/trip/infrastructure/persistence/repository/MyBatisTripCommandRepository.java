@@ -148,4 +148,16 @@ public class MyBatisTripCommandRepository implements TripCommandRepository {
 	public void removeTripMember(UUID tripId, UUID userId, UUID removedByUserId, Instant removedAt) {
 		mapper.removeTripMember(tripId, userId, removedByUserId, removedAt);
 	}
+
+	@Override
+	public void departUserForAccountDeletion(UUID userId, Instant departedAt) {
+		for (UUID tripId : mapper.findOwnedTripIdsForAccountDeletion(userId)) {
+			mapper.findNextActiveMemberUserId(tripId, userId)
+				.ifPresentOrElse(
+					newOwnerUserId -> mapper.transferTripOwnership(tripId, newOwnerUserId, departedAt),
+					() -> mapper.softDeleteTrip(tripId, departedAt)
+				);
+		}
+		mapper.leaveAllActiveMemberships(userId, departedAt);
+	}
 }

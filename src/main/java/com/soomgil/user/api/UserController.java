@@ -1,15 +1,7 @@
 package com.soomgil.user.api;
 
 import com.soomgil.auth.application.handler.GetCurrentUserQueryHandler;
-import com.soomgil.auth.application.handler.ListSecurityEventsQueryHandler;
-import com.soomgil.auth.application.handler.ListSessionsQueryHandler;
-import com.soomgil.auth.application.handler.RevokeSessionCommandHandler;
 import com.soomgil.auth.application.query.GetCurrentUserQuery;
-import com.soomgil.auth.application.query.ListSecurityEventsQuery;
-import com.soomgil.auth.application.query.ListSessionsQuery;
-import com.soomgil.auth.api.dto.PagedSecurityEvent;
-import com.soomgil.auth.api.dto.PagedUserSession;
-import com.soomgil.auth.application.command.RevokeSessionCommand;
 import com.soomgil.common.api.ApiControllerSupport;
 import com.soomgil.global.security.CurrentUser;
 import com.soomgil.user.api.dto.PagedUserSummary;
@@ -48,8 +40,8 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 /**
  * 사용자 도메인의 REST 엔드포인트.
  *
- * <p>{@code /me} 계열(프로필, 설정, 계정 삭제 예약, 세션, 보안 이벤트)과
- * {@code /users} 계열(검색, 공개 프로필)을 담당한다. 인증/세션/토큰 발급 자체은
+ * <p>{@code /me} 계열(프로필, 설정, 즉시 계정 탈퇴)과
+ * {@code /users} 계열(검색, 공개 프로필)을 담당한다. 인증/토큰 발급 자체는
  * {@code AuthController}({@code /api/v1/auth/*})에서 다룬다.
  */
 @Validated
@@ -65,9 +57,6 @@ public class UserController extends ApiControllerSupport {
 	private final UpdateMySettingsCommandHandler updateMySettingsCommandHandler;
 	private final SearchUsersQueryHandler searchUsersQueryHandler;
 	private final GetUserPublicProfileQueryHandler getUserPublicProfileQueryHandler;
-	private final ListSessionsQueryHandler listSessionsQueryHandler;
-	private final RevokeSessionCommandHandler revokeSessionCommandHandler;
-	private final ListSecurityEventsQueryHandler listSecurityEventsQueryHandler;
 
 	public UserController(
 		GetCurrentUserQueryHandler getCurrentUserQueryHandler,
@@ -76,10 +65,7 @@ public class UserController extends ApiControllerSupport {
 		GetMySettingsQueryHandler getMySettingsQueryHandler,
 		UpdateMySettingsCommandHandler updateMySettingsCommandHandler,
 		SearchUsersQueryHandler searchUsersQueryHandler,
-		GetUserPublicProfileQueryHandler getUserPublicProfileQueryHandler,
-		ListSessionsQueryHandler listSessionsQueryHandler,
-		RevokeSessionCommandHandler revokeSessionCommandHandler,
-		ListSecurityEventsQueryHandler listSecurityEventsQueryHandler
+		GetUserPublicProfileQueryHandler getUserPublicProfileQueryHandler
 	) {
 		this.getCurrentUserQueryHandler = getCurrentUserQueryHandler;
 		this.updateMeCommandHandler = updateMeCommandHandler;
@@ -88,9 +74,6 @@ public class UserController extends ApiControllerSupport {
 		this.updateMySettingsCommandHandler = updateMySettingsCommandHandler;
 		this.searchUsersQueryHandler = searchUsersQueryHandler;
 		this.getUserPublicProfileQueryHandler = getUserPublicProfileQueryHandler;
-		this.listSessionsQueryHandler = listSessionsQueryHandler;
-		this.revokeSessionCommandHandler = revokeSessionCommandHandler;
-		this.listSecurityEventsQueryHandler = listSecurityEventsQueryHandler;
 	}
 
 	@GetMapping("/me")
@@ -113,7 +96,7 @@ public class UserController extends ApiControllerSupport {
 	}
 
 	@DeleteMapping("/me")
-	@ResponseStatus(HttpStatus.ACCEPTED)
+	@ResponseStatus(HttpStatus.NO_CONTENT)
 	public void deleteMe(@AuthenticationPrincipal CurrentUser currentUser) {
 		requestAccountDeletionCommandHandler.handle(
 			new RequestAccountDeletionCommand(currentUser.userId())
@@ -139,39 +122,6 @@ public class UserController extends ApiControllerSupport {
 			request.marketingEmailOptIn(),
 			request.tripInviteEmailOptIn()
 		));
-	}
-
-	@GetMapping("/me/sessions")
-	public PagedUserSession listMySessions(
-		@AuthenticationPrincipal CurrentUser currentUser,
-		@RequestParam(defaultValue = "0") int page,
-		@RequestParam(defaultValue = "20") int size
-	) {
-		return listSessionsQueryHandler.handle(
-			new ListSessionsQuery(currentUser.userId(), page, size)
-		);
-	}
-
-	@DeleteMapping("/me/sessions/{sessionId}")
-	@ResponseStatus(HttpStatus.NO_CONTENT)
-	public void revokeMySession(
-		@AuthenticationPrincipal CurrentUser currentUser,
-		@PathVariable UUID sessionId
-	) {
-		revokeSessionCommandHandler.handle(
-			new RevokeSessionCommand(sessionId, currentUser.userId())
-		);
-	}
-
-	@GetMapping("/me/security-events")
-	public PagedSecurityEvent listMySecurityEvents(
-		@AuthenticationPrincipal CurrentUser currentUser,
-		@RequestParam(defaultValue = "0") int page,
-		@RequestParam(defaultValue = "20") int size
-	) {
-		return listSecurityEventsQueryHandler.handle(
-			new ListSecurityEventsQuery(currentUser.userId(), page, size)
-		);
 	}
 
 	@GetMapping("/users")
