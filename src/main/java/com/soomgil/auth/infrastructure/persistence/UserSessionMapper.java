@@ -1,8 +1,6 @@
 package com.soomgil.auth.infrastructure.persistence;
 
-import com.soomgil.auth.api.dto.UserSession;
 import java.time.Instant;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.apache.ibatis.annotations.Insert;
@@ -16,7 +14,7 @@ import org.apache.ibatis.annotations.Update;
  *
  * <p>refresh token rotation과 재사용 감지를 지원한다.
  * token hash로 session을 조회하고, rotation 시 기존 session을 revoke한다.
- * 세션 목록 조회와 개별/전체 폐기도 지원한다.
+ * 전체 폐기는 비밀번호 초기화와 계정 탈퇴에 사용한다.
  */
 @Mapper
 public interface UserSessionMapper {
@@ -47,36 +45,6 @@ public interface UserSessionMapper {
 
 	@Update("UPDATE auth.user_sessions SET revoked_at = #{revokedAt}, revocation_reason = #{reason} WHERE refresh_token_family_id = #{familyId} AND revoked_at IS NULL")
 	void revokeFamily(@Param("familyId") UUID familyId, @Param("revokedAt") Instant revokedAt, @Param("reason") String reason);
-
-	// ---- 세션 목록 / 개별 폐기 / 전체 폐기 ----
-
-	@Select("""
-		SELECT id, refresh_token_family_id, refresh_token_version,
-		       device_name, device_os, last_used_at, last_refreshed_at,
-		       expires_at, revoked_at, revocation_reason
-		FROM auth.user_sessions
-		WHERE user_id = #{userId}
-		ORDER BY created_at DESC
-		LIMIT #{limit} OFFSET #{offset}
-		""")
-	List<UserSession> findByUserId(
-		@Param("userId") UUID userId,
-		@Param("offset") int offset,
-		@Param("limit") int limit
-	);
-
-	@Select("SELECT COUNT(*) FROM auth.user_sessions WHERE user_id = #{userId}")
-	long countByUserId(@Param("userId") UUID userId);
-
-	@Select("""
-		SELECT id, user_id, refresh_token_hash, refresh_token_family_id, expires_at, revoked_at, created_at
-		FROM auth.user_sessions
-		WHERE id = #{id} AND user_id = #{userId}
-		""")
-	Optional<com.soomgil.auth.domain.model.UserSession> findByIdAndUserId(
-		@Param("id") UUID id,
-		@Param("userId") UUID userId
-	);
 
 	@Update("""
 		UPDATE auth.user_sessions

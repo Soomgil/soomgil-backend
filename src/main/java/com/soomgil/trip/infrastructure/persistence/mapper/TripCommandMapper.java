@@ -6,6 +6,8 @@ import com.soomgil.trip.infrastructure.persistence.row.TripMemberRow;
 import com.soomgil.trip.infrastructure.persistence.row.TripRegionRow;
 import com.soomgil.trip.infrastructure.persistence.row.TripRow;
 import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -102,5 +104,23 @@ public interface TripCommandMapper {
 		@Param("userId") UUID userId,
 		@Param("removedByUserId") UUID removedByUserId,
 		@Param("removedAt") Instant removedAt
+	);
+
+	List<UUID> findOwnedTripIdsForAccountDeletion(@Param("userId") UUID userId);
+
+	Optional<UUID> findNextActiveMemberUserId(
+		@Param("tripId") UUID tripId,
+		@Param("departingUserId") UUID departingUserId
+	);
+
+	void transferTripOwnership(
+		@Param("tripId") UUID tripId,
+		@Param("newOwnerUserId") UUID newOwnerUserId,
+		@Param("updatedAt") Instant updatedAt
+	);
+
+	void leaveAllActiveMemberships(
+		@Param("userId") UUID userId,
+		@Param("leftAt") Instant leftAt
 	);
 }

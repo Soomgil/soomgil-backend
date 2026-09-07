@@ -2,8 +2,14 @@ package com.soomgil.global.security;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
+import com.soomgil.auth.domain.model.AuthUser;
+import com.soomgil.auth.domain.model.UserStatus;
+import com.soomgil.auth.infrastructure.persistence.UserMapper;
 import java.time.Instant;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -18,12 +24,15 @@ import org.springframework.security.oauth2.jwt.Jwt;
  */
 class JwtToCurrentUserAuthenticationConverterTest {
 
-	private final JwtToCurrentUserAuthenticationConverter converter = new JwtToCurrentUserAuthenticationConverter();
+	private final UserMapper userMapper = mock(UserMapper.class);
+	private final JwtToCurrentUserAuthenticationConverter converter =
+		new JwtToCurrentUserAuthenticationConverter(userMapper);
 
 	@Test
 	@DisplayName("JWT subject와 email claim을 CurrentUser로 변환한다")
 	void convertsSubjectAndEmailToCurrentUser() {
 		UUID userId = UUID.randomUUID();
+		givenUser(userId, UserStatus.ACTIVE);
 		Jwt jwt = jwtBuilder()
 			.subject(userId.toString())
 			.claim("email", "user@example.com")
@@ -44,6 +53,7 @@ class JwtToCurrentUserAuthenticationConverterTest {
 	@DisplayName("email claim이 없으면 email이 null인 CurrentUser를 만든다")
 	void missingEmailClaimResultsInNullEmail() {
 		UUID userId = UUID.randomUUID();
+		givenUser(userId, UserStatus.ACTIVE);
 		Jwt jwt = jwtBuilder()
 			.subject(userId.toString())
 			.build();
@@ -78,6 +88,7 @@ class JwtToCurrentUserAuthenticationConverterTest {
 	@DisplayName("인증 토큰의 name은 userId 문자열이다")
 	void tokenNameIsUserIdString() {
 		UUID userId = UUID.randomUUID();
+		givenUser(userId, UserStatus.ACTIVE);
 		Jwt jwt = jwtBuilder()
 			.subject(userId.toString())
 			.build();
@@ -85,6 +96,22 @@ class JwtToCurrentUserAuthenticationConverterTest {
 		AbstractAuthenticationToken authentication = converter.convert(jwt);
 
 		assertThat(authentication.getName()).isEqualTo(userId.toString());
+	}
+
+	@Test
+	@DisplayName("탈퇴한 계정의 아직 만료되지 않은 JWT도 거부한다")
+	void deletedAccountIsRejected() {
+		UUID userId = UUID.randomUUID();
+		givenUser(userId, UserStatus.DELETED);
+		Jwt jwt = jwtBuilder().subject(userId.toString()).build();
+
+		assertThatThrownBy(() -> converter.convert(jwt))
+			.isInstanceOf(org.springframework.security.authentication.BadCredentialsException.class);
+	}
+
+	private void givenUser(UUID userId, UserStatus status) {
+		Instant now = Instant.now();
+		when(userMapper.findById(userId)).thenReturn(Optional.of(new AuthUser(userId, status, now, now)));
 	}
 
 	private Jwt.Builder jwtBuilder() {

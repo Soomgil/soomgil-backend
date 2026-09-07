@@ -9,17 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.soomgil.auth.api.dto.PagedSecurityEvent;
-import com.soomgil.auth.api.dto.PagedUserSession;
-import com.soomgil.auth.api.dto.SecurityEvent;
-import com.soomgil.auth.api.dto.UserSession;
-import com.soomgil.auth.application.command.RevokeSessionCommand;
 import com.soomgil.auth.application.handler.GetCurrentUserQueryHandler;
-import com.soomgil.auth.application.handler.ListSecurityEventsQueryHandler;
-import com.soomgil.auth.application.handler.ListSessionsQueryHandler;
-import com.soomgil.auth.application.handler.RevokeSessionCommandHandler;
-import com.soomgil.auth.application.query.ListSecurityEventsQuery;
-import com.soomgil.auth.application.query.ListSessionsQuery;
 import com.soomgil.common.api.dto.PageMeta;
 import com.soomgil.common.cqrs.NoResult;
 import com.soomgil.global.error.BusinessException;
@@ -110,12 +100,6 @@ class UserControllerWebMvcTest {
 	private SearchUsersQueryHandler searchUsersQueryHandler;
 	@MockBean
 	private GetUserPublicProfileQueryHandler getUserPublicProfileQueryHandler;
-	@MockBean
-	private ListSessionsQueryHandler listSessionsQueryHandler;
-	@MockBean
-	private RevokeSessionCommandHandler revokeSessionCommandHandler;
-	@MockBean
-	private ListSecurityEventsQueryHandler listSecurityEventsQueryHandler;
 
 	static RequestPostProcessor asCurrentUser() {
 		org.springframework.security.authentication.UsernamePasswordAuthenticationToken authentication =
@@ -173,24 +157,13 @@ class UserControllerWebMvcTest {
 	}
 
 	@Test
-	@DisplayName("DELETE /me - 정상 요청은 202 Accepted를 반환한다")
-	void deleteMeReturns202() throws Exception {
+	@DisplayName("DELETE /me - 정상 요청은 204 No Content를 반환한다")
+	void deleteMeReturns204() throws Exception {
 		when(requestAccountDeletionCommandHandler.handle(any(RequestAccountDeletionCommand.class)))
 			.thenReturn(NoResult.INSTANCE);
 
 		mockMvc.perform(delete("/api/v1/me").with(asCurrentUser()))
-			.andExpect(status().isAccepted());
-	}
-
-	@Test
-	@DisplayName("DELETE /me - 활성 OWNER 여행방이 있으면 409 ACCOUNT_DELETION_BLOCKED_BY_ACTIVE_OWNER_TRIP을 반환한다")
-	void deleteMeBlockedByActiveOwnerTrip() throws Exception {
-		when(requestAccountDeletionCommandHandler.handle(any(RequestAccountDeletionCommand.class)))
-			.thenThrow(new BusinessException(ErrorCode.ACCOUNT_DELETION_BLOCKED_BY_ACTIVE_OWNER_TRIP));
-
-		mockMvc.perform(delete("/api/v1/me").with(asCurrentUser()))
-			.andExpect(status().isConflict())
-			.andExpect(jsonPath("$.code").value("ACCOUNT_DELETION_BLOCKED_BY_ACTIVE_OWNER_TRIP"));
+			.andExpect(status().isNoContent());
 	}
 
 	@Test
@@ -272,68 +245,6 @@ class UserControllerWebMvcTest {
 			.andExpect(jsonPath("$.displayName").value("민지"))
 			.andExpect(jsonPath("$.bio").value("안녕하세요"))
 			.andExpect(jsonPath("$.profileVisibility").value("PUBLIC"));
-	}
-
-	@Test
-	@DisplayName("GET /me/sessions - 정상 요청은 200과 PagedUserSession을 반환한다")
-	void listMySessionsReturnsPagedSessions() throws Exception {
-		PagedUserSession result = new PagedUserSession(
-			List.of(new UserSession(
-				UUID.randomUUID(), UUID.randomUUID(), 1,
-				"Chrome on Windows", null, null, null,
-				OffsetDateTime.now().plusDays(7), null, null
-			)),
-			new PageMeta(0, 20, 1L, 1, List.of())
-		);
-		when(listSessionsQueryHandler.handle(any(ListSessionsQuery.class))).thenReturn(result);
-
-		mockMvc.perform(get("/api/v1/me/sessions").with(asCurrentUser()))
-			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.items[0].deviceName").value("Chrome on Windows"));
-	}
-
-	@Test
-	@DisplayName("DELETE /me/sessions/{sessionId} - 정상 요청은 204를 반환한다")
-	void revokeMySessionReturns204() throws Exception {
-		UUID sessionId = UUID.randomUUID();
-		when(revokeSessionCommandHandler.handle(any(RevokeSessionCommand.class)))
-			.thenReturn(com.soomgil.common.cqrs.NoResult.INSTANCE);
-
-		mockMvc.perform(delete("/api/v1/me/sessions/{sessionId}", sessionId).with(asCurrentUser()))
-			.andExpect(status().isNoContent());
-	}
-
-	@Test
-	@DisplayName("DELETE /me/sessions/{sessionId} - 타인 세션이면 404 SESSION_NOT_FOUND를 반환한다")
-	void revokeMySessionReturns404ForOthersSession() throws Exception {
-		when(revokeSessionCommandHandler.handle(any(RevokeSessionCommand.class)))
-			.thenThrow(new BusinessException(ErrorCode.SESSION_NOT_FOUND));
-
-		UUID sessionId = UUID.randomUUID();
-		mockMvc.perform(delete("/api/v1/me/sessions/{sessionId}", sessionId).with(asCurrentUser()))
-			.andExpect(status().isNotFound())
-			.andExpect(jsonPath("$.code").value("SESSION_NOT_FOUND"));
-	}
-
-	@Test
-	@DisplayName("GET /me/security-events - 정상 요청은 200과 PagedSecurityEvent를 반환한다")
-	void listMySecurityEventsReturnsEvents() throws Exception {
-		PagedSecurityEvent result = new PagedSecurityEvent(
-			List.of(new SecurityEvent(1L, "LOGIN_SUCCESS", true, null, OffsetDateTime.now())),
-			new PageMeta(0, 20, 1L, 1, List.of())
-		);
-		when(listSecurityEventsQueryHandler.handle(any(ListSecurityEventsQuery.class))).thenReturn(result);
-
-		mockMvc.perform(get("/api/v1/me/security-events").with(asCurrentUser()))
-			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.items[0].eventType").value("LOGIN_SUCCESS"));
-	}
-
-	@Test
-	@DisplayName("GET /me/sessions - 인증 없이 호출하면 401을 반환한다")
-	void listMySessionsReturns401WithoutAuth() throws Exception {
-		mockMvc.perform(get("/api/v1/me/sessions"))
-			.andExpect(status().isUnauthorized());
 	}
 
 	private User sampleUser() {

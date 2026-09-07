@@ -5,8 +5,12 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.soomgil.auth.domain.model.AuthUser;
+import com.soomgil.auth.domain.model.UserStatus;
+import com.soomgil.auth.infrastructure.persistence.UserMapper;
 import com.soomgil.global.security.JwtToCurrentUserAuthenticationConverter;
 import java.time.Instant;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
@@ -23,15 +27,19 @@ class WebSocketJwtAuthenticationInterceptorTest {
 	private static final UUID USER_ID = UUID.fromString("20000000-0000-0000-0000-000000000001");
 
 	private final JwtDecoder jwtDecoder = mock(JwtDecoder.class);
+	private final UserMapper userMapper = mock(UserMapper.class);
 	private final WebSocketJwtAuthenticationInterceptor interceptor = new WebSocketJwtAuthenticationInterceptor(
 		jwtDecoder,
-		new JwtToCurrentUserAuthenticationConverter()
+		new JwtToCurrentUserAuthenticationConverter(userMapper)
 	);
 	private final MessageChannel channel = mock(MessageChannel.class);
 
 	@Test
 	void setsPrincipalFromConnectBearerToken() {
 		when(jwtDecoder.decode("access-token")).thenReturn(jwt());
+		Instant now = Instant.now();
+		when(userMapper.findById(USER_ID))
+			.thenReturn(Optional.of(new AuthUser(USER_ID, UserStatus.ACTIVE, now, now)));
 		Message<?> message = connectMessage("Bearer access-token");
 
 		Message<?> authenticated = interceptor.preSend(message, channel);

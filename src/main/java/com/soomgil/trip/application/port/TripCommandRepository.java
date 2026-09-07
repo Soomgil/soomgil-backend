@@ -95,4 +95,16 @@ public interface TripCommandRepository {
 	 * @param removedAt 제거 시각
 	 */
 	void removeTripMember(UUID tripId, UUID userId, UUID removedByUserId, Instant removedAt);
+
+	/**
+	 * 계정 탈퇴 사용자를 모든 여행방에서 정리한다.
+	 *
+	 * <p>사용자가 소유한 여행방에 다른 활성 구성원이 있으면 가장 먼저 참여한 구성원에게
+	 * 소유권을 넘긴다. 다른 구성원이 없으면 여행방을 soft delete하고, 마지막으로 사용자의
+	 * 모든 활성 멤버십을 {@code LEFT}로 전환한다.
+	 *
+	 * @param userId 탈퇴 사용자 ID
+	 * @param departedAt 탈퇴 시각
+	 */
+	void departUserForAccountDeletion(UUID userId, Instant departedAt);
 }

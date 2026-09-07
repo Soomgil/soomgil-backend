@@ -1,16 +1,22 @@
 package com.soomgil.global.security;
 
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.soomgil.auth.domain.model.AuthUser;
+import com.soomgil.auth.domain.model.UserStatus;
+import com.soomgil.auth.infrastructure.persistence.UserMapper;
 import java.time.Instant;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
@@ -71,10 +77,14 @@ class SecurityJwtAuthenticationWebMvcTest {
 	@Autowired
 	private JwtEncoder jwtEncoder;
 
+	@MockBean
+	private UserMapper userMapper;
+
 	@Test
 	@DisplayName("유효한 JWT로 보호된 endpoint를 호출하면 200과 현재 사용자 정보를 반환한다")
 	void validJwtReturns200WithCurrentUser() throws Exception {
 		UUID userId = UUID.randomUUID();
+		givenActiveUser(userId);
 		String token = mintJwt(userId, "user@example.com", Instant.now().plusSeconds(900));
 
 		mockMvc.perform(get("/test/jwt-protected")
@@ -89,6 +99,7 @@ class SecurityJwtAuthenticationWebMvcTest {
 	@DisplayName("email claim이 없는 JWT도 허용된다")
 	void validJwtWithoutEmailClaimIsAccepted() throws Exception {
 		UUID userId = UUID.randomUUID();
+		givenActiveUser(userId);
 		String token = mintJwt(userId, null, Instant.now().plusSeconds(900));
 
 		mockMvc.perform(get("/test/jwt-protected")
@@ -147,6 +158,12 @@ class SecurityJwtAuthenticationWebMvcTest {
 
 	private String mintJwt(UUID userId, String email, Instant expiresAt) {
 		return mintJwt(userId, email, Instant.now(), expiresAt);
+	}
+
+	private void givenActiveUser(UUID userId) {
+		Instant now = Instant.now();
+		when(userMapper.findById(userId))
+			.thenReturn(Optional.of(new AuthUser(userId, UserStatus.ACTIVE, now, now)));
 	}
 
 	private String mintJwt(UUID userId, String email, Instant issuedAt, Instant expiresAt) {
