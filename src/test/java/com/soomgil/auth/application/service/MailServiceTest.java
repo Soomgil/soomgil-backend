@@ -19,6 +19,7 @@ class MailServiceTest {
 		mailSender,
 		"http://localhost:5173/auth/verify-email",
 		"http://localhost:5173/auth/reset-password",
+		"http://localhost:5173/trip-invites",
 		"sender@example.com"
 	);
 
@@ -37,6 +38,16 @@ class MailServiceTest {
 		when(mailSender.createMimeMessage()).thenReturn(new MimeMessage(Session.getInstance(new Properties())));
 
 		assertThatCode(() -> mailService.sendPasswordResetEmail("recipient@example.com", "reset-token"))
+			.doesNotThrowAnyException();
+
+		verify(mailSender).send(any(MimeMessage.class));
+	}
+
+	@Test
+	void sendsTripInviteEmailWithPlainTextAndHtmlBodies() {
+		when(mailSender.createMimeMessage()).thenReturn(new MimeMessage(Session.getInstance(new Properties())));
+
+		assertThatCode(() -> mailService.sendTripInviteEmail("recipient@example.com", "JOIN-ME"))
 			.doesNotThrowAnyException();
 
 		verify(mailSender).send(any(MimeMessage.class));
