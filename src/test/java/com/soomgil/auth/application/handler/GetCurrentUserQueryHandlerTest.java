@@ -15,6 +15,8 @@ import com.soomgil.auth.infrastructure.persistence.UserMapper;
 import com.soomgil.auth.infrastructure.persistence.UserProfileMapper;
 import com.soomgil.global.error.ErrorCode;
 import com.soomgil.user.api.dto.User;
+import com.soomgil.user.domain.model.UserSettingsRecord;
+import com.soomgil.user.infrastructure.persistence.UserMeSettingsMapper;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
@@ -26,9 +28,10 @@ class GetCurrentUserQueryHandlerTest {
 	private final UserMapper userMapper = mock(UserMapper.class);
 	private final EmailAddressMapper emailAddressMapper = mock(EmailAddressMapper.class);
 	private final UserProfileMapper userProfileMapper = mock(UserProfileMapper.class);
+	private final UserMeSettingsMapper userSettingsMapper = mock(UserMeSettingsMapper.class);
 
 	private final GetCurrentUserQueryHandler handler = new GetCurrentUserQueryHandler(
-		userMapper, emailAddressMapper, userProfileMapper
+		userMapper, emailAddressMapper, userProfileMapper, userSettingsMapper
 	);
 
 	@Test
@@ -47,6 +50,9 @@ class GetCurrentUserQueryHandlerTest {
 				userId, "민지", null, null, null, com.soomgil.user.api.dto.UserProfileVisibility.PUBLIC
 			)
 		));
+		when(userSettingsMapper.findByUserId(userId)).thenReturn(Optional.of(
+			new UserSettingsRecord(userId, "en", "Asia/Seoul", false, null, null, true)
+		));
 
 		User result = handler.handle(new GetCurrentUserQuery(userId));
 
@@ -55,6 +61,7 @@ class GetCurrentUserQueryHandlerTest {
 		assertThat(result.primaryEmailVerifiedAt()).isNotNull();
 		assertThat(result.status()).isEqualTo(com.soomgil.user.api.dto.UserStatus.ACTIVE);
 		assertThat(result.profile().displayName()).isEqualTo("민지");
+		assertThat(result.settings().displayLanguage()).isEqualTo("en");
 	}
 
 	@Test
@@ -78,11 +85,13 @@ class GetCurrentUserQueryHandlerTest {
 		when(userMapper.findById(userId)).thenReturn(Optional.of(user));
 		when(emailAddressMapper.findPrimaryByUserId(userId)).thenReturn(Optional.empty());
 		when(userProfileMapper.findFull(userId)).thenReturn(Optional.empty());
+		when(userSettingsMapper.findByUserId(userId)).thenReturn(Optional.empty());
 
 		User result = handler.handle(new GetCurrentUserQuery(userId));
 
 		assertThat(result.primaryEmail()).isNull();
 		assertThat(result.primaryEmailVerifiedAt()).isNull();
 		assertThat(result.profile().displayName()).isEmpty();
+		assertThat(result.settings().displayLanguage()).isEqualTo("ko");
 	}
 }

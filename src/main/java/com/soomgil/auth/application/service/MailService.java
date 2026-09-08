@@ -3,6 +3,8 @@ package com.soomgil.auth.application.service;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -24,18 +26,39 @@ public class MailService {
 	private final JavaMailSender mailSender;
 	private final String verificationBaseUrl;
 	private final String resetBaseUrl;
+	private final String tripInviteBaseUrl;
 	private final String fromAddress;
 
 	public MailService(
 		JavaMailSender mailSender,
 		@Value("${soomgil.mail.verification-base-url:http://localhost:5173/auth/verify-email}") String verificationBaseUrl,
 		@Value("${soomgil.mail.reset-base-url:http://localhost:5173/auth/reset-password}") String resetBaseUrl,
+		@Value("${soomgil.mail.trip-invite-base-url:http://localhost:5173/trip-invites}") String tripInviteBaseUrl,
 		@Value("${soomgil.mail.from:noreply@soomgil.com}") String fromAddress
 	) {
 		this.mailSender = mailSender;
 		this.verificationBaseUrl = verificationBaseUrl;
 		this.resetBaseUrl = resetBaseUrl;
+		this.tripInviteBaseUrl = tripInviteBaseUrl;
 		this.fromAddress = fromAddress;
+	}
+
+	/** 수신 동의가 확인된 사용자에게 여행 초대 메일을 발송한다. */
+	public void sendTripInviteEmail(String toEmail, String inviteCode) {
+		String link = tripInviteBaseUrl + "/" + URLEncoder.encode(inviteCode, StandardCharsets.UTF_8);
+		String subject = "[숨길] 새로운 여행 초대가 도착했습니다";
+		String plainText = "숨길 여행 초대\n\n아래 링크에서 여행 초대를 확인하세요.\n" + link;
+		String html = """
+			<!doctype html><html lang="ko"><body style="margin:0;padding:32px;background:#f5f7fb;font-family:Arial,sans-serif;color:#172033">
+			<div style="max-width:560px;margin:0 auto;padding:32px;background:#fff;border:1px solid #e5e7eb;border-radius:16px">
+			<p style="color:#6d5ce7;font-weight:700">숨길 SOOMGIL</p>
+			<h1 style="font-size:24px">새로운 여행 초대가 도착했습니다</h1>
+			<p style="line-height:1.7">아래 버튼을 눌러 여행 정보를 확인하고 초대를 수락할 수 있습니다.</p>
+			<p><a href="%s" style="display:inline-block;padding:13px 22px;border-radius:10px;background:#6d5ce7;color:#fff;text-decoration:none;font-weight:700">여행 초대 확인하기</a></p>
+			<p style="color:#64748b;font-size:12px">설정에서 여행 초대 이메일 수신을 언제든 끌 수 있습니다.</p>
+			</div></body></html>
+			""".formatted(link);
+		sendHtml(toEmail, subject, plainText, html);
 	}
 
 	/**

@@ -17,8 +17,8 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>가시성 규칙:
  * <ul>
  *   <li>{@code PUBLIC}: 전체 프로필(display name, profile image URL, bio, visibility) 반환.</li>
- *   <li>{@code PRIVATE}: 제한 요약(id, displayName, profileImageUrl, visibility)만 반환.
- *       자기소개({@code bio})는 노출하지 않는다.</li>
+ *   <li>{@code PRIVATE}: 본인과 승인된 팔로워에게 자기소개를 포함한 프로필을 반환하고,
+ *       그 외 사용자에게는 제한 요약만 반환한다.</li>
  * </ul>
  *
  * <p>follow 관련 필드({@code followerCount}, {@code followingCount}, {@code followedByMe},
@@ -47,9 +47,6 @@ public class GetUserPublicProfileQueryHandler
 			.orElseThrow(() -> new UserException(ErrorCode.USER_NOT_FOUND,
 				"User not found: " + query.targetUserId()));
 
-		boolean isPrivate = record.profileVisibility() == UserProfileVisibility.PRIVATE;
-		String bio = isPrivate ? null : record.bio();
-
 		// social 모듈 데이터 조회
 		int followerCount = userFollowMapper.countFollowers(query.targetUserId());
 		int followingCount = userFollowMapper.countFollowing(query.targetUserId());
@@ -69,6 +66,11 @@ public class GetUserPublicProfileQueryHandler
 			}
 			followedByMe = "ACTIVE".equals(statusStr);
 		}
+
+		boolean isPrivate = record.profileVisibility() == UserProfileVisibility.PRIVATE;
+		boolean canViewPrivateProfile = query.targetUserId().equals(query.viewerUserId())
+			|| Boolean.TRUE.equals(followedByMe);
+		String bio = isPrivate && !canViewPrivateProfile ? null : record.bio();
 
 		return new UserPublicProfile(
 			record.userId(),
