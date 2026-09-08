@@ -70,7 +70,7 @@ public class SocialFollowService {
 	/**
 	 * 사용자의 ACTIVE 팔로워를 최신 관계순으로 조회한다.
 	 *
-	 * <p>PUBLIC 프로필은 비로그인 사용자도 조회할 수 있다. PRIVATE 프로필은 본인만 조회할 수 있다.
+	 * <p>PUBLIC 프로필은 비로그인 사용자도 조회할 수 있다. PRIVATE 프로필은 본인과 승인된 팔로워가 조회할 수 있다.
 	 */
 	@Transactional(readOnly = true)
 	public PagedUserSummary listFollowers(UUID viewerUserId, UUID targetUserId, int page, int size) {
@@ -85,7 +85,7 @@ public class SocialFollowService {
 	/**
 	 * 사용자가 ACTIVE 상태로 팔로우하는 사람을 최신 관계순으로 조회한다.
 	 *
-	 * <p>PUBLIC 프로필은 비로그인 사용자도 조회할 수 있다. PRIVATE 프로필은 본인만 조회할 수 있다.
+	 * <p>PUBLIC 프로필은 비로그인 사용자도 조회할 수 있다. PRIVATE 프로필은 본인과 승인된 팔로워가 조회할 수 있다.
 	 */
 	@Transactional(readOnly = true)
 	public PagedUserSummary listFollowing(UUID viewerUserId, UUID targetUserId, int page, int size) {
@@ -127,7 +127,11 @@ public class SocialFollowService {
 			throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "User was not found.");
 		}
 		if ("PRIVATE".equals(visibility) && !targetUserId.equals(viewerUserId)) {
-			throw new BusinessException(ErrorCode.FORBIDDEN, "Private follow lists are visible only to the owner.");
+			SocialFollowRecord relationship = viewerUserId == null ? null : repository.find(viewerUserId, targetUserId);
+			if (relationship == null || !"ACTIVE".equals(relationship.status())) {
+				throw new BusinessException(ErrorCode.FORBIDDEN,
+					"Private follow lists are visible only to the owner and approved followers.");
+			}
 		}
 	}
 
