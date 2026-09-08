@@ -15,6 +15,8 @@ import com.soomgil.user.api.dto.UserProfileVisibility;
 import com.soomgil.user.api.dto.UserSettings;
 import com.soomgil.user.api.dto.UserStatus;
 import com.soomgil.user.domain.model.UserProfileRecord;
+import com.soomgil.user.domain.model.UserSettingsRecord;
+import com.soomgil.user.infrastructure.persistence.UserMeSettingsMapper;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import org.springframework.stereotype.Component;
@@ -32,15 +34,18 @@ public class GetCurrentUserQueryHandler implements QueryHandler<GetCurrentUserQu
 	private final UserMapper userMapper;
 	private final EmailAddressMapper emailAddressMapper;
 	private final UserProfileMapper userProfileMapper;
+	private final UserMeSettingsMapper userSettingsMapper;
 
 	public GetCurrentUserQueryHandler(
 		UserMapper userMapper,
 		EmailAddressMapper emailAddressMapper,
-		UserProfileMapper userProfileMapper
+		UserProfileMapper userProfileMapper,
+		UserMeSettingsMapper userSettingsMapper
 	) {
 		this.userMapper = userMapper;
 		this.emailAddressMapper = emailAddressMapper;
 		this.userProfileMapper = userProfileMapper;
+		this.userSettingsMapper = userSettingsMapper;
 	}
 
 	@Override
@@ -66,7 +71,16 @@ public class GetCurrentUserQueryHandler implements QueryHandler<GetCurrentUserQu
 			profileRow != null && profileRow.profileVisibility() != null
 				? profileRow.profileVisibility() : UserProfileVisibility.PUBLIC
 		);
-		UserSettings settings = new UserSettings("ko", "Asia/Seoul", false, null, null, true);
+		UserSettingsRecord settingsRow = userSettingsMapper.findByUserId(user.id())
+			.orElseGet(() -> new UserSettingsRecord(user.id(), "ko", "Asia/Seoul", false, null, null, true));
+		UserSettings settings = new UserSettings(
+			settingsRow.displayLanguage(),
+			settingsRow.timezone(),
+			settingsRow.marketingEmailOptIn(),
+			settingsRow.marketingEmailOptedInAt(),
+			settingsRow.marketingEmailOptedOutAt(),
+			settingsRow.tripInviteEmailOptIn()
+		);
 		OffsetDateTime createdAt = user.createdAt() != null
 			? OffsetDateTime.ofInstant(user.createdAt(), ZoneOffset.UTC)
 			: OffsetDateTime.now(ZoneOffset.UTC);
