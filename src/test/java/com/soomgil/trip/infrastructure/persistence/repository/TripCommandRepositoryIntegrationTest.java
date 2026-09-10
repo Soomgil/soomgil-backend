@@ -83,6 +83,56 @@ class TripCommandRepositoryIntegrationTest {
 		)).isEqualTo(1L);
 	}
 
+	@Test
+	void transfersOwnedTripToEarliestActiveMemberAndLeavesDepartingUser() {
+		insertTrip();
+		OffsetDateTime ownerJoinedAt = OffsetDateTime.parse("2026-06-01T00:00:00Z");
+		OffsetDateTime firstMemberJoinedAt = OffsetDateTime.parse("2026-06-02T00:00:00Z");
+		OffsetDateTime secondMemberJoinedAt = OffsetDateTime.parse("2026-06-03T00:00:00Z");
+		UUID secondMemberId = UUID.fromString("20000000-0000-0000-0000-000000000013");
+		insertActiveMember(OWNER_ID, ownerJoinedAt);
+		insertActiveMember(MEMBER_ID, firstMemberJoinedAt);
+		insertActiveMember(secondMemberId, secondMemberJoinedAt);
+
+		Instant departedAt = Instant.parse("2026-06-18T00:00:00Z");
+		repository.departUserForAccountDeletion(OWNER_ID, departedAt);
+
+		assertThat(jdbcTemplate.queryForObject(
+			"SELECT owner_user_id FROM trip.trips WHERE id = ?", UUID.class, TRIP_ID
+		)).isEqualTo(MEMBER_ID);
+		assertThat(jdbcTemplate.queryForObject(
+			"SELECT status FROM trip.trip_members WHERE trip_id = ? AND user_id = ?",
+			String.class, TRIP_ID, OWNER_ID
+		)).isEqualTo("LEFT");
+		assertThat(jdbcTemplate.queryForObject(
+			"SELECT status FROM trip.trips WHERE id = ?", String.class, TRIP_ID
+		)).isEqualTo("ACTIVE");
+	}
+
+	@Test
+	void deletesOwnedTripWhenNoOtherActiveMemberExists() {
+		insertTrip();
+		insertActiveMember(OWNER_ID, OffsetDateTime.parse("2026-06-01T00:00:00Z"));
+
+		repository.departUserForAccountDeletion(OWNER_ID, Instant.parse("2026-06-18T00:00:00Z"));
+
+		assertThat(jdbcTemplate.queryForObject(
+			"SELECT status FROM trip.trips WHERE id = ?", String.class, TRIP_ID
+		)).isEqualTo("DELETED");
+		assertThat(jdbcTemplate.queryForObject(
+			"SELECT status FROM trip.trip_members WHERE trip_id = ? AND user_id = ?",
+			String.class, TRIP_ID, OWNER_ID
+		)).isEqualTo("LEFT");
+	}
+
+	private void insertActiveMember(UUID userId, OffsetDateTime joinedAt) {
+		jdbcTemplate.update(
+			"INSERT INTO trip.trip_members (id, trip_id, user_id, role, status, joined_at) "
+				+ "VALUES (?, ?, ?, 'MEMBER', 'ACTIVE', ?)",
+			UUID.randomUUID(), TRIP_ID, userId, joinedAt
+		);
+	}
+
 	private void insertTrip() {
 		OffsetDateTime now = OffsetDateTime.parse("2026-06-18T00:00:00Z");
 		jdbcTemplate.update(

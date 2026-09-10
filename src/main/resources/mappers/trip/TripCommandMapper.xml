@@ -170,4 +170,40 @@
       AND user_id = #{userId}
       AND status = 'ACTIVE'
   </update>
+
+  <select id="findOwnedTripIdsForAccountDeletion" resultType="java.util.UUID">
+    SELECT id
+    FROM trip.trips
+    WHERE owner_user_id = #{userId}
+      AND status != 'DELETED'
+    ORDER BY created_at ASC, id ASC
+    FOR UPDATE
+  </select>
+
+  <select id="findNextActiveMemberUserId" resultType="java.util.UUID">
+    SELECT user_id
+    FROM trip.trip_members
+    WHERE trip_id = #{tripId}
+      AND user_id != #{departingUserId}
+      AND status = 'ACTIVE'
+    ORDER BY joined_at ASC, id ASC
+    LIMIT 1
+  </select>
+
+  <update id="transferTripOwnership">
+    UPDATE trip.trips
+    SET owner_user_id = #{newOwnerUserId},
+        updated_at = #{updatedAt}
+    WHERE id = #{tripId}
+      AND status != 'DELETED'
+  </update>
+
+  <update id="leaveAllActiveMemberships">
+    UPDATE trip.trip_members
+    SET status = 'LEFT',
+        left_at = #{leftAt},
+        removed_by_user_id = NULL
+    WHERE user_id = #{userId}
+      AND status = 'ACTIVE'
+  </update>
 </mapper>

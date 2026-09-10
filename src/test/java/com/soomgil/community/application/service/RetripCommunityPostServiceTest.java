@@ -135,8 +135,8 @@ class RetripCommunityPostServiceTest {
 				1200.0, 600.0, 0.9
 			)),
 			List.of(
-				new Note(UUID.randomUUID(), UUID.randomUUID(), PlanningScopeType.TRIP, null, "전체 메모", null),
-				new Note(UUID.randomUUID(), UUID.randomUUID(), PlanningScopeType.DAY, sourceDayId, "첫째 날 메모", null)
+				new Note(UUID.randomUUID(), UUID.randomUUID(), PlanningScopeType.TRIP, null, "전체 메모", 1, null),
+				new Note(UUID.randomUUID(), UUID.randomUUID(), PlanningScopeType.DAY, sourceDayId, "첫째 날 메모", 1, null)
 			),
 			List.of(new Checklist(
 				UUID.randomUUID(), UUID.randomUUID(), PlanningScopeType.DAY, sourceDayId, "준비물",

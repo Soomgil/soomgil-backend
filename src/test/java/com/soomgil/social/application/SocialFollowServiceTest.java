@@ -90,6 +90,9 @@ class SocialFollowServiceTest {
 				assertThat(exception.errorCode()).isEqualTo(ErrorCode.FORBIDDEN));
 
 		assertThat(service.listFollowers(TARGET, TARGET, 0, 20).items()).isEmpty();
+
+		repository.follow = new SocialFollowRecord(CURRENT, TARGET, "ACTIVE", NOW, NOW, null);
+		assertThat(service.listFollowers(CURRENT, TARGET, 0, 20).items()).isEmpty();
 	}
 
 	private static final class FakeRepository implements SocialFollowRepository {

@@ -14,8 +14,7 @@ import org.apache.ibatis.annotations.Update;
 /**
  * planning.trip_notes 테이블 접근 mapper.
  *
- * <p>DBML에 version 컬럼이 없으므로 optimistic lock은 리소스 단위가 아닌
- * 상위 itinerary_version으로 관리된다. UPDATE/DELETE는 식별자 기반으로 처리한다.
+ * <p>메모 단위 {@code version}을 사용해 UPDATE/DELETE의 낙관적 잠금을 수행한다.
  */
 @Mapper
 public interface NoteMapper {
@@ -30,17 +29,19 @@ public interface NoteMapper {
 	 * @param content 본문
 	 * @param actorUserId 작성자
 	 * @param now 생성 시각
+	 * @return 영향받은 row 수. 동일 scope의 활성 메모가 먼저 생성됐으면 0
 	 */
 	@Insert("""
 		INSERT INTO planning.trip_notes (
-		    id, trip_id, scope_type, itinerary_day_id, content,
+		    id, trip_id, scope_type, itinerary_day_id, content, version,
 		    created_by_user_id, updated_by_user_id, created_at, updated_at
 		) VALUES (
-		    #{id}, #{tripId}, #{scopeType}, #{itineraryDayId}, #{content},
+		    #{id}, #{tripId}, #{scopeType}, #{itineraryDayId}, #{content}, 1,
 		    #{actorUserId}, #{actorUserId}, #{now}, #{now}
 		)
+		ON CONFLICT DO NOTHING
 		""")
-	void insert(
+	int insert(
 		@Param("id") UUID id,
 		@Param("tripId") UUID tripId,
 		@Param("scopeType") PlanningScopeType scopeType,
@@ -59,7 +60,7 @@ public interface NoteMapper {
 	 * @return note. 없으면 empty
 	 */
 	@Select("""
-		SELECT id, trip_id, scope_type, itinerary_day_id, content,
+		SELECT id, trip_id, scope_type, itinerary_day_id, content, version,
 		       created_by_user_id, updated_by_user_id, deleted_by_user_id,
 		       deleted_at, created_at, updated_at
 		FROM planning.trip_notes
@@ -82,7 +83,7 @@ public interface NoteMapper {
 	 * @return note. 없으면 empty
 	 */
 	@Select("""
-		SELECT id, trip_id, scope_type, itinerary_day_id, content,
+		SELECT id, trip_id, scope_type, itinerary_day_id, content, version,
 		       created_by_user_id, updated_by_user_id, deleted_by_user_id,
 		       deleted_at, created_at, updated_at
 		FROM planning.trip_notes
@@ -97,20 +98,23 @@ public interface NoteMapper {
 	 * @param content 새 본문
 	 * @param actorUserId 수정자
 	 * @param now 수정 시각
-	 * @return 영향받은 row 수. 0이면 대상이 없거나 이미 삭제됨
+	 * @param baseVersion 클라이언트가 마지막으로 읽은 메모 버전
+	 * @return 영향받은 row 수. 0이면 대상이 없거나 삭제됐거나 version이 바뀜
 	 */
 	@Update("""
 		UPDATE planning.trip_notes
 		SET content = #{content},
+		    version = version + 1,
 		    updated_by_user_id = #{actorUserId},
 		    updated_at = #{now}
-		WHERE id = #{id} AND deleted_at IS NULL
+		WHERE id = #{id} AND deleted_at IS NULL AND version = #{baseVersion}
 		""")
 	int updateContent(
 		@Param("id") UUID id,
 		@Param("content") String content,
 		@Param("actorUserId") UUID actorUserId,
-		@Param("now") Instant now
+		@Param("now") Instant now,
+		@Param("baseVersion") long baseVersion
 	);
 
 	/**
@@ -119,19 +123,22 @@ public interface NoteMapper {
 	 * @param id note 식별자
 	 * @param actorUserId 삭제자
 	 * @param now 삭제 시각
-	 * @return 영향받은 row 수. 0이면 대상이 없거나 이미 삭제됨
+	 * @param baseVersion 클라이언트가 마지막으로 읽은 메모 버전
+	 * @return 영향받은 row 수. 0이면 대상이 없거나 삭제됐거나 version이 바뀜
 	 */
 	@Update("""
 		UPDATE planning.trip_notes
 		SET deleted_at = #{now},
+		    version = version + 1,
 		    deleted_by_user_id = #{actorUserId},
 		    updated_by_user_id = #{actorUserId},
 		    updated_at = #{now}
-		WHERE id = #{id} AND deleted_at IS NULL
+		WHERE id = #{id} AND deleted_at IS NULL AND version = #{baseVersion}
 		""")
 	int softDelete(
 		@Param("id") UUID id,
 		@Param("actorUserId") UUID actorUserId,
-		@Param("now") Instant now
+		@Param("now") Instant now,
+		@Param("baseVersion") long baseVersion
 	);
 }

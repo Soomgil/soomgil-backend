@@ -6,11 +6,13 @@ import com.soomgil.common.id.Ids;
 import com.soomgil.global.error.BusinessException;
 import com.soomgil.global.error.ErrorCode;
 import com.soomgil.itinerary.api.dto.CreateMapDrawingRequest;
+import com.soomgil.itinerary.api.dto.DeleteMapDrawingsRequest;
 import com.soomgil.itinerary.api.dto.ItineraryMutationResponse;
 import com.soomgil.itinerary.api.dto.MapDrawing;
 import com.soomgil.itinerary.api.dto.UpdateMapDrawingRequest;
 import com.soomgil.itinerary.application.command.dto.CreateMapDrawingCommand;
 import com.soomgil.itinerary.application.command.dto.DeleteMapDrawingCommand;
+import com.soomgil.itinerary.application.command.dto.DeleteMapDrawingsCommand;
 import com.soomgil.itinerary.application.command.dto.ItineraryMutationResult;
 import com.soomgil.itinerary.application.command.dto.MapDrawingView;
 import com.soomgil.itinerary.application.command.dto.UpdateMapDrawingCommand;
@@ -119,6 +121,23 @@ public class MapDrawingController {
 			userId,
 			request.baseVersion(),
 			drawingId,
+			sessionIdProvider.requireOwnedSession(websocketSessionId, principal)
+		)));
+	}
+
+	@PostMapping("/batch-delete")
+	public ItineraryMutationResponse deleteBatch(
+		@PathVariable UUID tripId,
+		@RequestHeader(name = HttpCollaborationSessionIdProvider.SESSION_HEADER) String websocketSessionId,
+		@Valid @RequestBody DeleteMapDrawingsRequest request,
+		Principal principal
+	) {
+		UUID userId = currentUserId(principal);
+		return toResponse(deleteHandler.handle(new DeleteMapDrawingsCommand(
+			tripId,
+			userId,
+			request.baseVersion(),
+			request.drawingIds(),
 			sessionIdProvider.requireOwnedSession(websocketSessionId, principal)
 		)));
 	}

@@ -1,6 +1,7 @@
 package com.soomgil.global.config;
 
 import com.soomgil.auth.application.service.OAuthProperties;
+import com.soomgil.auth.infrastructure.persistence.UserMapper;
 import com.soomgil.global.security.JwtToCurrentUserAuthenticationConverter;
 import com.soomgil.global.security.ProblemDetailsAuthenticationEntryPoint;
 import com.soomgil.global.security.ProblemDetailsAccessDeniedHandler;
@@ -27,6 +28,11 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 @Configuration
 @EnableConfigurationProperties({CorsProperties.class, OAuthProperties.class})
 public class SecurityConfig {
+
+	@Bean
+	JwtToCurrentUserAuthenticationConverter jwtAuthenticationConverter(UserMapper userMapper) {
+		return new JwtToCurrentUserAuthenticationConverter(userMapper);
+	}
 
 	@Bean
 	SecurityFilterChain securityFilterChain(

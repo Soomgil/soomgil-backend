@@ -24,6 +24,7 @@ class ItineraryCompensationExecutorTest {
 	private static final UUID TRIP_ID = UUID.fromString("10000000-0000-0000-0000-000000000001");
 	private static final UUID USER_ID = UUID.fromString("20000000-0000-0000-0000-000000000001");
 	private static final UUID ITEM_ID = UUID.fromString("30000000-0000-0000-0000-000000000001");
+	private static final UUID SECOND_ITEM_ID = UUID.fromString("30000000-0000-0000-0000-000000000002");
 	private static final Instant NOW = Instant.parse("2026-06-18T00:00:00Z");
 
 	private final ItineraryCommandRepository repository = mock(ItineraryCommandRepository.class);
@@ -58,6 +59,20 @@ class ItineraryCompensationExecutorTest {
 		executor.execute(TRIP_ID, USER_ID, payload, NOW);
 
 		verify(repository).restoreItem(TRIP_ID, ITEM_ID, USER_ID, NOW);
+	}
+
+	@Test
+	void restoresAllDrawingsInSingleBatchCompensation() {
+		String payload = "{\"action\":\"RESTORE_MAP_DRAWINGS\",\"drawingIds\":[\""
+			+ ITEM_ID + "\",\"" + SECOND_ITEM_ID + "\"]}";
+		when(repository.restoreMapDrawing(TRIP_ID, ITEM_ID, USER_ID, NOW)).thenReturn(true);
+		when(repository.restoreMapDrawing(TRIP_ID, SECOND_ITEM_ID, USER_ID, NOW)).thenReturn(true);
+
+		assertThat(executor.supports(payload)).isTrue();
+		executor.execute(TRIP_ID, USER_ID, payload, NOW);
+
+		verify(repository).restoreMapDrawing(TRIP_ID, ITEM_ID, USER_ID, NOW);
+		verify(repository).restoreMapDrawing(TRIP_ID, SECOND_ITEM_ID, USER_ID, NOW);
 	}
 
 	@Test

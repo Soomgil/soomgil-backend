@@ -82,7 +82,7 @@ public class MapDrawingPreviewController {
 		catch (BusinessException exception) {
 			throw new AccessDeniedException("Trip member preview is required.", exception);
 		}
-		if (!allow(sessionId)) {
+		if ("UPDATE".equals(payload.get("phase")) && !allow(sessionId)) {
 			return;
 		}
 		Map<String, Object> message = new LinkedHashMap<>(payload);
@@ -99,7 +99,7 @@ public class MapDrawingPreviewController {
 			|| !(payload.get("sequence") instanceof Number sequence) || sequence.longValue() < 0
 			|| !(payload.get("phase") instanceof String phase)
 			|| !(phase.equals("UPDATE") || phase.equals("END") || phase.equals("CANCEL"))
-			|| !(payload.get("coordinates") instanceof List<?> coordinates) || coordinates.size() > 32
+			|| !(payload.get("coordinates") instanceof List<?> coordinates) || coordinates.size() > 100
 			|| !(payload.get("color") instanceof String color) || !color.matches("#[0-9a-fA-F]{6}")
 			|| !(payload.get("width") instanceof Number width) || !Double.isFinite(width.doubleValue())
 			|| width.doubleValue() <= 0 || width.doubleValue() > 40

@@ -46,20 +46,21 @@ class UpsertNoteCommandHandlerTest {
 
 		when(noteMapper.findByTripScopeDay(tripId, PlanningScopeType.TRIP, null))
 			.thenReturn(Optional.empty());
-		Note stubNote = new Note(UUID.randomUUID(), tripId, PlanningScopeType.TRIP, null, "본문", null);
+		when(noteMapper.insert(any(), any(), any(), any(), any(), any(), any())).thenReturn(1);
+		Note stubNote = new Note(UUID.randomUUID(), tripId, PlanningScopeType.TRIP, null, "본문", 1, null);
 		when(assembler.toNoteDto(any(NoteRecord.class))).thenReturn(stubNote);
 		PlanningMutationResponse stubResponse = new PlanningMutationResponse(
 			tripId, null, null, false, false, stubNote, null, null, null);
 		when(assembler.toMutationResponse(eq(tripId), any(Note.class))).thenReturn(stubResponse);
 
 		PlanningMutationResponse result = handler.handle(new UpsertNoteCommand(
-			tripId, actorId, PlanningScopeType.TRIP, null, "본문"
+			tripId, actorId, PlanningScopeType.TRIP, null, "본문", 0
 		));
 
 		assertThat(result).isSameAs(stubResponse);
 		verify(noteMapper).insert(any(UUID.class), eq(tripId), eq(PlanningScopeType.TRIP),
 			eq(null), eq("본문"), eq(actorId), any(Instant.class));
-		verify(noteMapper, never()).updateContent(any(), any(), any(), any());
+		verify(noteMapper, never()).updateContent(any(), any(), any(), any(), any(Long.class));
 		verify(accessChecker).requireMember(tripId, actorId);
 		verify(broadcaster).broadcast(any(PlanningRealtimeEvent.class));
 	}
@@ -71,22 +72,23 @@ class UpsertNoteCommandHandlerTest {
 		UUID actorId = UUID.randomUUID();
 		UUID noteId = UUID.randomUUID();
 		NoteRecord existing = new NoteRecord(noteId, tripId, PlanningScopeType.TRIP, null,
-			"이전 본문", actorId, actorId, null, null, Instant.now(), Instant.now());
+			"이전 본문", 3, actorId, actorId, null, null, Instant.now(), Instant.now());
 
 		when(noteMapper.findByTripScopeDay(tripId, PlanningScopeType.TRIP, null))
 			.thenReturn(Optional.of(existing));
-		Note stubNote = new Note(noteId, tripId, PlanningScopeType.TRIP, null, "새 본문", null);
+		when(noteMapper.updateContent(any(), any(), any(), any(), any(Long.class))).thenReturn(1);
+		Note stubNote = new Note(noteId, tripId, PlanningScopeType.TRIP, null, "새 본문", 4, null);
 		when(assembler.toNoteDto(any(NoteRecord.class))).thenReturn(stubNote);
 		PlanningMutationResponse stubResponse = new PlanningMutationResponse(
 			tripId, null, null, false, false, stubNote, null, null, null);
 		when(assembler.toMutationResponse(eq(tripId), any(Note.class))).thenReturn(stubResponse);
 
 		PlanningMutationResponse result = handler.handle(new UpsertNoteCommand(
-			tripId, actorId, PlanningScopeType.TRIP, null, "새 본문"
+			tripId, actorId, PlanningScopeType.TRIP, null, "새 본문", 3
 		));
 
 		assertThat(result).isSameAs(stubResponse);
-		verify(noteMapper).updateContent(eq(noteId), eq("새 본문"), eq(actorId), any(Instant.class));
+		verify(noteMapper).updateContent(eq(noteId), eq("새 본문"), eq(actorId), any(Instant.class), eq(3L));
 		verify(noteMapper, never()).insert(any(), any(), any(), any(), any(), any(), any());
 	}
 
@@ -97,14 +99,14 @@ class UpsertNoteCommandHandlerTest {
 		UUID actorId = UUID.randomUUID();
 
 		assertThatThrownBy(() -> handler.handle(new UpsertNoteCommand(
-			tripId, actorId, PlanningScopeType.DAY, null, "본문"
+			tripId, actorId, PlanningScopeType.DAY, null, "본문", 0
 		)))
 			.isInstanceOf(PlanningException.class)
 			.satisfies(ex -> assertThat(((PlanningException) ex).errorCode())
 				.isEqualTo(ErrorCode.PLANNING_SCOPE_DAY_MISMATCH));
 
 		verify(noteMapper, never()).insert(any(), any(), any(), any(), any(), any(), any());
-		verify(noteMapper, never()).updateContent(any(), any(), any(), any());
+		verify(noteMapper, never()).updateContent(any(), any(), any(), any(), any(Long.class));
 	}
 
 	@Test
@@ -115,10 +117,51 @@ class UpsertNoteCommandHandlerTest {
 		UUID dayId = UUID.randomUUID();
 
 		assertThatThrownBy(() -> handler.handle(new UpsertNoteCommand(
-			tripId, actorId, PlanningScopeType.TRIP, dayId, "본문"
+			tripId, actorId, PlanningScopeType.TRIP, dayId, "본문", 0
 		)))
 			.isInstanceOf(PlanningException.class)
 			.satisfies(ex -> assertThat(((PlanningException) ex).errorCode())
 				.isEqualTo(ErrorCode.PLANNING_SCOPE_DAY_MISMATCH));
+	}
+
+	@Test
+	@DisplayName("읽은 뒤 메모 버전이 바뀌었으면 덮어쓰지 않는다")
+	void rejectsStaleBaseVersion() {
+		UUID tripId = UUID.randomUUID();
+		UUID actorId = UUID.randomUUID();
+		UUID noteId = UUID.randomUUID();
+		NoteRecord existing = new NoteRecord(noteId, tripId, PlanningScopeType.TRIP, null,
+			"다른 멤버의 본문", 4, actorId, actorId, null, null, Instant.now(), Instant.now());
+		when(noteMapper.findByTripScopeDay(tripId, PlanningScopeType.TRIP, null))
+			.thenReturn(Optional.of(existing));
+		when(noteMapper.updateContent(any(), any(), any(), any(), eq(3L))).thenReturn(0);
+
+		assertThatThrownBy(() -> handler.handle(new UpsertNoteCommand(
+			tripId, actorId, PlanningScopeType.TRIP, null, "내 본문", 3
+		)))
+			.isInstanceOf(PlanningException.class)
+			.satisfies(ex -> assertThat(((PlanningException) ex).errorCode())
+				.isEqualTo(ErrorCode.PLANNING_VERSION_CONFLICT));
+
+		verify(broadcaster, never()).broadcast(any());
+	}
+
+	@Test
+	@DisplayName("같은 scope의 메모가 동시에 먼저 생성됐으면 충돌로 거절한다")
+	void rejectsConcurrentInsert() {
+		UUID tripId = UUID.randomUUID();
+		UUID actorId = UUID.randomUUID();
+		when(noteMapper.findByTripScopeDay(tripId, PlanningScopeType.TRIP, null))
+			.thenReturn(Optional.empty());
+		when(noteMapper.insert(any(), any(), any(), any(), any(), any(), any())).thenReturn(0);
+
+		assertThatThrownBy(() -> handler.handle(new UpsertNoteCommand(
+			tripId, actorId, PlanningScopeType.TRIP, null, "내 본문", 0
+		)))
+			.isInstanceOf(PlanningException.class)
+			.satisfies(ex -> assertThat(((PlanningException) ex).errorCode())
+				.isEqualTo(ErrorCode.PLANNING_VERSION_CONFLICT));
+
+		verify(broadcaster, never()).broadcast(any());
 	}
 }

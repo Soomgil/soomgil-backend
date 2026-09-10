@@ -170,6 +170,10 @@ class RemoveTripMemberHandlerTest {
 			this.removedByUserId = removedByUserId;
 			this.removedAt = removedAt;
 		}
+
+		@Override
+		public void departUserForAccountDeletion(UUID userId, Instant departedAt) {
+		}
 	}
 
 	private class StubTripQueryRepository implements TripQueryRepository {

@@ -43,7 +43,6 @@ public enum ErrorCode {
 	INVALID_PROFILE_IMAGE(HttpStatus.UNPROCESSABLE_ENTITY, "INVALID_PROFILE_IMAGE", "Profile image reference is invalid."),
 	INVALID_TIMEZONE(HttpStatus.UNPROCESSABLE_ENTITY, "INVALID_TIMEZONE", "Timezone is not supported."),
 	INVALID_DISPLAY_LANGUAGE(HttpStatus.UNPROCESSABLE_ENTITY, "INVALID_DISPLAY_LANGUAGE", "Display language is not supported."),
-	ACCOUNT_DELETION_BLOCKED_BY_ACTIVE_OWNER_TRIP(HttpStatus.CONFLICT, "ACCOUNT_DELETION_BLOCKED_BY_ACTIVE_OWNER_TRIP", "Active trip ownership blocks account deletion."),
 	PROFILE_NOT_FOUND(HttpStatus.NOT_FOUND, "PROFILE_NOT_FOUND", "User profile was not found."),
 	POST_NOT_FOUND(HttpStatus.NOT_FOUND, "POST_NOT_FOUND", "Community post was not found."),
 	POST_AUTHOR_REQUIRED(HttpStatus.FORBIDDEN, "POST_AUTHOR_REQUIRED", "Only the post author can perform this action."),

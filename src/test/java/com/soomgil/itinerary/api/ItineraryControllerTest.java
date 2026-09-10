@@ -372,6 +372,25 @@ class ItineraryControllerTest {
 	}
 
 	@Test
+	void deletesMapDrawingsAsSingleVersionedRequest() {
+		StubItineraryCommandRepository repository = new StubItineraryCommandRepository();
+		MapDrawingController controller = mapDrawingController(repository);
+		UUID secondDrawingId = UUID.fromString("60000000-0000-0000-0000-000000000002");
+
+		ItineraryMutationResponse result = controller.deleteBatch(
+			TRIP_ID,
+			"session-1",
+			new com.soomgil.itinerary.api.dto.DeleteMapDrawingsRequest(
+				0L, java.util.List.of(DRAWING_ID, secondDrawingId)
+			),
+			principal()
+		);
+
+		assertThat(result.itineraryVersion()).isEqualTo(1);
+		assertThat(repository.deletedDrawingId).isEqualTo(secondDrawingId);
+	}
+
+	@Test
 	void updatesMapDrawingResponse() {
 		StubItineraryCommandRepository repository = new StubItineraryCommandRepository();
 		MapDrawingController controller = mapDrawingController(repository);

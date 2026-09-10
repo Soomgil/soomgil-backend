@@ -2,7 +2,7 @@
  * 사용자 프로필/설정 도메인 모듈.
  *
  * <p>인증된 사용자 식별자를 기준으로 프로필({@code /me}, {@code /users/{userId}}),
- * 사용자 설정({@code /me/settings}), 계정 삭제 예약({@code DELETE /me}),
+ * 사용자 설정({@code /me/settings}), 즉시 계정 탈퇴({@code DELETE /me}),
  * 사용자 검색({@code /users}) 기능을 다룬다. 세션/보안 이벤트/팔로우 관계는 각각
  * {@code auth}, {@code social} 모듈에서 담당한다.
  *

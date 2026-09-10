@@ -1,12 +1,12 @@
 package com.soomgil.global.security;
 
+import com.soomgil.auth.infrastructure.persistence.UserMapper;
 import java.util.UUID;
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
 /**
@@ -18,12 +18,22 @@ import org.springframework.util.StringUtils;
  *
  * <p>이 converter는 JWT 검증 자체를 수행하지 않는다. 서명/만료/issuer 검증은 {@code JwtDecoder}가 담당한다.
  */
-@Component
 public class JwtToCurrentUserAuthenticationConverter implements Converter<Jwt, AbstractAuthenticationToken> {
+	private final UserMapper userMapper;
+
+	public JwtToCurrentUserAuthenticationConverter(UserMapper userMapper) {
+		this.userMapper = userMapper;
+	}
 
 	@Override
 	public AbstractAuthenticationToken convert(Jwt jwt) {
 		UUID userId = parseUserId(jwt.getSubject());
+		boolean accountCanLogin = userMapper.findById(userId)
+			.map(user -> user.canLogin())
+			.orElse(false);
+		if (!accountCanLogin) {
+			throw new BadCredentialsException("User account is not active");
+		}
 		String email = jwt.getClaimAsString("email");
 
 		CurrentUser currentUser = new CurrentUser(userId, email);

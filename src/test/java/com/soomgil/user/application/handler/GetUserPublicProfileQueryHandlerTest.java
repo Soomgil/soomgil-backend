@@ -17,6 +17,7 @@ import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import com.soomgil.social.infrastructure.persistence.UserFollowRecord;
 
 /**
  * {@link GetUserPublicProfileQueryHandler} 단위 테스트.
@@ -75,6 +76,23 @@ class GetUserPublicProfileQueryHandlerTest {
 		assertThat(result.displayName()).isEqualTo("현우");
 		assertThat(result.bio()).isNull();
 		assertThat(result.profileVisibility()).isEqualTo(UserProfileVisibility.PRIVATE);
+	}
+
+	@Test
+	@DisplayName("승인된 팔로워는 PRIVATE 프로필의 자기소개를 볼 수 있다")
+	void returnsPrivateProfileDetailForApprovedFollower() {
+		UUID viewerId = UUID.randomUUID();
+		UUID targetId = UUID.randomUUID();
+		when(mapper.findByUserId(targetId)).thenReturn(Optional.of(new UserProfileRecord(
+			targetId, "현우", null, null, "비공개 자기소개", UserProfileVisibility.PRIVATE
+		)));
+		when(userFollowMapper.find(viewerId, targetId)).thenReturn(Optional.of(new UserFollowRecord(
+			viewerId, targetId, "ACTIVE", java.time.Instant.now(), java.time.Instant.now()
+		)));
+
+		UserPublicProfile result = handler.handle(new GetUserPublicProfileQuery(viewerId, targetId));
+
+		assertThat(result.bio()).isEqualTo("비공개 자기소개");
 	}
 
 	@Test
