@@ -45,21 +45,22 @@ class DeleteNoteCommandHandlerTest {
 		UUID actorId = UUID.randomUUID();
 		UUID noteId = UUID.randomUUID();
 		NoteRecord existing = new NoteRecord(noteId, tripId, PlanningScopeType.TRIP, null,
-			"본문", actorId, actorId, null, null, Instant.now(), Instant.now());
+			"본문", 2, actorId, actorId, null, null, Instant.now(), Instant.now());
 
 		when(noteMapper.findById(noteId)).thenReturn(Optional.of(existing));
-		Note stubNote = new Note(noteId, tripId, PlanningScopeType.TRIP, null, "본문", null);
+		when(noteMapper.softDelete(any(), any(), any(), any(Long.class))).thenReturn(1);
+		Note stubNote = new Note(noteId, tripId, PlanningScopeType.TRIP, null, "본문", 3, null);
 		when(assembler.toNoteDto(any(NoteRecord.class))).thenReturn(stubNote);
 		PlanningMutationResponse stubResponse = new PlanningMutationResponse(
 			tripId, null, null, false, false, stubNote, null, null, null);
 		when(assembler.toMutationResponse(eq(tripId), any(Note.class))).thenReturn(stubResponse);
 
 		PlanningMutationResponse result = handler.handle(new DeleteNoteCommand(
-			tripId, noteId, actorId
+			tripId, noteId, actorId, 2
 		));
 
 		assertThat(result).isSameAs(stubResponse);
-		verify(noteMapper).softDelete(eq(noteId), eq(actorId), any());
+		verify(noteMapper).softDelete(eq(noteId), eq(actorId), any(), eq(2L));
 		verify(broadcaster).broadcast(any(PlanningRealtimeEvent.class));
 	}
 
@@ -72,12 +73,53 @@ class DeleteNoteCommandHandlerTest {
 		when(noteMapper.findById(noteId)).thenReturn(Optional.empty());
 
 		assertThatThrownBy(() -> handler.handle(new DeleteNoteCommand(
-			tripId, noteId, UUID.randomUUID()
+			tripId, noteId, UUID.randomUUID(), 1
 		)))
 			.isInstanceOf(PlanningException.class)
 			.satisfies(ex -> assertThat(((PlanningException) ex).errorCode())
 				.isEqualTo(ErrorCode.PLANNING_NOTE_NOT_FOUND));
 
-		verify(noteMapper, never()).softDelete(any(), any(), any());
+		verify(noteMapper, never()).softDelete(any(), any(), any(), any(Long.class));
+	}
+
+	@Test
+	@DisplayName("다른 여행방의 note 식별자로는 삭제할 수 없다")
+	void noteFromAnotherTripIsNotFound() {
+		UUID requestedTripId = UUID.randomUUID();
+		UUID noteId = UUID.randomUUID();
+		UUID actorId = UUID.randomUUID();
+		NoteRecord existing = new NoteRecord(noteId, UUID.randomUUID(), PlanningScopeType.TRIP, null,
+			"본문", 1, actorId, actorId, null, null, Instant.now(), Instant.now());
+		when(noteMapper.findById(noteId)).thenReturn(Optional.of(existing));
+
+		assertThatThrownBy(() -> handler.handle(new DeleteNoteCommand(
+			requestedTripId, noteId, actorId, 1
+		)))
+			.isInstanceOf(PlanningException.class)
+			.satisfies(ex -> assertThat(((PlanningException) ex).errorCode())
+				.isEqualTo(ErrorCode.PLANNING_NOTE_NOT_FOUND));
+
+		verify(noteMapper, never()).softDelete(any(), any(), any(), any(Long.class));
+	}
+
+	@Test
+	@DisplayName("읽은 뒤 메모 버전이 바뀌었으면 삭제하지 않는다")
+	void rejectsStaleBaseVersion() {
+		UUID tripId = UUID.randomUUID();
+		UUID noteId = UUID.randomUUID();
+		UUID actorId = UUID.randomUUID();
+		NoteRecord existing = new NoteRecord(noteId, tripId, PlanningScopeType.TRIP, null,
+			"본문", 3, actorId, actorId, null, null, Instant.now(), Instant.now());
+		when(noteMapper.findById(noteId)).thenReturn(Optional.of(existing));
+		when(noteMapper.softDelete(any(), any(), any(), eq(2L))).thenReturn(0);
+
+		assertThatThrownBy(() -> handler.handle(new DeleteNoteCommand(
+			tripId, noteId, actorId, 2
+		)))
+			.isInstanceOf(PlanningException.class)
+			.satisfies(ex -> assertThat(((PlanningException) ex).errorCode())
+				.isEqualTo(ErrorCode.PLANNING_VERSION_CONFLICT));
+
+		verify(broadcaster, never()).broadcast(any());
 	}
 }

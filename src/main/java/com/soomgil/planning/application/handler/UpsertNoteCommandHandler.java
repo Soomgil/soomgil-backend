@@ -8,7 +8,9 @@ import com.soomgil.planning.application.event.NoteUpsertedEvent;
 import com.soomgil.planning.application.service.PlanningAssembler;
 import com.soomgil.planning.application.service.PlanningEventBroadcaster;
 import com.soomgil.planning.application.service.TripMemberAccessChecker;
+import com.soomgil.global.error.ErrorCode;
 import com.soomgil.planning.domain.model.NoteRecord;
+import com.soomgil.planning.domain.model.PlanningException;
 import com.soomgil.planning.domain.policy.PlanningPolicy;
 import com.soomgil.planning.infrastructure.persistence.mapper.NoteMapper;
 import java.time.Instant;
@@ -21,7 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
  * {@link UpsertNoteCommand}를 처리한다.
  *
  * <p>{@code (tripId, scopeType, itineraryDayId)} 조합으로 활성 note가 있으면 UPDATE,
- * 없으면 새로 INSERT한다. DBML에 version 컬럼이 없으므로 optimistic lock은 수행하지 않는다.
+ * 없으면 새로 INSERT한다. 메모의 현재 version과 요청 baseVersion이 다르면 충돌로 거절한다.
  */
 @Component
 @Transactional
@@ -48,6 +50,9 @@ public class UpsertNoteCommandHandler implements CommandHandler<UpsertNoteComman
 	public PlanningMutationResponse handle(UpsertNoteCommand command) {
 		accessChecker.requireMember(command.tripId(), command.actorUserId());
 		PlanningPolicy.validateScopeDay(command.scopeType(), command.itineraryDayId());
+		if (command.baseVersion() < 0) {
+			throw new PlanningException(ErrorCode.PLANNING_VERSION_CONFLICT);
+		}
 
 		Instant now = Instant.now();
 		Optional<NoteRecord> existing = noteMapper.findByTripScopeDay(
@@ -55,18 +60,27 @@ public class UpsertNoteCommandHandler implements CommandHandler<UpsertNoteComman
 
 		NoteRecord record;
 		if (existing.isEmpty()) {
+			if (command.baseVersion() != 0) {
+				throw new PlanningException(ErrorCode.PLANNING_VERSION_CONFLICT);
+			}
 			UUID noteId = UUID.randomUUID();
-			noteMapper.insert(noteId, command.tripId(), command.scopeType(),
+			int inserted = noteMapper.insert(noteId, command.tripId(), command.scopeType(),
 				command.itineraryDayId(), command.content(), command.actorUserId(), now);
+			if (inserted != 1) {
+				throw new PlanningException(ErrorCode.PLANNING_VERSION_CONFLICT);
+			}
 			record = new NoteRecord(noteId, command.tripId(), command.scopeType(),
-				command.itineraryDayId(), command.content(),
+				command.itineraryDayId(), command.content(), 1,
 				command.actorUserId(), command.actorUserId(), null, null, now, now);
 		} else {
 			NoteRecord current = existing.get();
-			noteMapper.updateContent(current.id(), command.content(),
-				command.actorUserId(), now);
+			int updated = noteMapper.updateContent(current.id(), command.content(),
+				command.actorUserId(), now, command.baseVersion());
+			if (updated != 1) {
+				throw new PlanningException(ErrorCode.PLANNING_VERSION_CONFLICT);
+			}
 			record = new NoteRecord(current.id(), current.tripId(), current.scopeType(),
-				current.itineraryDayId(), command.content(),
+				current.itineraryDayId(), command.content(), command.baseVersion() + 1,
 				current.createdByUserId(), command.actorUserId(),
 				current.deletedByUserId(), current.deletedAt(), current.createdAt(), now);
 		}

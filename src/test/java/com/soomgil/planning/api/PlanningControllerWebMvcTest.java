@@ -114,7 +114,7 @@ class PlanningControllerWebMvcTest {
 	void getNoteReturns200() throws Exception {
 		UUID tripId = UUID.randomUUID();
 		UUID noteId = UUID.randomUUID();
-		Note stub = new Note(noteId, tripId, PlanningScopeType.TRIP, null, "본문", null);
+		Note stub = new Note(noteId, tripId, PlanningScopeType.TRIP, null, "본문", 1, null);
 		when(getNoteQueryHandler.findOptional(any())).thenReturn(java.util.Optional.of(stub));
 
 		mockMvc.perform(get("/api/v1/trips/{tripId}/planning/notes", tripId)
@@ -150,11 +150,11 @@ class PlanningControllerWebMvcTest {
 	void upsertNoteReturns200() throws Exception {
 		UUID tripId = UUID.randomUUID();
 		UUID noteId = UUID.randomUUID();
-		Note stub = new Note(noteId, tripId, PlanningScopeType.TRIP, null, "본문", null);
+		Note stub = new Note(noteId, tripId, PlanningScopeType.TRIP, null, "본문", 1, null);
 		when(upsertNoteCommandHandler.handle(any())).thenReturn(new PlanningMutationResponse(
 			tripId, null, null, false, false, stub, null, null, null));
 
-		UpsertNoteRequest body = new UpsertNoteRequest(PlanningScopeType.TRIP, null, "본문");
+		UpsertNoteRequest body = new UpsertNoteRequest(0L, PlanningScopeType.TRIP, null, "본문");
 
 		mockMvc.perform(put("/api/v1/trips/{tripId}/planning/notes", tripId)
 				.with(asUser())
@@ -165,14 +165,37 @@ class PlanningControllerWebMvcTest {
 	}
 
 	@Test
+	@DisplayName("PUT /planning/notes - baseVersion이 없으면 400")
+	void upsertNoteRequiresBaseVersion() throws Exception {
+		mockMvc.perform(put("/api/v1/trips/{tripId}/planning/notes", UUID.randomUUID())
+				.with(asUser())
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{\"scopeType\":\"TRIP\",\"content\":\"본문\"}"))
+			.andExpect(status().isBadRequest());
+	}
+
+	@Test
 	@DisplayName("DELETE /planning/notes/{noteId} - 204")
 	void deleteNoteReturns204() throws Exception {
 		UUID tripId = UUID.randomUUID();
 		UUID noteId = UUID.randomUUID();
 
 		mockMvc.perform(delete("/api/v1/trips/{tripId}/planning/notes/{noteId}", tripId, noteId)
-				.with(asUser()))
+				.with(asUser())
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{\"baseVersion\":1}"))
 			.andExpect(status().isNoContent());
+	}
+
+	@Test
+	@DisplayName("DELETE /planning/notes/{noteId} - baseVersion이 없으면 400")
+	void deleteNoteRequiresBaseVersion() throws Exception {
+		mockMvc.perform(delete("/api/v1/trips/{tripId}/planning/notes/{noteId}",
+				UUID.randomUUID(), UUID.randomUUID())
+				.with(asUser())
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{}"))
+			.andExpect(status().isBadRequest());
 	}
 
 	@Test

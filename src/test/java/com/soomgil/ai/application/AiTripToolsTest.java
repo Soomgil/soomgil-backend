@@ -16,13 +16,16 @@ import com.soomgil.place.api.dto.PlaceSourceStatus;
 import com.soomgil.place.api.dto.PlaceSummary;
 import com.soomgil.place.application.query.handler.PlaceSearchQueryHandler;
 import com.soomgil.planning.api.dto.Checklist;
+import com.soomgil.planning.api.dto.Note;
 import com.soomgil.planning.api.dto.PlanningMutationResponse;
 import com.soomgil.planning.api.dto.PlanningScopeType;
 import com.soomgil.planning.application.command.CreateChecklistItemCommand;
 import com.soomgil.planning.application.command.UpsertChecklistCommand;
 import com.soomgil.planning.application.handler.CreateChecklistItemCommandHandler;
+import com.soomgil.planning.application.handler.GetNoteQueryHandler;
 import com.soomgil.planning.application.handler.UpsertChecklistCommandHandler;
 import com.soomgil.planning.application.handler.UpsertNoteCommandHandler;
+import com.soomgil.planning.application.query.GetNoteQuery;
 import com.soomgil.preference.api.dto.PagedPlaceRecommendation;
 import com.soomgil.preference.api.dto.PlaceRecommendation;
 import com.soomgil.preference.api.dto.RecommendationTab;
@@ -31,6 +34,7 @@ import com.soomgil.preference.application.query.handler.ListPlaceRecommendations
 import java.net.URI;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -84,6 +88,29 @@ class AiTripToolsTest {
 
 		verify(itemHandler).handle(new com.soomgil.planning.application.command.CreateChecklistItemCommand(
 			tripId, checklistId, userId, "여권 챙기기", null
+		));
+	}
+
+	@Test
+	void writesANoteUsingTheLatestNoteVersion() {
+		UUID tripId = UUID.randomUUID();
+		UUID userId = UUID.randomUUID();
+		UUID noteId = UUID.randomUUID();
+		GetNoteQueryHandler noteQueryHandler = mock(GetNoteQueryHandler.class);
+		UpsertNoteCommandHandler noteHandler = mock(UpsertNoteCommandHandler.class);
+		when(noteQueryHandler.findOptional(new GetNoteQuery(
+			tripId, PlanningScopeType.TRIP, null, userId
+		))).thenReturn(Optional.of(new Note(
+			noteId, tripId, PlanningScopeType.TRIP, null, "기존 메모", 5, null
+		)));
+		AiNoteTools tools = new AiNoteTools(
+			request(tripId, userId), audit(), noteHandler, noteQueryHandler
+		);
+
+		tools.upsertNote(new AiNoteTools.ScopedTextInput("TRIP", null, "AI가 수정한 메모"));
+
+		verify(noteHandler).handle(new com.soomgil.planning.application.command.UpsertNoteCommand(
+			tripId, userId, PlanningScopeType.TRIP, null, "AI가 수정한 메모", 5
 		));
 	}
 
@@ -210,6 +237,7 @@ class AiTripToolsTest {
 		return new AiTripToolsFactory(
 			mock(FindItineraryHandler.class), mock(PlaceSearchQueryHandler.class),
 			mock(ListPlaceRecommendationsQueryHandler.class), mock(UpsertNoteCommandHandler.class),
+			mock(GetNoteQueryHandler.class),
 			mock(UpsertChecklistCommandHandler.class), mock(CreateChecklistItemCommandHandler.class),
 			mock(AiItineraryToolService.class), audit()
 		);

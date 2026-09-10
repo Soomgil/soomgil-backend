@@ -7,9 +7,9 @@ import java.util.UUID;
 /**
  * planning mutation 응답.
  *
- * <p>{@code itineraryVersion}은 collaboration 모듈 연동 전까지 stub(null).
- * DBML planning 스키마에는 version 컬럼이 없으므로 resource 단위 version은 노출하지 않는다.
- * collaboration 도입 시 상위 itinerary_version으로 채워진다.
+ * <p>메모와 체크리스트 변경은 MVP의 collaboration undo/redo 대상이 아니므로
+ * {@code itineraryVersion}/{@code commandEventId}는 null이고 undo/redo flag는 false다.
+ * 메모의 다음 변경 기준은 {@link Note#version()}으로 전달한다.
  */
 public record PlanningMutationResponse(
 	@NotNull
