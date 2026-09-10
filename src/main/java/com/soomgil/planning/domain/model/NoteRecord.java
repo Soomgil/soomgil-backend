@@ -16,6 +16,7 @@ import java.util.UUID;
  * @param scopeType 범위 (TRIP 또는 DAY)
  * @param itineraryDayId DAY scope인 경우 일차 식별자. TRIP scope이면 null
  * @param content 본문
+ * @param version 메모 단위 낙관적 잠금 버전
  * @param createdByUserId 최초 작성자
  * @param updatedByUserId 마지막 수정자
  * @param deletedByUserId 삭제자
@@ -29,6 +30,7 @@ public record NoteRecord(
 	PlanningScopeType scopeType,
 	UUID itineraryDayId,
 	String content,
+	long version,
 	UUID createdByUserId,
 	UUID updatedByUserId,
 	UUID deletedByUserId,

@@ -23,11 +23,11 @@ import org.springframework.stereotype.Component;
  * planning domain record를 API 응답 DTO로 조립한다.
  *
  * <p>member status의 {@link UserSummary}는 {@link FindDisplayNameQueryHandler}를 통해
-	 * auth 모듈의 application interface로 해결한다.
+ * auth 모듈의 application interface로 해결한다.
  *
  * <p>{@link PlanningMutationResponse}의 {@code itineraryVersion}/{@code commandEventId}/
- * {@code undoAvailable}/{@code redoAvailable}은 collaboration/itinerary 모듈 연동 전까지 stub.
- * DBML planning 스키마에는 version 컬럼이 없으므로 resource 단위 version은 노출하지 않는다.
+ * {@code undoAvailable}/{@code redoAvailable}은 메모·체크리스트 변경에는 적용하지 않는다.
+ * 메모의 낙관적 잠금 버전은 응답의 {@link Note#version()}으로 전달한다.
  */
 @Component
 public class PlanningAssembler {
@@ -51,6 +51,7 @@ public class PlanningAssembler {
 			record.scopeType(),
 			record.itineraryDayId(),
 			record.content(),
+			record.version(),
 			toOffsetDateTime(record.deletedAt())
 		);
 	}

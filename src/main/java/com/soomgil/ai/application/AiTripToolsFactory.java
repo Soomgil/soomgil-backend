@@ -3,6 +3,7 @@ package com.soomgil.ai.application;
 import com.soomgil.itinerary.application.query.handler.FindItineraryHandler;
 import com.soomgil.place.application.query.handler.PlaceSearchQueryHandler;
 import com.soomgil.planning.application.handler.CreateChecklistItemCommandHandler;
+import com.soomgil.planning.application.handler.GetNoteQueryHandler;
 import com.soomgil.planning.application.handler.UpsertChecklistCommandHandler;
 import com.soomgil.planning.application.handler.UpsertNoteCommandHandler;
 import com.soomgil.preference.application.query.handler.ListPlaceRecommendationsQueryHandler;
@@ -16,6 +17,7 @@ public class AiTripToolsFactory {
 	private final PlaceSearchQueryHandler placeSearchHandler;
 	private final ListPlaceRecommendationsQueryHandler recommendationHandler;
 	private final UpsertNoteCommandHandler noteHandler;
+	private final GetNoteQueryHandler noteQueryHandler;
 	private final UpsertChecklistCommandHandler checklistHandler;
 	private final CreateChecklistItemCommandHandler checklistItemHandler;
 	private final AiItineraryToolService itineraryToolService;
@@ -26,6 +28,7 @@ public class AiTripToolsFactory {
 		PlaceSearchQueryHandler placeSearchHandler,
 		ListPlaceRecommendationsQueryHandler recommendationHandler,
 		UpsertNoteCommandHandler noteHandler,
+		GetNoteQueryHandler noteQueryHandler,
 		UpsertChecklistCommandHandler checklistHandler,
 		CreateChecklistItemCommandHandler checklistItemHandler,
 		AiItineraryToolService itineraryToolService,
@@ -35,6 +38,7 @@ public class AiTripToolsFactory {
 		this.placeSearchHandler = placeSearchHandler;
 		this.recommendationHandler = recommendationHandler;
 		this.noteHandler = noteHandler;
+		this.noteQueryHandler = noteQueryHandler;
 		this.checklistHandler = checklistHandler;
 		this.checklistItemHandler = checklistItemHandler;
 		this.itineraryToolService = itineraryToolService;
@@ -48,7 +52,9 @@ public class AiTripToolsFactory {
 			case RECOMMEND_PLACES -> List.of(new AiPlaceRecommendationTools(
 				request, auditService, recommendationHandler
 			));
-			case WRITE_NOTE -> List.of(new AiNoteTools(request, auditService, noteHandler));
+			case WRITE_NOTE -> List.of(new AiNoteTools(
+				request, auditService, noteHandler, noteQueryHandler
+			));
 			case WRITE_CHECKLIST -> List.of(new AiChecklistTools(
 				request, auditService, checklistHandler, checklistItemHandler
 			));

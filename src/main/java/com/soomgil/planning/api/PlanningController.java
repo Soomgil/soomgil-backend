@@ -4,6 +4,7 @@ import com.soomgil.common.api.ApiControllerSupport;
 import com.soomgil.global.security.CurrentUser;
 import com.soomgil.planning.api.dto.Checklist;
 import com.soomgil.planning.api.dto.CreateChecklistItemRequest;
+import com.soomgil.planning.api.dto.DeleteNoteRequest;
 import com.soomgil.planning.api.dto.Note;
 import com.soomgil.planning.api.dto.PlanningMutationResponse;
 import com.soomgil.planning.api.dto.PlanningScopeType;
@@ -58,7 +59,8 @@ import org.springframework.web.bind.annotation.RestController;
  * 여행방 planning REST 엔드포인트.
  *
  * <p>note / checklist / checklist item / member status에 대한 CRUD를 노출한다.
- * DBML에 version 컬럼이 없으므로 resource 단위 optimistic lock은 수행하지 않는다.
+ * 메모는 리소스 version으로 낙관적 잠금을 수행한다. 체크리스트와 개인 완료 상태는
+ * MVP에서 last-write-wins 정책을 유지한다.
  * 권한은 handler 단에서 {@code TripMemberAccessChecker}로 검증한다.
  */
 @Validated
@@ -128,7 +130,8 @@ public class PlanningController extends ApiControllerSupport {
 			currentUser.userId(),
 			request.scopeType(),
 			request.itineraryDayId(),
-			request.content()
+			request.content(),
+			request.baseVersion()
 		));
 	}
 
@@ -137,10 +140,11 @@ public class PlanningController extends ApiControllerSupport {
 	public void deleteNote(
 		@PathVariable UUID tripId,
 		@PathVariable UUID noteId,
-		@AuthenticationPrincipal CurrentUser currentUser
+		@AuthenticationPrincipal CurrentUser currentUser,
+		@Valid @RequestBody DeleteNoteRequest request
 	) {
 		deleteNoteCommandHandler.handle(new DeleteNoteCommand(
-			tripId, noteId, currentUser.userId()
+			tripId, noteId, currentUser.userId(), request.baseVersion()
 		));
 	}
 

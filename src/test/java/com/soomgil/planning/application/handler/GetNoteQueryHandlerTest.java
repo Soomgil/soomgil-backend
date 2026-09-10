@@ -37,11 +37,11 @@ class GetNoteQueryHandlerTest {
 		UUID tripId = UUID.randomUUID();
 		UUID viewerId = UUID.randomUUID();
 		NoteRecord record = new NoteRecord(UUID.randomUUID(), tripId, PlanningScopeType.TRIP, null,
-			"본문", viewerId, viewerId, null, null, Instant.now(), Instant.now());
+			"본문", 2, viewerId, viewerId, null, null, Instant.now(), Instant.now());
 
 		when(noteMapper.findByTripScopeDay(tripId, PlanningScopeType.TRIP, null))
 			.thenReturn(Optional.of(record));
-		Note stubNote = new Note(record.id(), tripId, PlanningScopeType.TRIP, null, "본문", null);
+		Note stubNote = new Note(record.id(), tripId, PlanningScopeType.TRIP, null, "본문", 2, null);
 		when(assembler.toNoteDto(record)).thenReturn(stubNote);
 
 		Note result = handler.handle(new GetNoteQuery(tripId, PlanningScopeType.TRIP, null, viewerId));
