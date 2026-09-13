@@ -104,6 +104,8 @@ class AiTripToolsTest {
 			.containsExactly("deleteItineraryItem");
 		assertThat(toolNames(factory.create(request, AiIntent.MOVE_ITINERARY_ITEM)))
 			.containsExactly("moveItineraryItem");
+		assertThat(toolNames(factory.create(request, AiIntent.OPTIMIZE_ROUTE)))
+			.containsExactlyInAnyOrder("optimizeRoute", "connectDayRoutes");
 		assertThat(toolNames(factory.create(request, AiIntent.GENERAL_CHAT))).isEmpty();
 		assertThat(toolNames(factory.create(request, AiIntent.HELP))).isEmpty();
 		assertThat(toolNames(factory.create(request, AiIntent.AMBIGUOUS))).isEmpty();

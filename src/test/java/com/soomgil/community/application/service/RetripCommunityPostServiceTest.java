@@ -25,6 +25,7 @@ import com.soomgil.itinerary.api.dto.RouteMode;
 import com.soomgil.itinerary.api.dto.RouteSegment;
 import com.soomgil.itinerary.application.port.ItineraryCommandRepository;
 import com.soomgil.itinerary.application.port.ItineraryDayCreate;
+import com.soomgil.itinerary.application.port.RouteSegmentCreate;
 import com.soomgil.place.api.dto.PlaceSourceStatus;
 import com.soomgil.planning.api.dto.Checklist;
 import com.soomgil.planning.api.dto.ChecklistItem;
@@ -130,8 +131,8 @@ class RetripCommunityPostServiceTest {
 				)
 			),
 			List.of(new RouteSegment(
-				UUID.randomUUID(), sourceItemAId, sourceItemBId, RouteMode.DRIVING, "OSRM",
-				"car", GeometryFormat.GEOJSON, Map.of("type", "LineString", "coordinates", List.of()),
+				UUID.randomUUID(), sourceItemAId, sourceItemBId, RouteMode.CYCLING, "MAPBOX",
+				"mapbox/cycling", GeometryFormat.GEOJSON, Map.of("type", "LineString", "coordinates", List.of()),
 				1200.0, 600.0, 0.9
 			)),
 			List.of(
@@ -172,7 +173,11 @@ class RetripCommunityPostServiceTest {
 			.extracting(ItineraryDayCreate::date)
 			.containsExactly(LocalDate.of(2026, 6, 25), LocalDate.of(2026, 6, 26), null);
 		verify(itineraryRepository, times(3)).insertItem(any());
-		verify(itineraryRepository).insertRouteSegment(any());
+		ArgumentCaptor<RouteSegmentCreate> routeCaptor = ArgumentCaptor.forClass(RouteSegmentCreate.class);
+		verify(itineraryRepository).insertRouteSegment(routeCaptor.capture());
+		assertThat(routeCaptor.getValue().mode().name()).isEqualTo("CYCLING");
+		assertThat(routeCaptor.getValue().provider()).isEqualTo("MAPBOX");
+		assertThat(routeCaptor.getValue().providerProfile()).isEqualTo("mapbox/cycling");
 		verify(noteMapper, times(2)).insert(any(), any(), any(), any(), any(), eq(userId), any());
 		verify(checklistMapper).insert(any(), any(), eq(PlanningScopeType.DAY), any(), eq("준비물"), eq(userId), any());
 		verify(checklistItemMapper).insert(any(), any(), eq(1), eq("우산 챙기기"), eq(userId), any());

@@ -1,6 +1,7 @@
 package com.soomgil.ai.application;
 
 import com.soomgil.ai.api.dto.AiToolCall;
+import com.soomgil.itinerary.domain.model.RouteMode;
 import com.soomgil.planning.api.dto.PlanningMutationResponse;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -36,8 +37,8 @@ public class LocalFallbackAiGuideModel implements AiGuideModel {
 		else if (q.matches(".*(뭐할수있어|무엇을할수|사용법|기능알려|도와줄수|뭐도와줘).*")) {
 			intent = AiIntent.HELP;
 		}
-		else if (q.matches(".*(동선|이동경로|이동.*경로).*(최적화|정리|개선|재구성|짜줘|짜기)|"
-			+ ".*(최적화|개선|재구성).*(동선|이동경로|경로)|"
+		else if (q.matches(".*(동선|이동경로|이동.*경로|경로|길).*(최적화|정리|개선|재구성|짜줘|짜기|연결|이어)|"
+			+ ".*(최적화|개선|재구성|연결|이어).*(동선|이동경로|경로|길)|"
 			+ ".*가까운.*곳.*묶어|.*가까운.*곳.*같이|효율.*동선.*")) {
 			intent = AiIntent.OPTIMIZE_ROUTE;
 		}
@@ -213,6 +214,17 @@ public class LocalFallbackAiGuideModel implements AiGuideModel {
 
 	private AiGuideReply optimizeRoute(AiGuideRequest request, AiOptimizeRouteTools tools) {
 		if (request.tripContext() == null) return new AiGuideReply("정리할 일정 정보를 확인하지 못했어요.", List.of());
+		RouteMode requestedMode = requestedRouteMode(request.question());
+		if (requestedMode != null && isRouteConnectionRequest(request.question())) {
+			Integer dayNumber = dayNumber(request.question());
+			if (dayNumber == null) {
+				return new AiGuideReply("몇 일차 경로를 연결할지 알려주세요.", List.of());
+			}
+			tools.connectDayRoutes(new AiOptimizeRouteTools.ConnectDayRoutesInput(
+				request.baseVersion(), dayId(request), dayNumber, requestedMode
+			));
+			return new AiGuideReply(dayNumber + "일차 장소들을 " + routeModeLabel(requestedMode) + " 경로로 연결했어요.", tools.executedCalls());
+		}
 		List<AiItineraryToolService.ItemMove> moves = new ArrayList<>();
 		for (AiTripContext.DaySummary day : request.tripContext().days()) {
 			List<AiTripContext.ItemSummary> sorted = day.items().stream()
@@ -234,6 +246,27 @@ public class LocalFallbackAiGuideModel implements AiGuideModel {
 		}
 		tools.optimizeRoute(new AiOptimizeRouteTools.OptimizeRouteInput(request.baseVersion(), moves));
 		return new AiGuideReply("좌표가 있는 장소들을 기준으로 일차별 동선을 정리했어요.", tools.executedCalls());
+	}
+
+	private boolean isRouteConnectionRequest(String question) {
+		String normalized = normalize(question);
+		return normalized.matches(".*(연결|이어|이어서|길로|경로로).*");
+	}
+
+	private RouteMode requestedRouteMode(String question) {
+		String normalized = normalize(question);
+		if (normalized.matches(".*(자전거|바이크|bike|cycling).*")) return RouteMode.CYCLING;
+		if (normalized.matches(".*(도보|걷|걸어서|walk|walking).*")) return RouteMode.WALKING;
+		if (normalized.matches(".*(자동차|차량|운전|car|driving).*")) return RouteMode.DRIVING;
+		return null;
+	}
+
+	private String routeModeLabel(RouteMode mode) {
+		return switch (mode) {
+			case CYCLING -> "자전거";
+			case WALKING -> "도보";
+			case DRIVING -> "자동차";
+		};
 	}
 
 	private AiGuideReply writeNote(AiGuideRequest request, AiNoteTools tools) {
@@ -337,6 +370,11 @@ public class LocalFallbackAiGuideModel implements AiGuideModel {
 		return request.tripContext().days().stream()
 			.filter(day -> day.dayNumber() != null && day.dayNumber() == dayNumber)
 			.map(AiTripContext.DaySummary::id).findFirst().orElse(null);
+	}
+
+	private Integer dayNumber(String question) {
+		Matcher matcher = DAY_PATTERN.matcher(question == null ? "" : question);
+		return matcher.find() ? Integer.parseInt(matcher.group(1)) : null;
 	}
 
 	private String extractAfter(String question, String... markers) {
