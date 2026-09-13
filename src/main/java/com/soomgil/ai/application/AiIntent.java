@@ -7,6 +7,7 @@ public enum AiIntent {
 	AMBIGUOUS,
 	UNSUPPORTED,
 	READ_ITINERARY,
+	READ_PLANNING,
 	SEARCH_PLACES,
 	RECOMMEND_PLACES,
 	WRITE_NOTE,
@@ -18,20 +19,33 @@ public enum AiIntent {
 	SUMMARIZE_ITINERARY,
 	FILTER_PLACES_BY_CONDITION,
 	GENERATE_CHECKLIST_FROM_ITINERARY,
-	OPTIMIZE_ROUTE;
+	OPTIMIZE_ROUTE,
+	CONNECT_DAY_ROUTES,
+	MANAGE_ITINERARY_DAY;
 
 	public boolean usesReadTools() {
-		return this == READ_ITINERARY || this == SEARCH_PLACES || this == RECOMMEND_PLACES
-			|| this == SUMMARIZE_ITINERARY;
+		return risk() == AiIntentRisk.READ;
 	}
 
 	public boolean usesWriteTools() {
-		return this == WRITE_NOTE || this == WRITE_CHECKLIST
-			|| this == ADD_PLACE_TO_ITINERARY || this == ADD_RECOMMENDED_PLACES_TO_ITINERARY
-			|| this == DELETE_ITINERARY_ITEM
-			|| this == MOVE_ITINERARY_ITEM
-			|| this == FILTER_PLACES_BY_CONDITION
-			|| this == GENERATE_CHECKLIST_FROM_ITINERARY
-			|| this == OPTIMIZE_ROUTE;
+		return risk() == AiIntentRisk.REVERSIBLE || risk() == AiIntentRisk.DESTRUCTIVE;
+	}
+
+	/**
+	 * 잘못 분류되었을 때의 피해 크기.
+	 *
+	 * <p>안전 정책({@code AiChatService})이 실행 문턱을 정할 때 사용한다.
+	 */
+	public AiIntentRisk risk() {
+		return switch (this) {
+			case GENERAL_CHAT, HELP, AMBIGUOUS, UNSUPPORTED -> AiIntentRisk.NONE;
+			case READ_ITINERARY, READ_PLANNING, SEARCH_PLACES, RECOMMEND_PLACES, SUMMARIZE_ITINERARY ->
+				AiIntentRisk.READ;
+			case DELETE_ITINERARY_ITEM, FILTER_PLACES_BY_CONDITION -> AiIntentRisk.DESTRUCTIVE;
+			case WRITE_NOTE, WRITE_CHECKLIST, ADD_PLACE_TO_ITINERARY, ADD_RECOMMENDED_PLACES_TO_ITINERARY,
+				MOVE_ITINERARY_ITEM, GENERATE_CHECKLIST_FROM_ITINERARY, OPTIMIZE_ROUTE, CONNECT_DAY_ROUTES,
+				MANAGE_ITINERARY_DAY ->
+				AiIntentRisk.REVERSIBLE;
+		};
 	}
 }

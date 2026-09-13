@@ -32,6 +32,11 @@ import org.springframework.transaction.annotation.Transactional;
 public class AiChatService {
 
 	private static final List<String> SORT = List.of("createdAt,desc", "id,desc");
+	/** 이 아래면 분류기를 신뢰하지 않고 되묻는다. */
+	private static final double LOW_CONFIDENCE = 0.35;
+	/** 표현 근거가 없어도 삭제를 실행할 만큼 분류기가 확신한 기준. */
+	private static final double HIGH_CONFIDENCE = 0.75;
+
 	private final TripAccessGuard accessGuard;
 	private final AiChatMapper mapper;
 	private final AiGuideModel model;
@@ -110,15 +115,10 @@ public class AiChatService {
 		AiGuideRequest replyRequest = decision.intent().usesReadTools() || decision.intent().usesWriteTools()
 			? withTripContext(classificationRequest, contextService.load(tripId, userId))
 			: classificationRequest;
-		AiGuideReply reply = switch (decision.intent()) {
-			case READ_ITINERARY, SEARCH_PLACES, RECOMMEND_PLACES, SUMMARIZE_ITINERARY ->
-				model.replyWithReadTools(replyRequest, decision);
-			case WRITE_NOTE, WRITE_CHECKLIST, ADD_PLACE_TO_ITINERARY, ADD_RECOMMENDED_PLACES_TO_ITINERARY,
-					DELETE_ITINERARY_ITEM, MOVE_ITINERARY_ITEM,
-					FILTER_PLACES_BY_CONDITION, GENERATE_CHECKLIST_FROM_ITINERARY, OPTIMIZE_ROUTE ->
-				model.replyWithWriteTools(replyRequest, decision);
-			case GENERAL_CHAT, HELP, AMBIGUOUS, UNSUPPORTED ->
-				model.replyWithoutTools(replyRequest, decision);
+		AiGuideReply reply = switch (decision.intent().risk()) {
+			case READ -> model.replyWithReadTools(replyRequest, decision);
+			case REVERSIBLE, DESTRUCTIVE -> model.replyWithWriteTools(replyRequest, decision);
+			case NONE -> model.replyWithoutTools(replyRequest, decision);
 		};
 		String answer = AiPlainTextFormatter.format(reply.content());
 		if (decision.intent() == AiIntent.UNSUPPORTED
@@ -194,33 +194,73 @@ public class AiChatService {
 				"장소 이름 삭제 요청은 일정 장소 삭제 도구로 처리합니다."
 			);
 		}
+		// 저장된 내용을 묻는 질문이 생성 규칙에 걸려 항목을 새로 만들지 않도록 조회를 먼저 판정한다.
+		if (isPlanningReadRequest(normalized)) {
+			return decision.force(
+				AiIntent.READ_PLANNING,
+				"저장된 메모·체크리스트 내용을 묻는 질문은 조회로 처리합니다."
+			);
+		}
 		if (isChecklistGenerationRequest(normalized)) {
 			return decision.force(
 				AiIntent.GENERATE_CHECKLIST_FROM_ITINERARY,
 				"일정 기반 체크리스트 생성 요청은 자동 생성 도구로 처리합니다."
 			);
 		}
-		if ((decision.intent().usesReadTools() || decision.intent().usesWriteTools())
-			&& !hasExplicitIntentCue(decision.intent(), normalized)) {
-			return new AiIntentDecision(
-				AiIntent.AMBIGUOUS,
-				decision.confidence(),
-				"도구 실행에 필요한 명시적인 요청 표현이 없습니다.",
-				"조회하거나 변경하려는 내용을 조금 더 구체적으로 말씀해주시겠어요?"
+		// "4일차 추가해줘"는 장소 추가로 분류되기 쉬우나 일차 그룹을 만드는 요청이다.
+		if (isDayManagementRequest(normalized)) {
+			return decision.force(
+				AiIntent.MANAGE_ITINERARY_DAY,
+				"일차 자체를 늘리거나 고치는 요청은 일차 관리 도구로 처리합니다."
 			);
 		}
-		if (decision.confidence() < 0.55 && decision.intent() != AiIntent.GENERAL_CHAT
-			&& decision.intent() != AiIntent.HELP && decision.intent() != AiIntent.UNSUPPORTED) {
-			return new AiIntentDecision(
-				AiIntent.AMBIGUOUS,
-				decision.confidence(),
-				"분류 확신도가 낮아 실행하지 않습니다.",
-				decision.clarificationQuestion() == null
-					? "어떤 정보를 확인하거나 변경하고 싶은지 조금 더 구체적으로 알려주시겠어요?"
-					: decision.clarificationQuestion()
+		// 이동수단을 지정한 경로 연결은 순서 재배치(OPTIMIZE_ROUTE)와 결과가 전혀 다르므로 분리한다.
+		if (isRouteConnectionRequest(normalized)) {
+			return decision.force(
+				AiIntent.CONNECT_DAY_ROUTES,
+				"이동수단을 지정한 경로 연결 요청은 경로 연결 도구로 처리합니다."
 			);
 		}
-		return decision;
+		return applyRiskGate(decision, normalized);
+	}
+
+	/**
+	 * intent 위험도에 따라 실행 문턱을 다르게 적용한다.
+	 *
+	 * <p>예전에는 모든 도구 intent에 대해 하드코딩된 한국어 표현이 일치해야만 실행했다. 그 결과
+	 * 분류기가 정확히 맞혀도 표현이 조금만 달라지면 되묻기로 떨어져 기능이 동작하지 않는 것처럼
+	 * 보였다. 조회는 데이터를 바꾸지 않으므로 통과시키고, 되돌리기 부담이 큰 삭제 계열만
+	 * 표현 근거 또는 높은 확신도를 요구한다.
+	 */
+	private AiIntentDecision applyRiskGate(AiIntentDecision decision, String normalized) {
+		AiIntent intent = decision.intent();
+		double confidence = decision.confidence();
+		return switch (intent.risk()) {
+			case NONE -> decision;
+			// 조회는 잘못 분류돼도 데이터가 바뀌지 않는다. 되묻기보다 답을 주는 편이 낫다.
+			case READ -> confidence < LOW_CONFIDENCE
+				? clarify(decision, "조회 의도를 확신하지 못했습니다.")
+				: decision;
+			// 가역 변경은 undo가 가능하다. 표현 근거가 있으면 낮은 확신도라도 실행한다.
+			case REVERSIBLE -> confidence < LOW_CONFIDENCE && !hasExplicitIntentCue(intent, normalized)
+				? clarify(decision, "변경 의도를 확신하지 못했습니다.")
+				: decision;
+			// 삭제는 표현 근거가 있거나 분류기가 충분히 확신할 때만 실행한다.
+			case DESTRUCTIVE -> hasExplicitIntentCue(intent, normalized) || confidence >= HIGH_CONFIDENCE
+				? decision
+				: clarify(decision, "삭제 요청으로 단정하기에 근거가 부족합니다.");
+		};
+	}
+
+	private AiIntentDecision clarify(AiIntentDecision decision, String reason) {
+		return new AiIntentDecision(
+			AiIntent.AMBIGUOUS,
+			decision.confidence(),
+			reason,
+			decision.clarificationQuestion() == null
+				? "어떤 정보를 확인하거나 변경하고 싶은지 조금 더 구체적으로 알려주시겠어요?"
+				: decision.clarificationQuestion()
+		);
 	}
 
 	private boolean hasExplicitIntentCue(AiIntent intent, String question) {
@@ -242,27 +282,77 @@ public class AiChatService {
 			case MOVE_ITINERARY_ITEM -> question.matches(".*(옮겨|이동|재배치|순서.*바꿔).*");
 			case SUMMARIZE_ITINERARY -> question.matches(".*(요약|정리|분석|리뷰|코스.*봐줘|코스.*리뷰).*")
 				|| question.matches(".*(여행일정|여행.*일정|전체.*일정).*(어때|어떨까|봐줘).*");
-			case FILTER_PLACES_BY_CONDITION -> question.matches(".*(유료|무료|장애인|유모차|접근|휴무|닫은|폐업).*(빼|삭제|제거|없애).*")
-				|| question.matches(".*(빼|삭제|제거|없애).*(유료|무료|장애인|유모카|접근).*");
+			case READ_PLANNING -> question.matches(".*(체크리스트|준비물|메모).*(뭐|알려|보여|조회|확인|있어|남았).*")
+				|| question.matches(".*(보여|알려|조회|확인).*(체크리스트|준비물|메모).*");
+			case FILTER_PLACES_BY_CONDITION -> question.matches(".*(유료|무료|장애인|휠체어|유모차|접근|휴무|닫은|폐업|입장료).*(빼|삭제|제거|없애).*")
+				|| question.matches(".*(빼|삭제|제거|없애).*(유료|무료|장애인|휠체어|유모차|접근|입장료).*");
 			case GENERATE_CHECKLIST_FROM_ITINERARY -> question.matches(".*(체크리스트.*(자동|만들어|생성|추천|분석)|"
 				+ "준비물.*알려|필요.*준비|예약.*필요.*체크).*")
 				|| isChecklistGenerationRequest(question);
-			case OPTIMIZE_ROUTE -> question.matches(".*(동선.*최적화|최적화.*동선|가까운.*곳.*묶어|동선.*정리|"
-				+ "이동.*순서.*정리|효율.*동선).*");
+			case OPTIMIZE_ROUTE -> question.matches(".*(동선|이동순서|이동경로).*(최적화|정리|개선|재구성|짜|묶).*")
+				|| question.matches(".*(최적화|정리|개선|재구성|묶).*(동선|이동순서|이동경로).*")
+				|| question.matches(".*가까운.*(묶|같이|모아).*")
+				|| question.matches(".*효율.*동선.*");
+			case CONNECT_DAY_ROUTES -> isRouteConnectionRequest(question);
+			case MANAGE_ITINERARY_DAY -> isDayManagementRequest(question);
 			default -> false;
 		};
 	}
 
+	/**
+	 * 이동수단을 지정한 경로 연결 요청인지 판별한다.
+	 *
+	 * <p>"자전거로 2일차 이어줘"처럼 이동수단만 말하고 연결 동사를 생략하는 경우가 많아
+	 * 이동수단 표현 단독으로도 근거로 인정한다.
+	 */
+	/**
+	 * 일차 그룹 자체를 늘리거나 고치는 요청인지 판별한다.
+	 *
+	 * <p>장소 추가("2일차에 경복궁 넣어줘")와 구분해야 하므로, 일차를 가리키는 표현과
+	 * 생성·수정 동사가 함께 있고 장소 추가 표현이 없을 때만 인정한다.
+	 */
+	private boolean isDayManagementRequest(String question) {
+		boolean dayCreation = question.matches(".*\\d+일차.*(추가|만들|생성|늘려).*")
+			|| question.matches(".*(하루|일차).*(더|추가|만들|생성|늘려).*");
+		boolean dayEdit = question.matches(".*\\d+일차.*(이름|제목|날짜).*(바꿔|수정|변경|로).*")
+			|| question.matches(".*(이름|제목|날짜).*\\d+일차.*(바꿔|수정|변경).*");
+		return (dayCreation || dayEdit) && !question.matches(".*(장소|여행지|맛집|카페).*");
+	}
+
+	private boolean isRouteConnectionRequest(String question) {
+		boolean connectVerb = question.matches(".*(연결|이어|이어서|길로|경로로|루트).*");
+		boolean transportMode = question.matches(".*(자전거|바이크|bike|cycling|도보|걸어|걷|walk|자동차|차량|운전|car|driving).*");
+		return connectVerb && (transportMode || question.matches(".*(일차|일정|장소).*"))
+			|| transportMode && question.matches(".*(경로|길|동선|이동).*");
+	}
+
+	/**
+	 * 이미 저장된 메모·체크리스트 내용을 묻는 질문인지 판별한다.
+	 *
+	 * <p>"체크리스트에 뭐 있어?"는 조회인데 생성 규칙의 "알려"에 걸려 항목을 새로 만들어버리던 문제가
+	 * 있었다. 저장된 내용을 가리키는 표현이 있으면 생성보다 조회를 우선한다.
+	 */
+	private boolean isPlanningReadRequest(String question) {
+		// "메모에 ...라고 써줘"처럼 저장할 내용에 조회 표현이 섞여 있을 수 있어 쓰기 동사가 있으면 제외한다.
+		if (question.matches(".*(써줘|써|적어|작성|기록|저장|수정|바꿔|만들|생성|넣어).*")) {
+			return false;
+		}
+		return question.matches(".*(체크리스트|메모).*(뭐있|뭐가있|있는지|있어|있나|남았|보여|확인|어디까지).*")
+			|| question.matches(".*(보여|확인).*(체크리스트|메모).*");
+	}
+
 	private boolean isChecklistGenerationRequest(String question) {
-		return question.matches(".*(체크리스트|준비물).*(자동|만들|생성|추천|분석|작성|알려|짜).*")
+		if (isPlanningReadRequest(question)) {
+			return false;
+		}
+		return question.matches(".*(체크리스트|준비물).*(자동|만들|생성|추천|분석|작성|짜).*")
 			|| question.matches(".*(체크리스트|준비물).*(여행계획|여행|여행전|여행전준비|준비물).*(추가|넣어|작성).*")
 			|| question.matches(".*(여행계획|여행|여행전|여행전준비|준비물).*(체크리스트).*(추가|넣어|작성).*")
 			|| question.matches(".*체크리스트에.*(여행|여행전|준비물).*")
 			|| question.matches(".*(자동|분석).*(체크리스트|준비물).*")
 			|| question.matches(".*여행.*필요.*준비.*")
 			|| question.matches(".*예약.*필요.*체크.*")
-			|| question.matches(".*준비물.*뭐.*")
-			|| question.matches(".*체크리스트.*뭐.*");
+			|| question.matches(".*준비물.*뭐.*");
 	}
 
 	private boolean isRecommendedPlaceAddRequest(String question) {

@@ -23,7 +23,10 @@ import com.soomgil.itinerary.application.port.RouteCoordinate;
 import com.soomgil.itinerary.application.query.dto.FindItineraryQuery;
 import com.soomgil.itinerary.application.query.dto.ItineraryDayDetailView;
 import com.soomgil.itinerary.application.query.handler.FindItineraryHandler;
+import com.soomgil.itinerary.application.command.dto.UpdateItineraryDayCommand;
+import com.soomgil.itinerary.application.command.handler.UpdateItineraryDayHandler;
 import com.soomgil.itinerary.domain.model.ItineraryDayGroupType;
+import java.time.LocalDate;
 import com.soomgil.itinerary.domain.model.ItineraryItemType;
 import com.soomgil.itinerary.domain.model.RouteMode;
 import com.soomgil.global.error.BusinessException;
@@ -48,6 +51,7 @@ public class AiItineraryToolService {
 
 	private final FindItineraryHandler itineraryHandler;
 	private final CreateItineraryDayHandler createDayHandler;
+	private final UpdateItineraryDayHandler updateDayHandler;
 	private final CreateItineraryItemHandler createItemHandler;
 	private final DeleteItineraryItemHandler deleteItemHandler;
 	private final UpdateItineraryItemHandler updateItemHandler;
@@ -58,6 +62,7 @@ public class AiItineraryToolService {
 	public AiItineraryToolService(
 		FindItineraryHandler itineraryHandler,
 		CreateItineraryDayHandler createDayHandler,
+		UpdateItineraryDayHandler updateDayHandler,
 		CreateItineraryItemHandler createItemHandler,
 		DeleteItineraryItemHandler deleteItemHandler,
 		UpdateItineraryItemHandler updateItemHandler,
@@ -67,6 +72,7 @@ public class AiItineraryToolService {
 	) {
 		this.itineraryHandler = itineraryHandler;
 		this.createDayHandler = createDayHandler;
+		this.updateDayHandler = updateDayHandler;
 		this.createItemHandler = createItemHandler;
 		this.deleteItemHandler = deleteItemHandler;
 		this.updateItemHandler = updateItemHandler;
@@ -375,6 +381,81 @@ public class AiItineraryToolService {
 			created++;
 		}
 		return new ConnectDayRoutesResult(tripId, version, day.id(), day.dayNumber(), mode, created, updated, unchanged, last);
+	}
+
+	/**
+	 * 새 일차를 만든다.
+	 *
+	 * <p>{@code dayNumber}를 주지 않으면 기존 DAY 그룹의 최대 번호 다음으로 자동 배정한다.
+	 * 같은 번호가 이미 있으면 만들지 않고 기존 일차를 그대로 반환 대상으로 삼지 않고 예외를 던진다.
+	 *
+	 * @param dayNumber 만들 일차 번호. null이면 마지막 일차 다음 번호
+	 * @param date 일정 날짜. null 허용
+	 * @param title 일차 제목. null이면 "{n}일차"
+	 */
+	@Transactional
+	public ItineraryMutationResult createDay(
+		UUID tripId,
+		UUID userId,
+		long baseVersion,
+		Integer dayNumber,
+		LocalDate date,
+		String title
+	) {
+		var itinerary = itineraryHandler.handle(new FindItineraryQuery(tripId, userId));
+		int resolvedNumber = dayNumber != null ? dayNumber : nextDayNumber(itinerary);
+		if (resolvedNumber < 1) {
+			throw new BusinessException(ErrorCode.VALIDATION_FAILED, "일차 번호는 1 이상이어야 해요.");
+		}
+		boolean duplicated = itinerary.days().stream()
+			.anyMatch(day -> day.dayNumber() != null && day.dayNumber() == resolvedNumber);
+		if (duplicated) {
+			throw new BusinessException(ErrorCode.VALIDATION_FAILED, resolvedNumber + "일차는 이미 있어요.");
+		}
+		return createDayHandler.handle(new CreateItineraryDayCommand(
+			tripId, userId, baseVersion, ItineraryDayGroupType.DAY,
+			resolvedNumber, date,
+			title == null || title.isBlank() ? resolvedNumber + "일차" : title,
+			resolvedNumber
+		));
+	}
+
+	/**
+	 * 기존 일차의 제목이나 날짜를 바꾼다.
+	 *
+	 * <p>{@code itineraryDayId}가 없으면 {@code dayNumber}로 일차를 찾는다. 둘 다 없으면 예외를 던진다.
+	 * null로 전달한 항목은 변경하지 않는다.
+	 */
+	@Transactional
+	public ItineraryMutationResult updateDay(
+		UUID tripId,
+		UUID userId,
+		long baseVersion,
+		UUID itineraryDayId,
+		Integer dayNumber,
+		LocalDate date,
+		String title
+	) {
+		if (itineraryDayId == null && dayNumber == null) {
+			throw new BusinessException(ErrorCode.VALIDATION_FAILED, "어떤 일차를 바꿀지 알려주세요.");
+		}
+		var itinerary = itineraryHandler.handle(new FindItineraryQuery(tripId, userId));
+		ItineraryDayDetailView day = resolveDay(itinerary, itineraryDayId, dayNumber);
+		if (date == null && (title == null || title.isBlank())) {
+			throw new BusinessException(ErrorCode.VALIDATION_FAILED, "바꿀 제목이나 날짜를 알려주세요.");
+		}
+		return updateDayHandler.handle(new UpdateItineraryDayCommand(
+			tripId, userId, baseVersion, day.id(),
+			day.dayNumber(), date, title == null || title.isBlank() ? null : title, null
+		));
+	}
+
+	private int nextDayNumber(com.soomgil.itinerary.application.query.dto.ItineraryView itinerary) {
+		return itinerary.days().stream()
+			.filter(day -> day.groupType() == ItineraryDayGroupType.DAY && day.dayNumber() != null)
+			.mapToInt(ItineraryDayDetailView::dayNumber)
+			.max()
+			.orElse(0) + 1;
 	}
 
 	private ItineraryDayDetailView resolveDay(

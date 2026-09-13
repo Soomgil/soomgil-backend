@@ -37,6 +37,9 @@ public class LocalFallbackAiGuideModel implements AiGuideModel {
 		else if (q.matches(".*(뭐할수있어|무엇을할수|사용법|기능알려|도와줄수|뭐도와줘).*")) {
 			intent = AiIntent.HELP;
 		}
+		else if (requestedRouteMode(request.question()) != null && isRouteConnectionRequest(request.question())) {
+			intent = AiIntent.CONNECT_DAY_ROUTES;
+		}
 		else if (q.matches(".*(동선|이동경로|이동.*경로|경로|길).*(최적화|정리|개선|재구성|짜줘|짜기|연결|이어)|"
 			+ ".*(최적화|개선|재구성|연결|이어).*(동선|이동경로|경로|길)|"
 			+ ".*가까운.*곳.*묶어|.*가까운.*곳.*같이|효율.*동선.*")) {
@@ -81,6 +84,10 @@ public class LocalFallbackAiGuideModel implements AiGuideModel {
 		else if (q.matches(".*(찾아|검색|어디있|장소알려).*")) {
 			intent = AiIntent.SEARCH_PLACES;
 		}
+		else if (q.matches(".*(체크리스트|준비물|메모).*(뭐|알려|보여|조회|확인|있어|남았).*|"
+			+ ".*(보여|알려|조회|확인).*(체크리스트|준비물|메모).*")) {
+			intent = AiIntent.READ_PLANNING;
+		}
 		else if (q.matches(".*(일정|일차|동선|경로).*(보여|조회|알려|확인|어떻게|뭐야).*|"
 			+ ".*(보여|조회|알려|확인).*(일정|일차|동선|경로).*")) {
 			intent = AiIntent.READ_ITINERARY;
@@ -94,8 +101,9 @@ public class LocalFallbackAiGuideModel implements AiGuideModel {
 	@Override
 	public AiGuideReply replyWithoutTools(AiGuideRequest request, AiIntentDecision decision) {
 		String answer = switch (decision.intent()) {
-			case HELP -> "일정 조회·요약, 장소 검색·추천, 공동 메모·체크리스트 작성, 일정 장소 추가·이동, "
-				+ "조건(유료/접근성) 기반 장소 삭제, 체크리스트 자동 생성, 동선 최적화까지 도와드릴 수 있어요. "
+			case HELP -> "일정 조회·요약, 장소 검색·추천, 공동 메모·체크리스트 작성과 조회, 일정 장소 추가·이동, "
+				+ "조건(유료/접근성) 기반 장소 삭제, 체크리스트 자동 생성, 동선 최적화, "
+				+ "도보·자전거·자동차 경로 연결까지 도와드릴 수 있어요. "
 				+ "원하시는 작업을 편하게 말씀해주세요.";
 			case AMBIGUOUS -> decision.clarificationQuestion() == null
 				? "어떤 여행 정보를 확인하거나 변경하고 싶은지 조금 더 구체적으로 알려주시겠어요?"
@@ -115,6 +123,9 @@ public class LocalFallbackAiGuideModel implements AiGuideModel {
 			AiExecutableTools executable = toolsFactory.create(request, decision.intent()).getFirst();
 			Object result = switch (decision.intent()) {
 				case READ_ITINERARY -> ((AiItineraryReadTools) executable).getCurrentItinerary();
+				case READ_PLANNING -> ((AiPlanningReadTools) executable).getChecklists(
+					new AiPlanningReadTools.ChecklistScopeInput(null)
+				);
 				case SUMMARIZE_ITINERARY -> ((AiSummarizeItineraryTools) executable).summarizeItinerary();
 				case SEARCH_PLACES -> ((AiPlaceSearchTools) executable).searchPlaces(
 					new AiPlaceSearchTools.SearchPlacesInput(request.question(), viewport(request), null, null)
@@ -155,9 +166,10 @@ public class LocalFallbackAiGuideModel implements AiGuideModel {
 					"정확한 장소 정보가 필요해요. 먼저 장소를 검색하거나 추천받은 뒤 추가할 장소와 일차를 지정해주세요.",
 					List.of()
 				);
+				case MANAGE_ITINERARY_DAY -> manageDay(request, (AiItineraryDayTools) executable);
 				case FILTER_PLACES_BY_CONDITION -> filterPlaces(request, (AiFilterPlacesTools) executable);
 				case GENERATE_CHECKLIST_FROM_ITINERARY -> generateChecklist(request, (AiGenerateChecklistTools) executable);
-				case OPTIMIZE_ROUTE -> optimizeRoute(request, (AiOptimizeRouteTools) executable);
+				case OPTIMIZE_ROUTE, CONNECT_DAY_ROUTES -> optimizeRoute(request, (AiOptimizeRouteTools) executable);
 				default -> replyWithoutTools(request, decision);
 			};
 		}
@@ -210,6 +222,22 @@ public class LocalFallbackAiGuideModel implements AiGuideModel {
 			List.of("교통편 확인하기", "영업시간 확인하기", "보조배터리 챙기기"), null
 		));
 		return new AiGuideReply("현재 일정 기준으로 여행방 전체 체크리스트를 자동 생성했어요.", tools.executedCalls());
+	}
+
+	/** LLM 없이 일차를 추가한다. 제목·날짜 수정은 표현 해석이 필요해 되묻는다. */
+	private AiGuideReply manageDay(AiGuideRequest request, AiItineraryDayTools tools) {
+		String q = normalize(request.question());
+		if (!q.matches(".*(추가|만들|생성|늘려|더).*")) {
+			return new AiGuideReply("몇 일차를 어떻게 바꿀지 알려주세요.", List.of());
+		}
+		Integer dayNumber = dayNumber(request.question());
+		tools.createItineraryDay(new AiItineraryDayTools.CreateDayInput(
+			request.baseVersion(), dayNumber, null, null
+		));
+		return new AiGuideReply(
+			dayNumber == null ? "일정에 새 일차를 추가했어요." : dayNumber + "일차를 추가했어요.",
+			tools.executedCalls()
+		);
 	}
 
 	private AiGuideReply optimizeRoute(AiGuideRequest request, AiOptimizeRouteTools tools) {

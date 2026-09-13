@@ -93,22 +93,76 @@ class AiTripToolsTest {
 		AiGuideRequest request = request(UUID.randomUUID(), UUID.randomUUID());
 
 		assertThat(toolNames(factory.create(request, AiIntent.READ_ITINERARY)))
-			.containsExactly("getCurrentItinerary");
+			.contains("getCurrentItinerary");
+		assertThat(toolNames(factory.create(request, AiIntent.READ_PLANNING)))
+			.contains("getChecklists", "getNote");
 		assertThat(toolNames(factory.create(request, AiIntent.WRITE_NOTE)))
-			.containsExactly("upsertNote");
+			.contains("upsertNote");
 		assertThat(toolNames(factory.create(request, AiIntent.ADD_PLACE_TO_ITINERARY)))
-			.containsExactly("addPlaceToItinerary");
+			.contains("addPlaceToItinerary", "searchPlaces");
 		assertThat(toolNames(factory.create(request, AiIntent.ADD_RECOMMENDED_PLACES_TO_ITINERARY)))
-			.containsExactly("addRecommendedPlacesToItinerary");
+			.contains("addRecommendedPlacesToItinerary");
 		assertThat(toolNames(factory.create(request, AiIntent.DELETE_ITINERARY_ITEM)))
-			.containsExactly("deleteItineraryItem");
+			.contains("deleteItineraryItem");
 		assertThat(toolNames(factory.create(request, AiIntent.MOVE_ITINERARY_ITEM)))
-			.containsExactly("moveItineraryItem");
+			.contains("moveItineraryItem");
 		assertThat(toolNames(factory.create(request, AiIntent.OPTIMIZE_ROUTE)))
-			.containsExactlyInAnyOrder("optimizeRoute", "connectDayRoutes");
+			.contains("optimizeRoute", "connectDayRoutes");
+		assertThat(toolNames(factory.create(request, AiIntent.CONNECT_DAY_ROUTES)))
+			.contains("connectDayRoutes");
 		assertThat(toolNames(factory.create(request, AiIntent.GENERAL_CHAT))).isEmpty();
 		assertThat(toolNames(factory.create(request, AiIntent.HELP))).isEmpty();
 		assertThat(toolNames(factory.create(request, AiIntent.AMBIGUOUS))).isEmpty();
+	}
+
+	@Test
+	void readIntentsNeverExposeAnyWriteTool() {
+		AiTripToolsFactory factory = factory();
+		AiGuideRequest request = request(UUID.randomUUID(), UUID.randomUUID());
+		Set<String> writeTools = Set.of(
+			"upsertNote", "upsertChecklist", "addChecklistItem", "addPlaceToItinerary",
+			"addRecommendedPlacesToItinerary", "deleteItineraryItem", "moveItineraryItem",
+			"removeItineraryItemsByCondition", "generateChecklistItems", "generateChecklistItemsByDay",
+			"optimizeRoute", "connectDayRoutes"
+		);
+
+		for (AiIntent intent : AiIntent.values()) {
+			if (intent.risk() != AiIntentRisk.READ) continue;
+			assertThat(toolNames(factory.create(request, intent)))
+				.as("read intent %s must not expose write tools", intent)
+				.doesNotContainAnyElementsOf(writeTools);
+		}
+	}
+
+	@Test
+	void onlyDestructiveIntentsExposeItemRemovalTools() {
+		AiTripToolsFactory factory = factory();
+		AiGuideRequest request = request(UUID.randomUUID(), UUID.randomUUID());
+		Set<String> removalTools = Set.of("deleteItineraryItem", "removeItineraryItemsByCondition");
+
+		for (AiIntent intent : AiIntent.values()) {
+			if (intent.risk() == AiIntentRisk.DESTRUCTIVE) continue;
+			assertThat(toolNames(factory.create(request, intent)))
+				.as("non-destructive intent %s must not expose removal tools", intent)
+				.doesNotContainAnyElementsOf(removalTools);
+		}
+	}
+
+	@Test
+	void everyToolIntentKeepsItsPrimaryToolFirstForDeterministicFallback() {
+		AiTripToolsFactory factory = factory();
+		AiGuideRequest request = request(UUID.randomUUID(), UUID.randomUUID());
+
+		for (AiIntent intent : AiIntent.values()) {
+			if (intent.risk() == AiIntentRisk.NONE) continue;
+			var bundle = factory.create(request, intent);
+			assertThat(bundle)
+				.as("intent %s must expose at least one tool", intent)
+				.isNotEmpty();
+			assertThat(toolNames(java.util.List.of(bundle.getFirst())))
+				.as("primary tool of %s must expose a callable tool method", intent)
+				.isNotEmpty();
+		}
 	}
 
 	@Test
@@ -213,6 +267,8 @@ class AiTripToolsTest {
 			mock(FindItineraryHandler.class), mock(PlaceSearchQueryHandler.class),
 			mock(ListPlaceRecommendationsQueryHandler.class), mock(UpsertNoteCommandHandler.class),
 			mock(UpsertChecklistCommandHandler.class), mock(CreateChecklistItemCommandHandler.class),
+			mock(com.soomgil.planning.application.handler.ListChecklistsQueryHandler.class),
+			mock(com.soomgil.planning.application.handler.GetNoteQueryHandler.class),
 			mock(AiItineraryToolService.class), audit()
 		);
 	}

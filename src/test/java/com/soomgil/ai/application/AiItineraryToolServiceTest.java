@@ -1,8 +1,10 @@
 package com.soomgil.ai.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -21,6 +23,7 @@ import com.soomgil.itinerary.application.command.handler.CreateItineraryItemHand
 import com.soomgil.itinerary.application.command.handler.DeleteItineraryItemHandler;
 import com.soomgil.itinerary.application.command.handler.MapMatchRouteHandler;
 import com.soomgil.itinerary.application.command.handler.ReorderItineraryHandler;
+import com.soomgil.itinerary.application.command.handler.UpdateItineraryDayHandler;
 import com.soomgil.itinerary.application.command.handler.UpdateItineraryItemHandler;
 import com.soomgil.itinerary.application.command.handler.UpdateRouteSegmentHandler;
 import com.soomgil.itinerary.application.query.dto.FindItineraryQuery;
@@ -100,7 +103,7 @@ class AiItineraryToolServiceTest {
 		));
 
 		new AiItineraryToolService(
-			itineraryHandler, dayHandler, itemHandler,
+			itineraryHandler, dayHandler, mock(UpdateItineraryDayHandler.class), itemHandler,
 			mock(DeleteItineraryItemHandler.class), mock(UpdateItineraryItemHandler.class),
 			mock(ReorderItineraryHandler.class), mock(MapMatchRouteHandler.class),
 			mock(UpdateRouteSegmentHandler.class)
@@ -144,7 +147,8 @@ class AiItineraryToolServiceTest {
 			Map.of()
 		));
 		AiItineraryToolService service = new AiItineraryToolService(
-			itineraryHandler, mock(CreateItineraryDayHandler.class), mock(CreateItineraryItemHandler.class),
+			itineraryHandler, mock(CreateItineraryDayHandler.class), mock(UpdateItineraryDayHandler.class),
+			mock(CreateItineraryItemHandler.class),
 			mock(DeleteItineraryItemHandler.class), mock(UpdateItineraryItemHandler.class),
 			mock(ReorderItineraryHandler.class), mapMatchRouteHandler, mock(UpdateRouteSegmentHandler.class)
 		);
@@ -188,7 +192,8 @@ class AiItineraryToolServiceTest {
 			tripId, 8L, null, null, route(routeId, firstId, secondId, RouteMode.CYCLING), null, List.of(routeId)
 		));
 		AiItineraryToolService service = new AiItineraryToolService(
-			itineraryHandler, mock(CreateItineraryDayHandler.class), mock(CreateItineraryItemHandler.class),
+			itineraryHandler, mock(CreateItineraryDayHandler.class), mock(UpdateItineraryDayHandler.class),
+			mock(CreateItineraryItemHandler.class),
 			mock(DeleteItineraryItemHandler.class), mock(UpdateItineraryItemHandler.class),
 			mock(ReorderItineraryHandler.class), mock(MapMatchRouteHandler.class), updateRouteSegmentHandler
 		);
@@ -204,12 +209,78 @@ class AiItineraryToolServiceTest {
 		assertThat(result.versionAfter()).isEqualTo(8L);
 	}
 
+	@Test
+	void createDayAssignsTheNextDayNumberWhenTheCallerDoesNotSpecifyOne() {
+		UUID tripId = UUID.randomUUID();
+		UUID userId = UUID.randomUUID();
+		FindItineraryHandler itineraryHandler = mock(FindItineraryHandler.class);
+		CreateItineraryDayHandler dayHandler = mock(CreateItineraryDayHandler.class);
+		when(itineraryHandler.handle(new FindItineraryQuery(tripId, userId))).thenReturn(new ItineraryView(
+			tripId, 7L,
+			List.of(
+				day(tripId, 1), day(tripId, 2),
+				new ItineraryDayDetailView(
+					UUID.randomUUID(), tripId, ItineraryDayGroupType.UNSCHEDULED,
+					null, null, "일차 미정", 0, List.of()
+				)
+			),
+			List.of(), List.of()
+		));
+		when(dayHandler.handle(any(CreateItineraryDayCommand.class))).thenReturn(new ItineraryMutationResult(
+			tripId, 8L, null, null, null, null, List.of()
+		));
+
+		new AiItineraryToolService(
+			itineraryHandler, dayHandler, mock(UpdateItineraryDayHandler.class),
+			mock(CreateItineraryItemHandler.class),
+			mock(DeleteItineraryItemHandler.class), mock(UpdateItineraryItemHandler.class),
+			mock(ReorderItineraryHandler.class), mock(MapMatchRouteHandler.class),
+			mock(UpdateRouteSegmentHandler.class)
+		).createDay(tripId, userId, 7L, null, null, null);
+
+		ArgumentCaptor<CreateItineraryDayCommand> captor = ArgumentCaptor.forClass(CreateItineraryDayCommand.class);
+		verify(dayHandler).handle(captor.capture());
+		assertThat(captor.getValue().dayNumber()).isEqualTo(3);
+		assertThat(captor.getValue().groupType()).isEqualTo(ItineraryDayGroupType.DAY);
+		assertThat(captor.getValue().title()).isEqualTo("3일차");
+	}
+
+	@Test
+	void createDayRejectsADayNumberThatAlreadyExists() {
+		UUID tripId = UUID.randomUUID();
+		UUID userId = UUID.randomUUID();
+		FindItineraryHandler itineraryHandler = mock(FindItineraryHandler.class);
+		CreateItineraryDayHandler dayHandler = mock(CreateItineraryDayHandler.class);
+		when(itineraryHandler.handle(new FindItineraryQuery(tripId, userId))).thenReturn(new ItineraryView(
+			tripId, 7L, List.of(day(tripId, 1), day(tripId, 2)), List.of(), List.of()
+		));
+		AiItineraryToolService service = new AiItineraryToolService(
+			itineraryHandler, dayHandler, mock(UpdateItineraryDayHandler.class),
+			mock(CreateItineraryItemHandler.class),
+			mock(DeleteItineraryItemHandler.class), mock(UpdateItineraryItemHandler.class),
+			mock(ReorderItineraryHandler.class), mock(MapMatchRouteHandler.class),
+			mock(UpdateRouteSegmentHandler.class)
+		);
+
+		assertThatThrownBy(() -> service.createDay(tripId, userId, 7L, 2, null, null))
+			.isInstanceOf(com.soomgil.global.error.BusinessException.class);
+		verify(dayHandler, never()).handle(any(CreateItineraryDayCommand.class));
+	}
+
+	private ItineraryDayDetailView day(UUID tripId, int dayNumber) {
+		return new ItineraryDayDetailView(
+			UUID.randomUUID(), tripId, ItineraryDayGroupType.DAY,
+			dayNumber, null, dayNumber + "일차", dayNumber, List.of()
+		);
+	}
+
 	private AiItineraryToolService service(
 		FindItineraryHandler itineraryHandler,
 		ReorderItineraryHandler reorderHandler
 	) {
 		return new AiItineraryToolService(
-			itineraryHandler, mock(CreateItineraryDayHandler.class), mock(CreateItineraryItemHandler.class),
+			itineraryHandler, mock(CreateItineraryDayHandler.class), mock(UpdateItineraryDayHandler.class),
+			mock(CreateItineraryItemHandler.class),
 			mock(DeleteItineraryItemHandler.class), mock(UpdateItineraryItemHandler.class), reorderHandler,
 			mock(MapMatchRouteHandler.class), mock(UpdateRouteSegmentHandler.class)
 		);

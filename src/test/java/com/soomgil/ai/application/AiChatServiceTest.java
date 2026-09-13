@@ -246,6 +246,133 @@ class AiChatServiceTest {
 		verify(model, never()).replyWithoutTools(any(), any());
 	}
 
+	@Test
+	void askingWhatIsInTheChecklistReadsInsteadOfGeneratingNewItems() {
+		stubAssistant("체크리스트에 3개 항목이 있어요.");
+		when(model.classify(any())).thenReturn(decision(AiIntent.GENERATE_CHECKLIST_FROM_ITINERARY));
+		when(model.replyWithReadTools(any(), any())).thenReturn(
+			new AiGuideReply("체크리스트에 3개 항목이 있어요.", List.of())
+		);
+
+		service.createMessage(tripId, userId, "체크리스트에 뭐 있는지 알려줘", null);
+
+		verify(model).replyWithReadTools(any(), org.mockito.ArgumentMatchers.argThat(
+			decision -> decision.intent() == AiIntent.READ_PLANNING
+		));
+		verify(model, never()).replyWithWriteTools(any(), any());
+	}
+
+	@Test
+	void askingToBuildAChecklistStillGenerates() {
+		stubAssistant("일정 기준으로 체크리스트를 만들었어요.");
+		when(model.classify(any())).thenReturn(decision(AiIntent.WRITE_CHECKLIST));
+		when(model.replyWithWriteTools(any(), any())).thenReturn(
+			new AiGuideReply("일정 기준으로 체크리스트를 만들었어요.", List.of())
+		);
+
+		service.createMessage(tripId, userId, "체크리스트 자동으로 만들어줘", null);
+
+		verify(model).replyWithWriteTools(any(), org.mockito.ArgumentMatchers.argThat(
+			decision -> decision.intent() == AiIntent.GENERATE_CHECKLIST_FROM_ITINERARY
+		));
+	}
+
+	@Test
+	void addingADayUsesDayManagementInsteadOfPlaceAdd() {
+		stubAssistant("5일차를 추가했어요.");
+		when(model.classify(any())).thenReturn(decision(AiIntent.ADD_PLACE_TO_ITINERARY));
+		when(model.replyWithWriteTools(any(), any())).thenReturn(
+			new AiGuideReply("5일차를 추가했어요.", List.of())
+		);
+
+		service.createMessage(tripId, userId, "5일차 하나 추가해줘", null);
+
+		verify(model).replyWithWriteTools(any(), org.mockito.ArgumentMatchers.argThat(
+			decision -> decision.intent() == AiIntent.MANAGE_ITINERARY_DAY
+		));
+	}
+
+	@Test
+	void transportModeRouteRequestUsesTheRouteConnectionIntent() {
+		stubAssistant("2일차 장소들을 자전거 경로로 연결했어요.");
+		when(model.classify(any())).thenReturn(decision(AiIntent.OPTIMIZE_ROUTE));
+		when(model.replyWithWriteTools(any(), any())).thenReturn(
+			new AiGuideReply("2일차 장소들을 자전거 경로로 연결했어요.", List.of())
+		);
+
+		service.createMessage(tripId, userId, "2일차 자전거로 경로 이어줘", null);
+
+		verify(model).replyWithWriteTools(any(), org.mockito.ArgumentMatchers.argThat(
+			decision -> decision.intent() == AiIntent.CONNECT_DAY_ROUTES
+		));
+		verify(model, never()).replyWithoutTools(any(), any());
+	}
+
+	@Test
+	void naturallyPhrasedRouteRequestIsNoLongerRejectedByCueMatching() {
+		stubAssistant("도보 경로로 연결했어요.");
+		when(model.classify(any())).thenReturn(decision(AiIntent.CONNECT_DAY_ROUTES));
+		when(model.replyWithWriteTools(any(), any())).thenReturn(
+			new AiGuideReply("도보 경로로 연결했어요.", List.of())
+		);
+
+		service.createMessage(tripId, userId, "여기 걸어서 가는 길로 바꿔줄래", null);
+
+		verify(model).replyWithWriteTools(any(), any());
+		verify(model, never()).replyWithoutTools(any(), any());
+	}
+
+	@Test
+	void readIntentRunsEvenWhenTheQuestionUsesUnexpectedWording() {
+		stubAssistant("체크리스트에는 3개 항목이 있어요.");
+		when(model.classify(any())).thenReturn(decision(AiIntent.READ_PLANNING));
+		when(model.replyWithReadTools(any(), any())).thenReturn(
+			new AiGuideReply("체크리스트에는 3개 항목이 있어요.", List.of())
+		);
+
+		service.createMessage(tripId, userId, "우리 준비물 어디까지 했더라", null);
+
+		verify(model).replyWithReadTools(any(), org.mockito.ArgumentMatchers.argThat(
+			decision -> decision.intent() == AiIntent.READ_PLANNING
+		));
+		verify(model, never()).replyWithoutTools(any(), any());
+	}
+
+	@Test
+	void lowConfidenceDeletionWithoutAnyCueStillAsksBack() {
+		stubAssistant("어떤 장소를 삭제할까요?");
+		when(model.classify(any())).thenReturn(
+			new AiIntentDecision(AiIntent.DELETE_ITINERARY_ITEM, 0.4, "test", null)
+		);
+		when(model.replyWithoutTools(any(), any())).thenReturn(
+			new AiGuideReply("어떤 장소를 삭제할까요?", List.of())
+		);
+
+		service.createMessage(tripId, userId, "여기 좀 정리해줘", null);
+
+		verify(model).replyWithoutTools(any(), org.mockito.ArgumentMatchers.argThat(
+			decision -> decision.intent() == AiIntent.AMBIGUOUS
+		));
+		verify(model, never()).replyWithWriteTools(any(), any());
+	}
+
+	@Test
+	void reversibleWriteRunsOnLowConfidenceWhenTheWordingIsExplicit() {
+		stubAssistant("경복궁을 3일차로 옮겼어요.");
+		when(model.classify(any())).thenReturn(
+			new AiIntentDecision(AiIntent.MOVE_ITINERARY_ITEM, 0.3, "test", null)
+		);
+		when(model.replyWithWriteTools(any(), any())).thenReturn(
+			new AiGuideReply("경복궁을 3일차로 옮겼어요.", List.of())
+		);
+
+		service.createMessage(tripId, userId, "경복궁 3일차로 옮겨줘", null);
+
+		verify(model).replyWithWriteTools(any(), org.mockito.ArgumentMatchers.argThat(
+			decision -> decision.intent() == AiIntent.MOVE_ITINERARY_ITEM
+		));
+	}
+
 	private AiIntentDecision decision(AiIntent intent) {
 		return new AiIntentDecision(intent, 0.99, "test", null);
 	}
