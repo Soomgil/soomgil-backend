@@ -293,7 +293,6 @@ class AiTripToolsTest {
 		return new AiTripToolsFactory(
 			mock(FindItineraryHandler.class), mock(PlaceSearchQueryHandler.class),
 			mock(ListPlaceRecommendationsQueryHandler.class), mock(UpsertNoteCommandHandler.class),
-			mock(GetNoteQueryHandler.class),
 			mock(UpsertChecklistCommandHandler.class), mock(CreateChecklistItemCommandHandler.class),
 			mock(com.soomgil.planning.application.handler.ListChecklistsQueryHandler.class),
 			mock(com.soomgil.planning.application.handler.GetNoteQueryHandler.class),
