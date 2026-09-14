@@ -9,6 +9,7 @@ import org.springframework.http.HttpStatus;
  * 도메인별 세부 code가 필요해지기 전까지 공통 code로 실패 의미를 맞춘다.
  */
 public enum ErrorCode {
+	ROUTE_CALCULATION_FAILED(HttpStatus.BAD_GATEWAY, "ROUTE_CALCULATION_FAILED", "선택한 이동수단의 경로를 계산하지 못했습니다. 다른 장소나 이동수단으로 다시 시도해 주세요."),
 	INVALID_REQUEST(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "Invalid request."),
 	VALIDATION_FAILED(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", "Request validation failed."),
 	UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "Authentication is required."),

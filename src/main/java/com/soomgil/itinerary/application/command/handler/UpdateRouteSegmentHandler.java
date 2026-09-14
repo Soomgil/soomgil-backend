@@ -12,6 +12,11 @@ import com.soomgil.itinerary.application.command.dto.ItineraryMutationResult;
 import com.soomgil.itinerary.application.command.dto.RouteSegmentView;
 import com.soomgil.itinerary.application.command.dto.UpdateRouteSegmentCommand;
 import com.soomgil.itinerary.application.port.ItineraryCommandRepository;
+import com.soomgil.itinerary.application.port.MapMatchingClient;
+import com.soomgil.itinerary.application.port.MapMatchClientRequest;
+import com.soomgil.itinerary.application.port.MapMatchClientResult;
+import com.soomgil.itinerary.application.port.MapMatchingException;
+import com.soomgil.itinerary.application.port.RouteCoordinate;
 import com.soomgil.itinerary.application.port.RouteSegmentUpdate;
 import com.soomgil.itinerary.application.port.RouteSegmentUpdateResult;
 import com.soomgil.itinerary.domain.model.RouteMode;
@@ -24,7 +29,9 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * {@link UpdateRouteSegmentCommand}를 처리해 저장 route segment를 수정한다.
+ * 저장 경로를 수정하고 협업 이벤트를 기록한다.
+ * <p>geometry 없이 mode를 지정하면 기존 경로의 양 끝점 사이를 다시 계산한다.
+ * 계산 실패 시 기존 경로와 일정 버전을 유지한다.
  */
 @Component
 public class UpdateRouteSegmentHandler implements CommandHandler<UpdateRouteSegmentCommand, ItineraryMutationResult> {
@@ -37,19 +44,22 @@ public class UpdateRouteSegmentHandler implements CommandHandler<UpdateRouteSegm
 	private final TripAccessGuard tripAccessGuard;
 	private final TimeProvider timeProvider;
 	private final ObjectMapper objectMapper;
+	private final MapMatchingClient routingClient;
 
 	public UpdateRouteSegmentHandler(
 		ItineraryCommandRepository repository,
 		CollaborationCommandEventRepository eventRepository,
 		TripAccessGuard tripAccessGuard,
 		TimeProvider timeProvider,
-		ObjectMapper objectMapper
+		ObjectMapper objectMapper,
+		MapMatchingClient routingClient
 	) {
 		this.repository = Objects.requireNonNull(repository, "repository must not be null");
 		this.eventRepository = Objects.requireNonNull(eventRepository, "eventRepository must not be null");
 		this.tripAccessGuard = Objects.requireNonNull(tripAccessGuard, "tripAccessGuard must not be null");
 		this.timeProvider = Objects.requireNonNull(timeProvider, "timeProvider must not be null");
 		this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper must not be null");
+		this.routingClient = Objects.requireNonNull(routingClient, "routingClient must not be null");
 	}
 
 	@Override
@@ -59,7 +69,19 @@ public class UpdateRouteSegmentHandler implements CommandHandler<UpdateRouteSegm
 		validate(command);
 		RouteSegmentUpdateResult current = repository.findRouteSegment(command.tripId(), command.routeId())
 			.orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "Route was not found."));
+		if (repository.findItineraryVersion(command.tripId()).orElse(-1L) != command.baseVersion()) {
+			throw new BusinessException(ErrorCode.CONFLICT, "Itinerary version does not match.");
+		}
 
+		MapMatchClientResult calculated = null;
+		if (command.mode() != null && command.geometry() == null) {
+			try {
+				calculated = routingClient.match(new MapMatchClientRequest(
+					providerProfile(command.mode()), endpoints(current), null, false));
+			} catch (MapMatchingException exception) {
+				throw new BusinessException(ErrorCode.ROUTE_CALCULATION_FAILED);
+			}
+		}
 		Instant now = timeProvider.now();
 		long newVersion = repository.incrementItineraryVersion(command.tripId(), command.baseVersion(), now)
 			.orElseThrow(() -> new BusinessException(ErrorCode.CONFLICT, "Itinerary version does not match."));
@@ -67,11 +89,12 @@ public class UpdateRouteSegmentHandler implements CommandHandler<UpdateRouteSegm
 			command.tripId(),
 			command.routeId(),
 			command.mode(),
+			calculated == null ? null : "MAPBOX",
 			command.mode() == null ? null : providerProfile(command.mode()),
-			command.geometry() == null ? null : toJson(command.geometry()),
-			command.distanceMeters(),
-			command.durationSeconds(),
-			command.confidence(),
+			calculated != null ? toJson(calculated.geometry()) : command.geometry() == null ? null : toJson(command.geometry()),
+			calculated != null ? calculated.distanceMeters() : command.distanceMeters(),
+			calculated != null ? calculated.durationSeconds() : command.durationSeconds(),
+			calculated != null ? calculated.confidence() : command.confidence(),
 			command.actorUserId(),
 			now
 		)).orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "Route was not found."));
@@ -121,6 +144,33 @@ public class UpdateRouteSegmentHandler implements CommandHandler<UpdateRouteSegm
 		}
 	}
 
+	private List<RouteCoordinate> endpoints(RouteSegmentUpdateResult route) {
+		try {
+			var geometry = objectMapper.readTree(route.geometry());
+			var coordinates = geometry.path("coordinates");
+			if (!"LineString".equals(geometry.path("type").asText()) || coordinates.size() < 2) {
+				throw new BusinessException(ErrorCode.VALIDATION_FAILED, "경로의 출발점과 도착점을 확인할 수 없습니다.");
+			}
+			var first = coordinates.get(0);
+			var last = coordinates.get(coordinates.size() - 1);
+			return List.of(coordinate(first), coordinate(last));
+		} catch (JsonProcessingException exception) {
+			throw new BusinessException(ErrorCode.VALIDATION_FAILED, "저장된 경로 좌표가 올바르지 않습니다.");
+		}
+	}
+
+	private RouteCoordinate coordinate(com.fasterxml.jackson.databind.JsonNode point) {
+		if (!point.isArray() || point.size() < 2 || !point.get(0).isNumber() || !point.get(1).isNumber()) {
+			throw new BusinessException(ErrorCode.VALIDATION_FAILED, "저장된 경로 좌표가 올바르지 않습니다.");
+		}
+		double lng = point.get(0).asDouble();
+		double lat = point.get(1).asDouble();
+		if (!Double.isFinite(lng) || !Double.isFinite(lat) || Math.abs(lng) > 180 || Math.abs(lat) > 90) {
+			throw new BusinessException(ErrorCode.VALIDATION_FAILED, "저장된 경로 좌표가 올바르지 않습니다.");
+		}
+		return new RouteCoordinate(lng, lat);
+	}
+
 	private RouteSegmentView toView(RouteSegmentUpdateResult route) {
 		return new RouteSegmentView(
 			route.id(),
@@ -141,6 +191,7 @@ public class UpdateRouteSegmentHandler implements CommandHandler<UpdateRouteSegm
 		return switch (mode) {
 			case DRIVING -> "mapbox/driving";
 			case WALKING -> "mapbox/walking";
+			case CYCLING -> "mapbox/cycling";
 		};
 	}
 

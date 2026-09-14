@@ -11,6 +11,7 @@ public record RouteSegmentSnapshotUpdate(
 	UUID tripId,
 	UUID routeId,
 	RouteMode mode,
+	String provider,
 	String providerProfile,
 	String geometry,
 	Double distanceMeters,

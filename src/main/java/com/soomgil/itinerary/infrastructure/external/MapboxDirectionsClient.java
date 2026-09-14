@@ -9,6 +9,9 @@ import com.soomgil.itinerary.application.port.MapMatchingClient;
 import com.soomgil.itinerary.application.port.MapMatchingException;
 import com.soomgil.itinerary.application.port.RouteCoordinate;
 import java.net.URI;
+import java.net.http.HttpClient;
+import java.time.Duration;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -22,7 +25,8 @@ import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.util.UriComponentsBuilder;
 
 /**
- * Mapbox Directions API client.
+ * Mapbox Directions API로 선택한 이동수단의 경로·거리·예상 시간을 계산한다.
+ * <p>외부 호출은 연결 5초, 응답 15초로 제한하며 실패는 MapMatchingException으로 전달한다.
  */
 @Component
 public class MapboxDirectionsClient implements MapMatchingClient {
@@ -37,7 +41,10 @@ public class MapboxDirectionsClient implements MapMatchingClient {
 	public MapboxDirectionsClient(MapboxProperties properties, ObjectMapper objectMapper) {
 		this.properties = Objects.requireNonNull(properties, "properties must not be null");
 		this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper must not be null");
-		this.restClient = RestClient.builder().build();
+		var requestFactory = new JdkClientHttpRequestFactory(HttpClient.newBuilder()
+			.connectTimeout(Duration.ofSeconds(5)).build());
+		requestFactory.setReadTimeout(Duration.ofSeconds(15));
+		this.restClient = RestClient.builder().requestFactory(requestFactory).build();
 	}
 
 	@Override

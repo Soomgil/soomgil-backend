@@ -184,6 +184,7 @@ public class ItineraryCompensationExecutor implements CollaborationCompensationE
 			tripId,
 			uuid(command, "routeId"),
 			RouteMode.valueOf(command.path("mode").asText()),
+			nullableText(command, "provider"),
 			nullableText(command, "providerProfile"),
 			command.path("geometry").toString(),
 			nullableDouble(command, "distanceMeters"),

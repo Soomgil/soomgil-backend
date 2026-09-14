@@ -1,6 +1,7 @@
 package com.soomgil.ai.application;
 
 import com.soomgil.ai.api.dto.AiToolExecutionPolicy;
+import com.soomgil.itinerary.domain.model.RouteMode;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.ai.tool.annotation.Tool;
@@ -38,6 +39,29 @@ public final class AiOptimizeRouteTools extends AiToolSupport {
 		);
 	}
 
+	@Tool(description = "특정 일차의 장소들을 현재 일정 순서대로 모두 경로 연결한다. "
+		+ "도보는 WALKING, 자전거길은 CYCLING, 자동차길은 DRIVING을 mode로 지정한다. "
+		+ "이미 연결된 구간은 중복 생성하지 않고 mode가 다르면 해당 이동수단으로 다시 계산한다.")
+	public Object connectDayRoutes(ConnectDayRoutesInput input) {
+		long version = baseVersion(input.baseVersion());
+		return execute(
+			"connectDayRoutes",
+			AiToolExecutionPolicy.REVERSIBLE_WRITE,
+			input, version,
+			() -> itineraryToolService.connectDayRoutes(
+				tripId, userId, version, input.itineraryDayId(), input.dayNumber(), input.mode()
+			)
+		);
+	}
+
 	public record OptimizeRouteInput(Long baseVersion, List<AiItineraryToolService.ItemMove> moves) {
+	}
+
+	public record ConnectDayRoutesInput(
+		Long baseVersion,
+		UUID itineraryDayId,
+		Integer dayNumber,
+		RouteMode mode
+	) {
 	}
 }
