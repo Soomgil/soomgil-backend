@@ -83,9 +83,10 @@ public class PreferenceListTripVoteCandidatesQueryHandler implements ListTripVot
 			return List.of();
 		}
 
-		List<String> regionCodes = regionCodesHandler.handle(
-			new ListTripRegionCodesQuery(query.tripId(), query.requesterUserId())
-		);
+		// 방장이 이번 투표용 지역을 골랐으면 그 지역을, 아니면 여행방에 등록된 지역을 쓴다.
+		List<String> regionCodes = !query.regionCodes().isEmpty()
+			? query.regionCodes()
+			: regionCodesHandler.handle(new ListTripRegionCodesQuery(query.tripId(), query.requesterUserId()));
 		List<PlaceViewportCandidate> candidates = placeCandidatesHandler.handle(new PlaceRegionCandidateQuery(
 			regionCodes, query.destinationKeyword(), null, MAX_CANDIDATE_POOL
 		));

@@ -2,6 +2,7 @@ package com.soomgil.voting.application.command.dto;
 
 import com.soomgil.common.cqrs.Command;
 import com.soomgil.voting.api.dto.TripVoteSessionDetail;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -15,12 +16,26 @@ import java.util.UUID;
  * @param stickerAllowance 사용자당 스티커 지급 개수
  * @param selectionCount 최종 선정 관광지 개수
  * @param candidateCount 만들 후보 수. null이면 기본 10개
+ * @param legalRegionCodes 방장이 이번 투표용으로 고른 법정동 코드. 비어 있으면 여행방 지역을 쓴다
  */
 public record OpenVoteSessionCommand(
 	UUID tripId,
 	UUID actorUserId,
 	int stickerAllowance,
 	int selectionCount,
-	Integer candidateCount
+	Integer candidateCount,
+	List<String> legalRegionCodes
 ) implements Command<TripVoteSessionDetail> {
+	public OpenVoteSessionCommand {
+		legalRegionCodes = legalRegionCodes == null ? List.of() : List.copyOf(legalRegionCodes);
+	}
+
+	/**
+	 * 지역을 고르지 않은 command를 만든다. 여행방에 등록된 지역을 사용한다.
+	 */
+	public OpenVoteSessionCommand(
+		UUID tripId, UUID actorUserId, int stickerAllowance, int selectionCount, Integer candidateCount
+	) {
+		this(tripId, actorUserId, stickerAllowance, selectionCount, candidateCount, List.of());
+	}
 }

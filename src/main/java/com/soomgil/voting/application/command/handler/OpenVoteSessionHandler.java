@@ -22,6 +22,12 @@ import com.soomgil.voting.application.service.VoteSessionAssembler;
 import com.soomgil.voting.domain.model.VoteParticipantStatus;
 import com.soomgil.voting.domain.model.VoteSessionStatus;
 import com.soomgil.voting.domain.policy.VoteSessionPolicy;
+import com.soomgil.geo.application.query.dto.FindLegalRegionsByCodesQuery;
+import com.soomgil.geo.application.query.dto.LegalRegionView;
+import com.soomgil.geo.application.query.handler.FindLegalRegionsByCodesHandler;
+import com.soomgil.trip.application.query.dto.ListTripRegionCodesQuery;
+import com.soomgil.trip.application.query.handler.ListTripRegionCodesHandler;
+import com.soomgil.voting.application.port.VoteRegionRecord;
 import com.soomgil.trip.application.query.dto.ListTripMembersQuery;
 import com.soomgil.trip.application.query.dto.TripMemberView;
 import com.soomgil.trip.application.query.handler.ListTripMembersHandler;
@@ -29,6 +35,8 @@ import com.soomgil.trip.domain.model.TripMemberStatus;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
@@ -51,6 +59,8 @@ public class OpenVoteSessionHandler implements CommandHandler<OpenVoteSessionCom
 	private final ListTripMembersHandler membersHandler;
 	private final FindTripDetailHandler tripDetailHandler;
 	private final ListTripVoteCandidatesQueryHandler candidatesHandler;
+	private final ListTripRegionCodesHandler regionCodesHandler;
+	private final FindLegalRegionsByCodesHandler legalRegionsHandler;
 	private final VoteSessionAssembler assembler;
 	private final TimeProvider timeProvider;
 
@@ -60,6 +70,8 @@ public class OpenVoteSessionHandler implements CommandHandler<OpenVoteSessionCom
 		ListTripMembersHandler membersHandler,
 		FindTripDetailHandler tripDetailHandler,
 		ListTripVoteCandidatesQueryHandler candidatesHandler,
+		ListTripRegionCodesHandler regionCodesHandler,
+		FindLegalRegionsByCodesHandler legalRegionsHandler,
 		VoteSessionAssembler assembler,
 		TimeProvider timeProvider
 	) {
@@ -68,6 +80,8 @@ public class OpenVoteSessionHandler implements CommandHandler<OpenVoteSessionCom
 		this.membersHandler = Objects.requireNonNull(membersHandler, "membersHandler must not be null");
 		this.tripDetailHandler = Objects.requireNonNull(tripDetailHandler, "tripDetailHandler must not be null");
 		this.candidatesHandler = Objects.requireNonNull(candidatesHandler, "candidatesHandler must not be null");
+		this.regionCodesHandler = Objects.requireNonNull(regionCodesHandler, "regionCodesHandler must not be null");
+		this.legalRegionsHandler = Objects.requireNonNull(legalRegionsHandler, "legalRegionsHandler must not be null");
 		this.assembler = Objects.requireNonNull(assembler, "assembler must not be null");
 		this.timeProvider = Objects.requireNonNull(timeProvider, "timeProvider must not be null");
 	}
@@ -93,12 +107,23 @@ public class OpenVoteSessionHandler implements CommandHandler<OpenVoteSessionCom
 		int requestedCandidateCount = command.candidateCount() == null
 			? VoteSessionPolicy.DEFAULT_CANDIDATE_COUNT
 			: command.candidateCount();
-		// 여행방에 등록된 지역이 없을 때를 대비해 대표 목적지를 대체 검색어로 함께 넘긴다.
 		TripDetailView trip = tripDetailHandler.handle(
 			new FindTripDetailQuery(command.tripId(), command.actorUserId())
 		);
+		// 방장이 이번 투표의 지역을 직접 골랐으면 그 지역을, 아니면 여행방에 등록된 지역을 쓴다.
+		// 지역이 하나도 없으면 대표 목적지를 대체 검색어로 넘기고, 그것도 없으면 후보를 만들 수 없어 거절한다.
+		List<String> regionCodes = command.legalRegionCodes().isEmpty()
+			? regionCodesHandler.handle(new ListTripRegionCodesQuery(command.tripId(), command.actorUserId()))
+			: command.legalRegionCodes().stream().distinct().toList();
+		boolean hasDestination = trip.displayDestination() != null && !trip.displayDestination().isBlank();
+		if (regionCodes.isEmpty() && !hasDestination) {
+			throw new BusinessException(
+				ErrorCode.VOTE_CANDIDATE_POOL_INSUFFICIENT,
+				"Vote needs at least one region or a destination to build candidates."
+			);
+		}
 		List<TripVoteCandidateView> candidateViews = candidatesHandler.handle(new ListTripVoteCandidatesQuery(
-			command.tripId(), command.actorUserId(), requestedCandidateCount, trip.displayDestination()
+			command.tripId(), command.actorUserId(), requestedCandidateCount, trip.displayDestination(), regionCodes
 		));
 		int candidateCount = candidateViews.size();
 		if (candidateCount < command.selectionCount() || candidateCount < 1) {
@@ -138,6 +163,8 @@ public class OpenVoteSessionHandler implements CommandHandler<OpenVoteSessionCom
 			null
 		);
 		repository.insertSession(session);
+		List<VoteRegionRecord> regions = snapshotRegions(sessionId, regionCodes);
+		repository.insertRegions(regions);
 
 		List<VoteCandidateRecord> candidates = new ArrayList<>();
 		for (TripVoteCandidateView view : candidateViews) {
@@ -174,6 +201,24 @@ public class OpenVoteSessionHandler implements CommandHandler<OpenVoteSessionCom
 		}
 		repository.insertParticipants(participants);
 
-		return assembler.toDetail(session, candidates, participants);
+		return assembler.toDetail(session, candidates, participants, regions);
+	}
+	/**
+	 * 후보를 뽑은 지역을 이름과 함께 세션 snapshot으로 고정한다. 이름을 못 찾은 코드는 코드를 이름으로 남긴다.
+	 */
+	private List<VoteRegionRecord> snapshotRegions(UUID sessionId, List<String> regionCodes) {
+		if (regionCodes.isEmpty()) {
+			return List.of();
+		}
+		Map<String, String> namesByCode = legalRegionsHandler
+			.handle(new FindLegalRegionsByCodesQuery(regionCodes))
+			.stream()
+			.collect(Collectors.toMap(LegalRegionView::code, LegalRegionView::name, (first, second) -> first));
+		List<VoteRegionRecord> regions = new ArrayList<>();
+		for (int index = 0; index < regionCodes.size(); index++) {
+			String code = regionCodes.get(index);
+			regions.add(new VoteRegionRecord(Ids.newUuid(), sessionId, code, namesByCode.getOrDefault(code, code), index));
+		}
+		return regions;
 	}
 }

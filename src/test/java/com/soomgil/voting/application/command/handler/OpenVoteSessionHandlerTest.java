@@ -2,6 +2,7 @@ package com.soomgil.voting.application.command.handler;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -10,6 +11,14 @@ import static org.mockito.Mockito.when;
 
 import com.soomgil.global.error.BusinessException;
 import com.soomgil.global.error.ErrorCode;
+import com.soomgil.geo.application.query.dto.FindLegalRegionsByCodesQuery;
+import com.soomgil.geo.application.query.dto.LegalRegionView;
+import com.soomgil.geo.application.query.handler.FindLegalRegionsByCodesHandler;
+import com.soomgil.geo.domain.model.LegalRegionLevel;
+import com.soomgil.trip.application.query.dto.ListTripRegionCodesQuery;
+import com.soomgil.trip.application.query.handler.ListTripRegionCodesHandler;
+import com.soomgil.voting.api.dto.TripVoteRegion;
+import com.soomgil.voting.application.port.VoteRegionRecord;
 import com.soomgil.place.api.dto.PlaceProvider;
 import com.soomgil.preference.application.query.dto.ListTripVoteCandidatesQuery;
 import com.soomgil.preference.application.query.dto.TripVoteCandidateView;
@@ -54,10 +63,12 @@ class OpenVoteSessionHandlerTest {
 	private final ListTripVoteCandidatesQueryHandler candidatesHandler =
 		mock(ListTripVoteCandidatesQueryHandler.class);
 	private final FindTripDetailHandler tripDetailHandler = mock(FindTripDetailHandler.class);
+	private final ListTripRegionCodesHandler regionCodesHandler = mock(ListTripRegionCodesHandler.class);
+	private final FindLegalRegionsByCodesHandler legalRegionsHandler = mock(FindLegalRegionsByCodesHandler.class);
 
 	private final OpenVoteSessionHandler handler = new OpenVoteSessionHandler(
 		repository, tripAccessGuard, membersHandler, tripDetailHandler, candidatesHandler,
-		new VoteSessionAssembler(), () -> NOW
+		regionCodesHandler, legalRegionsHandler, new VoteSessionAssembler(), () -> NOW
 	);
 
 	private final UUID tripId = UUID.randomUUID();
@@ -71,6 +82,10 @@ class OpenVoteSessionHandlerTest {
 			.thenReturn(List.of(member(ownerId), member(memberId)));
 		when(candidatesHandler.handle(any(ListTripVoteCandidatesQuery.class))).thenReturn(candidates(10));
 		when(tripDetailHandler.handle(any(FindTripDetailQuery.class))).thenReturn(tripDetail("제주"));
+		when(regionCodesHandler.handle(any(ListTripRegionCodesQuery.class))).thenReturn(List.of("5011000000"));
+		when(legalRegionsHandler.handle(any(FindLegalRegionsByCodesQuery.class))).thenReturn(List.of(
+			new LegalRegionView("5011000000", "제주시", "제주특별자치도 제주시", LegalRegionLevel.SIGUNGU, "5000000000", true)
+		));
 	}
 
 	@Test
@@ -252,5 +267,50 @@ class OpenVoteSessionHandlerTest {
 		return new VoteSessionRecord(
 			UUID.randomUUID(), tripId, VoteSessionStatus.OPEN, ownerId, 5, 3, 10, NOW, null, null, null, null
 		);
+	}
+	@Test
+	@DisplayName("방장이 고른 지역이 있으면 여행방 지역 대신 그 지역으로 후보를 만든다")
+	void usesRequestedRegionsInsteadOfTripRegions() {
+		handler.handle(new OpenVoteSessionCommand(tripId, ownerId, 5, 3, null, List.of("5013000000")));
+
+		ArgumentCaptor<ListTripVoteCandidatesQuery> captor = ArgumentCaptor.forClass(ListTripVoteCandidatesQuery.class);
+		verify(candidatesHandler).handle(captor.capture());
+		assertThat(captor.getValue().regionCodes()).containsExactly("5013000000");
+		verify(regionCodesHandler, never()).handle(any(ListTripRegionCodesQuery.class));
+	}
+
+	@Test
+	@DisplayName("지역을 고르지 않으면 여행방에 등록된 지역을 그대로 쓴다")
+	void fallsBackToTripRegionsWhenRequestHasNone() {
+		handler.handle(new OpenVoteSessionCommand(tripId, ownerId, 5, 3, null));
+
+		ArgumentCaptor<ListTripVoteCandidatesQuery> captor = ArgumentCaptor.forClass(ListTripVoteCandidatesQuery.class);
+		verify(candidatesHandler).handle(captor.capture());
+		assertThat(captor.getValue().regionCodes()).containsExactly("5011000000");
+	}
+
+	@Test
+	@DisplayName("지역도 목적지도 없으면 후보를 만들 수 없어 시작을 거절한다")
+	void rejectsWhenNoRegionAndNoDestination() {
+		when(regionCodesHandler.handle(any(ListTripRegionCodesQuery.class))).thenReturn(List.of());
+		when(tripDetailHandler.handle(any(FindTripDetailQuery.class))).thenReturn(tripDetail(""));
+
+		assertThatThrownBy(() -> handler.handle(new OpenVoteSessionCommand(tripId, ownerId, 5, 3, null)))
+			.isInstanceOf(BusinessException.class);
+		verify(candidatesHandler, never()).handle(any(ListTripVoteCandidatesQuery.class));
+	}
+
+	@Test
+	@DisplayName("투표를 시작하면 사용한 지역을 이름과 함께 세션에 고정한다")
+	void snapshotsRegionsWithNames() {
+		TripVoteSessionDetail detail = handler.handle(new OpenVoteSessionCommand(tripId, ownerId, 5, 3, null));
+
+		@SuppressWarnings("unchecked")
+		ArgumentCaptor<List<VoteRegionRecord>> captor = ArgumentCaptor.forClass(List.class);
+		verify(repository).insertRegions(captor.capture());
+		assertThat(captor.getValue())
+			.extracting(VoteRegionRecord::legalRegionCode, VoteRegionRecord::regionName, VoteRegionRecord::sortOrder)
+			.containsExactly(tuple("5011000000", "제주시", 0));
+		assertThat(detail.regions()).containsExactly(new TripVoteRegion("5011000000", "제주시"));
 	}
 }

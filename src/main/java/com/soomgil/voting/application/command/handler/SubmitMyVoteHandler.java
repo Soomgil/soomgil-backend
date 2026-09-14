@@ -122,7 +122,7 @@ public class SubmitMyVoteHandler implements CommandHandler<SubmitMyVoteCommand, 
 				session.status(),
 				participant == null ? null : participant.status()
 			),
-			assembler.toDetail(session, repository.findCandidates(sessionId), participants),
+			assembler.toDetail(session, repository.findCandidates(sessionId), participants, repository.findRegions(sessionId)),
 			assembler.toParticipation(
 				participant,
 				participant == null ? List.of() : repository.findStickersByParticipant(participant.id())

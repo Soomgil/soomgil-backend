@@ -221,4 +221,18 @@ public interface VoteSessionRepository {
 	 * @return 일정 반영 기록 목록
 	 */
 	List<VoteItineraryLinkRecord> findItineraryLinks(UUID sessionId);
+	/**
+	 * 세션이 후보를 뽑은 지역 snapshot을 저장한다.
+	 *
+	 * @param regions 지역 목록. 비어 있으면 아무것도 저장하지 않는다
+	 */
+	void insertRegions(List<VoteRegionRecord> regions);
+
+	/**
+	 * 세션의 지역 snapshot을 방장이 고른 순서대로 조회한다.
+	 *
+	 * @param sessionId 세션 식별자
+	 * @return 지역 목록
+	 */
+	List<VoteRegionRecord> findRegions(UUID sessionId);
 }

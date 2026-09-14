@@ -41,6 +41,14 @@ public class MyBatisLegalRegionQueryRepository implements LegalRegionQueryReposi
 		return new LegalRegionPage(items, totalElements);
 	}
 
+	@Override
+	public List<LegalRegionReadModel> findLegalRegionsByCodes(List<String> codes) {
+		if (codes == null || codes.isEmpty()) {
+			return List.of();
+		}
+		return mapper.findLegalRegionsByCodes(codes).stream().map(this::toReadModel).toList();
+	}
+
 	private LegalRegionReadModel toReadModel(LegalRegionRow row) {
 		return new LegalRegionReadModel(
 			row.code(),

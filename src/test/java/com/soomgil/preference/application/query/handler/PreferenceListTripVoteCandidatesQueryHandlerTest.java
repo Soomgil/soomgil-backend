@@ -208,4 +208,17 @@ class PreferenceListTripVoteCandidatesQueryHandlerTest {
 			userId.toString(), new BigDecimal(score), null, OffsetDateTime.now(), null, null
 		);
 	}
+	@Test
+	@DisplayName("요청에 지역 코드가 있으면 여행방 지역 대신 그 지역으로 후보 풀을 만든다")
+	void usesRegionOverrideInsteadOfTripRegions() {
+		when(placeCandidatesHandler.handle(any(PlaceRegionCandidateQuery.class)))
+			.thenReturn(List.of(place("1", "천지연폭포")));
+
+		handler.handle(new ListTripVoteCandidatesQuery(tripId, requesterId, 10, "제주", List.of("5013000000")));
+
+		ArgumentCaptor<PlaceRegionCandidateQuery> placeCaptor = ArgumentCaptor.forClass(PlaceRegionCandidateQuery.class);
+		verify(placeCandidatesHandler).handle(placeCaptor.capture());
+		assertThat(placeCaptor.getValue().legalRegionCodes()).containsExactly("5013000000");
+		verify(regionCodesHandler, never()).handle(any(ListTripRegionCodesQuery.class));
+	}
 }

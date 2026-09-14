@@ -8,6 +8,8 @@ import com.soomgil.voting.api.dto.TripVoteSessionDetail;
 import com.soomgil.voting.api.dto.VoteStickerPlacement;
 import com.soomgil.voting.application.port.VoteCandidateRecord;
 import com.soomgil.voting.application.port.VoteParticipantRecord;
+import com.soomgil.voting.api.dto.TripVoteRegion;
+import com.soomgil.voting.application.port.VoteRegionRecord;
 import com.soomgil.voting.application.port.VoteSessionRecord;
 import com.soomgil.voting.application.port.VoteStickerRecord;
 import com.soomgil.voting.domain.model.VoteSessionStatus;
@@ -33,12 +35,14 @@ public class VoteSessionAssembler {
 	 * @param session 세션 record
 	 * @param candidates 후보 목록
 	 * @param participants 참여자 목록
+	 * @param regions 후보를 뽑은 지역 snapshot
 	 * @return 세션 상세
 	 */
 	public TripVoteSessionDetail toDetail(
 		VoteSessionRecord session,
 		List<VoteCandidateRecord> candidates,
-		List<VoteParticipantRecord> participants
+		List<VoteParticipantRecord> participants,
+		List<VoteRegionRecord> regions
 	) {
 		boolean completed = session.status() == VoteSessionStatus.COMPLETED;
 		List<TripVoteCandidate> candidateViews = candidates.stream()
@@ -72,7 +76,10 @@ public class VoteSessionAssembler {
 			toOffsetDateTime(session.completedAt()),
 			session.completionReason(),
 			new TripVoteParticipantSummary(participants.size(), submitted),
-			candidateViews
+			candidateViews,
+			regions.stream()
+				.map(region -> new TripVoteRegion(region.legalRegionCode(), region.regionName()))
+				.toList()
 		);
 	}
 

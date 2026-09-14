@@ -115,7 +115,8 @@ public class TripVoteSessionController extends ApiControllerSupport {
 			currentUser.userId(),
 			request.stickerAllowance(),
 			request.selectionCount(),
-			request.candidateCount()
+			request.candidateCount(),
+			request.legalRegionCodes()
 		));
 	}
 

@@ -3,6 +3,7 @@ package com.soomgil.voting.infrastructure.persistence.mapper;
 import com.soomgil.voting.application.port.VoteCandidateRecord;
 import com.soomgil.voting.application.port.VoteItineraryLinkRecord;
 import com.soomgil.voting.application.port.VoteParticipantRecord;
+import com.soomgil.voting.application.port.VoteRegionRecord;
 import com.soomgil.voting.application.port.VoteSessionRecord;
 import com.soomgil.voting.application.port.VoteStickerRecord;
 import java.time.Instant;
@@ -380,4 +381,28 @@ public interface VoteSessionMapper {
 		WHERE vote_session_id = #{sessionId}
 		""")
 	List<VoteItineraryLinkRecord> findItineraryLinks(@Param("sessionId") UUID sessionId);
+	/**
+	 * 세션의 지역 snapshot 한 건을 저장한다.
+	 *
+	 * @param region 지역 record
+	 */
+	@Insert("""
+		INSERT INTO voting.vote_session_regions (id, vote_session_id, legal_region_code, region_name, sort_order)
+		VALUES (#{id}, #{voteSessionId}, #{legalRegionCode}, #{regionName}, #{sortOrder})
+		""")
+	void insertRegion(VoteRegionRecord region);
+
+	/**
+	 * 세션의 지역 snapshot을 순서대로 조회한다.
+	 *
+	 * @param sessionId 세션 식별자
+	 * @return 지역 목록
+	 */
+	@Select("""
+		SELECT id, vote_session_id, legal_region_code, region_name, sort_order
+		FROM voting.vote_session_regions
+		WHERE vote_session_id = #{sessionId}
+		ORDER BY sort_order, legal_region_code
+		""")
+	List<VoteRegionRecord> findRegions(@Param("sessionId") UUID sessionId);
 }

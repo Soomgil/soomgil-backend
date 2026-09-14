@@ -18,23 +18,40 @@ import java.util.UUID;
  * @param tripId 후보를 만들 여행방 ID
  * @param requesterUserId 요청 사용자 ID. active member 권한 확인에 사용된다
  * @param limit 최대 후보 수. 기본 설계값은 10이다
- * @param destinationKeyword 여행방에 등록된 지역이 없을 때 사용할 대체 검색어. 없으면 null
+ * @param destinationKeyword 지역이 없을 때 사용할 대체 검색어. 없으면 null
+ * @param regionCodes 이번 후보 풀에 쓸 법정동 코드. 비어 있으면 여행방에 등록된 지역을 조회한다
  */
 public record ListTripVoteCandidatesQuery(
 	UUID tripId,
 	UUID requesterUserId,
 	int limit,
-	String destinationKeyword
+	String destinationKeyword,
+	List<String> regionCodes
 ) implements Query<List<TripVoteCandidateView>> {
+	public ListTripVoteCandidatesQuery {
+		regionCodes = regionCodes == null ? List.of() : List.copyOf(regionCodes);
+	}
 
 	/**
-	 * 대체 검색어 없이 query를 만든다.
+	 * 대체 검색어와 지역 override 없이 query를 만든다.
 	 *
 	 * @param tripId 여행방 ID
 	 * @param requesterUserId 요청 사용자 ID
 	 * @param limit 최대 후보 수
 	 */
 	public ListTripVoteCandidatesQuery(UUID tripId, UUID requesterUserId, int limit) {
-		this(tripId, requesterUserId, limit, null);
+		this(tripId, requesterUserId, limit, null, List.of());
+	}
+
+	/**
+	 * 지역 override 없이 대체 검색어만 넣어 query를 만든다.
+	 *
+	 * @param tripId 여행방 ID
+	 * @param requesterUserId 요청 사용자 ID
+	 * @param limit 최대 후보 수
+	 * @param destinationKeyword 대체 검색어
+	 */
+	public ListTripVoteCandidatesQuery(UUID tripId, UUID requesterUserId, int limit, String destinationKeyword) {
+		this(tripId, requesterUserId, limit, destinationKeyword, List.of());
 	}
 }

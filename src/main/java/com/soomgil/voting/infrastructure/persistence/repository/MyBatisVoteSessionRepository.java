@@ -3,6 +3,7 @@ package com.soomgil.voting.infrastructure.persistence.repository;
 import com.soomgil.voting.application.port.VoteCandidateRecord;
 import com.soomgil.voting.application.port.VoteItineraryLinkRecord;
 import com.soomgil.voting.application.port.VoteParticipantRecord;
+import com.soomgil.voting.application.port.VoteRegionRecord;
 import com.soomgil.voting.application.port.VoteSessionRecord;
 import com.soomgil.voting.application.port.VoteSessionRepository;
 import com.soomgil.voting.application.port.VoteStickerRecord;
@@ -162,5 +163,16 @@ public class MyBatisVoteSessionRepository implements VoteSessionRepository {
 	@Override
 	public List<VoteItineraryLinkRecord> findItineraryLinks(UUID sessionId) {
 		return mapper.findItineraryLinks(sessionId);
+	}
+	@Override
+	public void insertRegions(List<VoteRegionRecord> regions) {
+		for (VoteRegionRecord region : regions) {
+			mapper.insertRegion(region);
+		}
+	}
+
+	@Override
+	public List<VoteRegionRecord> findRegions(UUID sessionId) {
+		return mapper.findRegions(sessionId);
 	}
 }

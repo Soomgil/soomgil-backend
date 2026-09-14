@@ -58,7 +58,9 @@ public class FindCurrentVoteSessionHandler
 		return new TripVoteSessionState(
 			true,
 			VoteSessionPolicy.nextScreen(session.status(), participant == null ? null : participant.status()),
-			assembler.toDetail(session, repository.findCandidates(session.id()), participants),
+			assembler.toDetail(
+				session, repository.findCandidates(session.id()), participants, repository.findRegions(session.id())
+			),
 			assembler.toParticipation(
 				participant,
 				participant == null ? List.of() : repository.findStickersByParticipant(participant.id())
