@@ -46,6 +46,14 @@ public interface TripQueryMapper {
 	List<TripMemberReadRow> findTripMembers(@Param("tripId") UUID tripId, @Param("status") String status);
 
 	/**
+	 * 여행방에 등록된 법정동 코드를 정렬 순서대로 조회한다.
+	 *
+	 * @param tripId 여행방 ID
+	 * @return 법정동 코드 목록. 등록된 지역이 없으면 빈 목록
+	 */
+	List<String> findTripRegionCodes(@Param("tripId") UUID tripId);
+
+	/**
 	 * 현재 사용자가 active member인 여행방 목록을 조회한다.
 	 *
 	 * @param userId 사용자 ID

@@ -74,6 +74,9 @@ abstract class AiToolSupport implements AiExecutableTools {
 		if (result instanceof AiAddRecommendedPlacesTools.BulkAddRecommendedPlacesResult bulkAdd) {
 			return bulkAdd.versionAfter();
 		}
+		if (result instanceof AiItineraryToolService.ConnectDayRoutesResult connectRoutes) {
+			return connectRoutes.versionAfter();
+		}
 		if (result instanceof PlanningMutationResponse planning) return planning.itineraryVersion();
 		return null;
 	}

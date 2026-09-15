@@ -23,9 +23,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.HexFormat;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -33,13 +31,13 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Mapbox map matching 결과로 route segment를 생성한다.
+ * Mapbox Directions 결과로 경로 구간을 생성한다.
+ * <p>2~25개 경유점을 순서대로 연결하며 계산 실패 시 경로를 저장하지 않는다.
  */
 @Component
 public class MapMatchRouteHandler implements CommandHandler<MapMatchRouteCommand, MapMatchRouteResult> {
 
 	private static final String PROVIDER = "MAPBOX";
-	private static final String FALLBACK_PROVIDER = "USER_TRACE";
 
 	private final ItineraryCommandRepository repository;
 	private final TripAccessGuard tripAccessGuard;
@@ -72,6 +70,13 @@ public class MapMatchRouteHandler implements CommandHandler<MapMatchRouteCommand
 	public MapMatchRouteResult handle(MapMatchRouteCommand command) {
 		tripAccessGuard.requireActiveMember(command.tripId(), command.actorUserId());
 		validate(command);
+		if (repository.findItineraryVersion(command.tripId()).orElse(-1L) != command.baseVersion()) {
+			throw new BusinessException(ErrorCode.CONFLICT, "Itinerary version does not match.");
+		}
+		if (!repository.existsItem(command.tripId(), command.originItineraryItemId())
+			|| !repository.existsItem(command.tripId(), command.destinationItineraryItemId())) {
+			throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "Itinerary item was not found.");
+		}
 		boolean tidy = Boolean.TRUE.equals(command.tidy());
 		String providerProfile = providerProfile(command.mode());
 		MapMatchClientRequest clientRequest = new MapMatchClientRequest(
@@ -86,35 +91,7 @@ public class MapMatchRouteHandler implements CommandHandler<MapMatchRouteCommand
 			clientResult = mapMatchingClient.match(clientRequest);
 		}
 		catch (MapMatchingException exception) {
-			ItineraryMutationResult fallbackMutation = saveRouteSegmentHandler.handle(new SaveRouteSegmentCommand(
-				command.tripId(),
-				command.actorUserId(),
-				command.baseVersion(),
-				command.originItineraryItemId(),
-				command.destinationItineraryItemId(),
-				command.mode(),
-				FALLBACK_PROVIDER,
-				fallbackProviderProfile(command.mode()),
-				rawLineStringGeometry(command.coordinates()),
-				null,
-				null,
-				null
-			));
-			Long requestId = saveMatchLog(
-				command,
-				providerProfile,
-				fallbackMutation.route().id(),
-				"FAILED",
-				null,
-				exception,
-				tidy
-			);
-			return new MapMatchRouteResult(
-				fallbackMutation,
-				requestId,
-				List.of(),
-				fallbackMetadata(exception)
-			);
+			throw new BusinessException(ErrorCode.ROUTE_CALCULATION_FAILED);
 		}
 
 		ItineraryMutationResult mutation = saveRouteSegmentHandler.handle(new SaveRouteSegmentCommand(
@@ -164,6 +141,10 @@ public class MapMatchRouteHandler implements CommandHandler<MapMatchRouteCommand
 		for (RouteCoordinate coordinate : command.coordinates()) {
 			if (coordinate == null) {
 				throw new BusinessException(ErrorCode.VALIDATION_FAILED, "Route coordinates must not contain null.");
+			}
+			if (!Double.isFinite(coordinate.lng()) || !Double.isFinite(coordinate.lat())
+				|| Math.abs(coordinate.lng()) > 180 || Math.abs(coordinate.lat()) > 90) {
+				throw new BusinessException(ErrorCode.VALIDATION_FAILED, "Route coordinates are out of range.");
 			}
 		}
 		if (command.radiuses() != null) {
@@ -221,34 +202,10 @@ public class MapMatchRouteHandler implements CommandHandler<MapMatchRouteCommand
 		return switch (mode) {
 			case DRIVING -> "mapbox/driving";
 			case WALKING -> "mapbox/walking";
+			case CYCLING -> "mapbox/cycling";
 		};
 	}
 
-	private String fallbackProviderProfile(RouteMode mode) {
-		return switch (mode) {
-			case DRIVING -> "user-trace/driving";
-			case WALKING -> "user-trace/walking";
-		};
-	}
-
-	private Map<String, Object> fallbackMetadata(MapMatchingException exception) {
-		Map<String, Object> metadata = new LinkedHashMap<>();
-		metadata.put("code", "FALLBACK");
-		metadata.put("reason", exception.providerCode());
-		metadata.put("message", exception.getMessage());
-		return metadata;
-	}
-
-	private Map<String, Object> rawLineStringGeometry(List<RouteCoordinate> coordinates) {
-		List<List<Double>> lineCoordinates = new ArrayList<>();
-		for (RouteCoordinate coordinate : coordinates) {
-			lineCoordinates.add(List.of(coordinate.lng(), coordinate.lat()));
-		}
-		return Map.of(
-			"type", "LineString",
-			"coordinates", lineCoordinates
-		);
-	}
 
 	private String toJson(Object value) {
 		try {

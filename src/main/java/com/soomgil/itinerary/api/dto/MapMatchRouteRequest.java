@@ -7,6 +7,7 @@ import jakarta.validation.constraints.Size;
 import java.util.List;
 import java.util.UUID;
 
+/** 선택한 이동수단으로 2~25개의 경유점을 연결하는 Directions 요청. tidy는 호환성 필드로 사용하지 않는다. */
 public record MapMatchRouteRequest(
 	@NotNull
 	Long baseVersion,
@@ -18,7 +19,7 @@ public record MapMatchRouteRequest(
 	RouteMode mode,
 	@Valid
 	@NotNull
-	@Size(min = 2, max = 100)
+	@Size(min = 2, max = 25)
 	List<LngLat> coordinates,
 	List<Double> radiuses,
 	Boolean tidy

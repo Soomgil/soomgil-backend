@@ -234,4 +234,35 @@ class KtoTourismPlaceClientTest {
 			id, "place-" + id, null, null, null, null, "12", null, List.of(), null
 		);
 	}
+	@Test
+	void appendsAreaAndSigunguCodesToAreaBasedListQuery() {
+		var withSigungu = KtoTourismPlaceClient.appendAreaParams(
+			org.springframework.web.util.UriComponentsBuilder.fromPath("/areaBasedList2"), "39", "4", "12"
+		).build().toUriString();
+		var sidoOnly = KtoTourismPlaceClient.appendAreaParams(
+			org.springframework.web.util.UriComponentsBuilder.fromPath("/areaBasedList2"), "39", null, null
+		).build().toUriString();
+
+		assertThat(withSigungu).contains("areaCode=39").contains("sigunguCode=4").contains("contentTypeId=12");
+		assertThat(sidoOnly).contains("areaCode=39").doesNotContain("sigunguCode").doesNotContain("contentTypeId");
+	}
+	@Test
+	void passesThroughAnyKtoAreaCodeForLiveRegionSearch() {
+		assertThat(KtoTourismPlaceClient.liveAreaCode(
+			new com.soomgil.place.application.port.TourismPlaceLiveSearchRequest(null, null, "1", null, 10, "1")
+		)).isEqualTo("1");
+		assertThat(KtoTourismPlaceClient.liveAreaCode(
+			new com.soomgil.place.application.port.TourismPlaceLiveSearchRequest(null, null, "39", null, 10)
+		)).isEqualTo("39");
+	}
+
+	@Test
+	void keepsJejuHeuristicsOnlyWhenNoAreaCodeIsGiven() {
+		assertThat(KtoTourismPlaceClient.liveAreaCode(
+			new com.soomgil.place.application.port.TourismPlaceLiveSearchRequest("제주 카페", null, null, null, 10)
+		)).isEqualTo("39");
+		assertThat(KtoTourismPlaceClient.liveAreaCode(
+			new com.soomgil.place.application.port.TourismPlaceLiveSearchRequest(null, "126.9,37.4,127.1,37.7", null, null, 10)
+		)).isNull();
+	}
 }

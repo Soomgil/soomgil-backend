@@ -12,7 +12,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Test;
 
 class MapboxDirectionsClientTest {
 
@@ -25,8 +24,9 @@ class MapboxDirectionsClientTest {
 		}
 	}
 
-	@Test
-	void sendsDirectionsRequestAndParsesFirstRoute() throws Exception {
+	@org.junit.jupiter.params.ParameterizedTest
+	@org.junit.jupiter.params.provider.ValueSource(strings = {"walking", "cycling", "driving"})
+	void sendsDirectionsRequestAndParsesFirstRoute(String mode) throws Exception {
 		AtomicReference<URI> requestedUri = new AtomicReference<>();
 		server = HttpServer.create(new InetSocketAddress(0), 0);
 		server.createContext("/directions/v5/", exchange -> {
@@ -55,14 +55,14 @@ class MapboxDirectionsClientTest {
 		MapboxDirectionsClient client = new MapboxDirectionsClient(properties, new ObjectMapper());
 
 		var result = client.match(new MapMatchClientRequest(
-			"mapbox/walking",
+			"mapbox/" + mode,
 			List.of(new RouteCoordinate(127.0, 37.0), new RouteCoordinate(127.1, 37.1)),
 			List.of(10.0, 20.0),
 			true
 		));
 
 		assertThat(requestedUri.get().getPath())
-			.isEqualTo("/directions/v5/mapbox/walking/127.0,37.0;127.1,37.1.json");
+			.isEqualTo("/directions/v5/mapbox/" + mode + "/127.0,37.0;127.1,37.1.json");
 		assertThat(requestedUri.get().getQuery())
 			.contains("access_token=test-token", "geometries=geojson", "overview=full", "steps=false")
 			.doesNotContain("radiuses=", "tidy=");

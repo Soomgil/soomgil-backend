@@ -113,6 +113,10 @@ class ItineraryCommandRepositoryIntegrationTest {
 		assertThat(sticker.stickerCode()).isEqualTo("HEART");
 		assertThat(sticker.transform()).contains("widthMeters");
 		assertThat(repository.findRouteSegment(TRIP_ID, ROUTE_ID)).isPresent();
+		repository.updateRouteSegment(new com.soomgil.itinerary.application.port.RouteSegmentUpdate(
+			TRIP_ID, ROUTE_ID, RouteMode.CYCLING, "MAPBOX", "mapbox/cycling", null, 800.0, 240.0, null, USER_ID, NOW));
+		assertThat(repository.findRouteSegment(TRIP_ID, ROUTE_ID).orElseThrow().mode()).isEqualTo(RouteMode.CYCLING);
+		assertThat(repository.findRouteSegment(TRIP_ID, ROUTE_ID).orElseThrow().durationSeconds()).isEqualTo(240.0);
 		assertThat(repository.incrementItineraryVersion(TRIP_ID, 0, NOW)).hasValue(1L);
 		assertThat(repository.incrementItineraryVersion(TRIP_ID, 0, NOW)).isEmpty();
 	}

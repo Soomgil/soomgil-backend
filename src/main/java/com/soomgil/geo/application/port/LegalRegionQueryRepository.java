@@ -1,5 +1,7 @@
 package com.soomgil.geo.application.port;
 
+import java.util.List;
+
 import com.soomgil.geo.domain.model.LegalRegionLevel;
 
 /**
@@ -26,4 +28,12 @@ public interface LegalRegionQueryRepository {
 		int page,
 		int size
 	);
+
+	/**
+	 * 코드 목록에 해당하는 법정동 지역을 조회한다.
+	 *
+	 * @param codes 10자리 법정동 코드 목록
+	 * @return 존재하는 지역만 코드 순으로 정렬한 목록
+	 */
+	List<LegalRegionReadModel> findLegalRegionsByCodes(List<String> codes);
 }

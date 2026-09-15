@@ -80,6 +80,11 @@ class ListLegalRegionsHandlerTest {
 	}
 
 	private static class CapturingLegalRegionQueryRepository implements LegalRegionQueryRepository {
+		@Override
+		public List<LegalRegionReadModel> findLegalRegionsByCodes(List<String> codes) {
+			return List.of();
+		}
+
 
 		private String query;
 		private LegalRegionLevel level;
