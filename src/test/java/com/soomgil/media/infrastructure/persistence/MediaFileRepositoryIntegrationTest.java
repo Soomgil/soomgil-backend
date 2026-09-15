@@ -6,6 +6,9 @@ import com.soomgil.TestcontainersConfiguration;
 import com.soomgil.global.storage.StorageObjectKey;
 import com.soomgil.media.application.port.LinkedMediaResourceAuthorizer;
 import com.soomgil.media.application.port.MediaFileRepository;
+import com.soomgil.media.infrastructure.persistence.mapper.MediaFileMapper;
+import com.soomgil.media.infrastructure.persistence.mapper.MediaUploadIntentMapper;
+import com.soomgil.media.infrastructure.persistence.row.MediaUploadIntentRow;
 import com.soomgil.media.domain.model.MediaFileMetadata;
 import java.net.URI;
 import java.time.Instant;
@@ -43,6 +46,12 @@ class MediaFileRepositoryIntegrationTest {
 	@Autowired
 	private JdbcTemplate jdbcTemplate;
 
+	@Autowired
+	private MediaFileMapper mediaFileMapper;
+
+	@Autowired
+	private MediaUploadIntentMapper uploadIntentMapper;
+
 	@Test
 	void savesReadsAndSoftDeletesMediaMetadata() {
 		MediaFileMetadata mediaFile = mediaFile();
@@ -69,6 +78,36 @@ class MediaFileRepositoryIntegrationTest {
 		assertThat(authorizer.canLink(USER_ID, "TRIP_RECORD", RECORD_ID)).isTrue();
 		assertThat(authorizer.canLink(UUID.randomUUID(), "TRIP_RECORD", RECORD_ID)).isFalse();
 		assertThat(authorizer.canLink(USER_ID, "UNKNOWN", RECORD_ID)).isFalse();
+	}
+
+	@Test
+	void keepsThreadAttachedMediaOutOfOrphanCleanup() {
+		// 쓰레드에 붙은 미디어는 linked_resource가 비어 있어도 고아 정리 대상이 아니다.
+		repository.save(mediaFile());
+		jdbcTemplate.update("INSERT INTO auth.users (id) VALUES (?) ON CONFLICT DO NOTHING", USER_ID);
+		UUID threadId = UUID.randomUUID();
+		jdbcTemplate.update(
+			"INSERT INTO community.threads (id, author_user_id, content, created_at, updated_at) "
+				+ "VALUES (?, ?, '미디어 정리 보호 테스트', ?, ?)",
+			threadId, USER_ID, NOW, NOW
+		);
+		jdbcTemplate.update(
+			"INSERT INTO community.thread_media (thread_id, media_file_id, sort_order, created_at) "
+				+ "VALUES (?, ?, 0, ?)",
+			threadId, MEDIA_ID, NOW
+		);
+		jdbcTemplate.update(
+			"INSERT INTO media.upload_intents (id, owner_user_id, object_key, status, media_file_id, expires_at, created_at, completed_at) "
+				+ "VALUES (?, ?, ?, 'COMPLETED', ?, ?, ?, ?)",
+			UUID.randomUUID(), USER_ID, "media/" + USER_ID + "/community-post/thread.jpg",
+			MEDIA_ID, NOW.minusMinutes(5), NOW.minusHours(1), NOW.minusHours(1)
+		);
+
+		OffsetDateTime now = NOW.plusDays(1);
+		assertThat(uploadIntentMapper.findExpiredCompletedUnlinked(now, 100))
+			.extracting(MediaUploadIntentRow::mediaFileId)
+			.doesNotContain(MEDIA_ID);
+		assertThat(mediaFileMapper.claimUnlinkedForPurge(MEDIA_ID, now.toInstant())).isZero();
 	}
 
 	private MediaFileMetadata mediaFile() {

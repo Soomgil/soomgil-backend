@@ -111,6 +111,11 @@ class GeoControllerTest {
 	}
 
 	private static class StubLegalRegionQueryRepository implements LegalRegionQueryRepository {
+		@Override
+		public List<LegalRegionReadModel> findLegalRegionsByCodes(List<String> codes) {
+			return List.of();
+		}
+
 
 		private LegalRegionPage result = new LegalRegionPage(List.of(), 0);
 

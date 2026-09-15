@@ -16,6 +16,7 @@ public class PreferencePolicyProperties {
 	private final Recommendation recommendation = new Recommendation();
 	private final SyntheticPersona syntheticPersona = new SyntheticPersona();
 	private final RealUser realUser = new RealUser();
+	private final TripVote tripVote = new TripVote();
 
 	public Statistics getStatistics() {
 		return statistics;
@@ -35,6 +36,15 @@ public class PreferencePolicyProperties {
 
 	public RealUser getRealUser() {
 		return realUser;
+	}
+
+	/**
+	 * 여행 방 투표 스티커를 취향 근거로 환산할 때 사용하는 설정.
+	 *
+	 * @return 투표 근거 환산 설정
+	 */
+	public TripVote getTripVote() {
+		return tripVote;
 	}
 
 	public static class Statistics {
@@ -180,6 +190,44 @@ public class PreferencePolicyProperties {
 
 		public void setMinimumCoreTagReactionCount(long minimumCoreTagReactionCount) {
 			this.minimumCoreTagReactionCount = minimumCoreTagReactionCount;
+		}
+	}
+
+	/**
+	 * 투표 스티커 개수를 취향 근거 단위로 환산하는 설정.
+	 *
+	 * <p>단위는 스와이프 근거와 같은 척도다. 기본값은 스티커 1개를 LIKE 강도(1.0)로,
+	 * 상한을 SUPER_LIKE 강도(2.0)로 맞춘다. 값을 바꾸면 이미 반영된 근거는 재계산되지 않으므로
+	 * {@code TripVoteEvidencePolicy}의 계산 버전과 함께 관리해야 한다.
+	 */
+	public static class TripVote {
+
+		private BigDecimal baseWeight = new BigDecimal("1.0");
+		private BigDecimal stickerStep = new BigDecimal("0.5");
+		private BigDecimal maxWeight = new BigDecimal("2.0");
+
+		public BigDecimal getBaseWeight() {
+			return baseWeight;
+		}
+
+		public void setBaseWeight(BigDecimal baseWeight) {
+			this.baseWeight = baseWeight;
+		}
+
+		public BigDecimal getStickerStep() {
+			return stickerStep;
+		}
+
+		public void setStickerStep(BigDecimal stickerStep) {
+			this.stickerStep = stickerStep;
+		}
+
+		public BigDecimal getMaxWeight() {
+			return maxWeight;
+		}
+
+		public void setMaxWeight(BigDecimal maxWeight) {
+			this.maxWeight = maxWeight;
 		}
 	}
 }

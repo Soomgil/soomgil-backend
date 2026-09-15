@@ -55,6 +55,26 @@ public class MediaFileQueryService {
 			.toList();
 	}
 
+	/**
+	 * 특정 사용자가 소유한 활성 미디어인지 확인한다.
+	 *
+	 * <p>다른 도메인이 업로드된 미디어를 자기 리소스에 연결하기 전에 소유권을 검증하는 용도다.
+	 * 미디어가 없거나 {@code ACTIVE}가 아니거나 소유자가 다르면 {@code false}를 반환하며,
+	 * 호출자는 이 결과를 권한 실패로 변환해야 한다.
+	 *
+	 * @param mediaFileId 확인할 미디어 파일 식별자. null이면 항상 false
+	 * @param ownerUserId 소유자로 기대하는 사용자 식별자. null이면 항상 false
+	 * @return 해당 사용자가 소유한 활성 미디어면 true
+	 */
+	public boolean isOwnedActiveMedia(UUID mediaFileId, UUID ownerUserId) {
+		if (mediaFileId == null || ownerUserId == null) {
+			return false;
+		}
+		return mediaFileMapper.findById(mediaFileId)
+			.map(record -> ownerUserId.equals(record.ownerUserId()))
+			.orElse(false);
+	}
+
 	private MediaFile toDto(MediaFileRecord record) {
 		return new MediaFile(
 			record.id(),

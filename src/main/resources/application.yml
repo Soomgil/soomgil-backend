@@ -138,3 +138,7 @@ soomgil:
     real-user:
       minimum-total-reaction-count: ${PREFERENCE_REAL_MIN_TOTAL_REACTIONS:10000}
       minimum-core-tag-reaction-count: ${PREFERENCE_REAL_MIN_CORE_TAG_REACTIONS:100}
+    trip-vote:
+      base-weight: ${PREFERENCE_TRIP_VOTE_BASE_WEIGHT:1.0}
+      sticker-step: ${PREFERENCE_TRIP_VOTE_STICKER_STEP:0.5}
+      max-weight: ${PREFERENCE_TRIP_VOTE_MAX_WEIGHT:2.0}

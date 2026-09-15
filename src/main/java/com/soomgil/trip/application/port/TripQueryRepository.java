@@ -78,4 +78,19 @@ public interface TripQueryRepository {
 	 * @return 수락 검증용 read model
 	 */
 	Optional<TripInviteAcceptReadModel> findTripInviteForAccept(String inviteCode);
+
+	/**
+	 * 여행방에 등록된 법정동 코드를 조회한다.
+	 *
+	 * <p>여행 지역 기반 추천/검색이 필요한 다른 모듈이 trip DB를 직접 읽지 않도록 열어 둔 조회다.
+	 *
+	 * <p>기존 구현/테스트 stub이 깨지지 않도록 default로 빈 목록을 반환한다.
+	 * 실제 조회가 필요한 구현체는 반드시 override해야 한다.
+	 *
+	 * @param tripId 여행방 ID
+	 * @return 정렬 순서대로의 법정동 코드 목록. 지역이 등록되어 있지 않으면 빈 목록
+	 */
+	default List<String> findTripRegionCodes(UUID tripId) {
+		return List.of();
+	}
 }

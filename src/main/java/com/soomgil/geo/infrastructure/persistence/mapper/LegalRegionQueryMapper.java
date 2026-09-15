@@ -46,4 +46,12 @@ public interface LegalRegionQueryMapper {
 		@Param("parentCode") String parentCode,
 		@Param("isActive") Boolean isActive
 	);
+
+	/**
+	 * 코드 목록에 해당하는 법정동 지역을 조회한다.
+	 *
+	 * @param codes 10자리 법정동 코드 목록
+	 * @return 지역 목록
+	 */
+	List<LegalRegionRow> findLegalRegionsByCodes(@Param("codes") List<String> codes);
 }

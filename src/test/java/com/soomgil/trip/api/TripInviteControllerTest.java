@@ -43,7 +43,7 @@ class TripInviteControllerTest {
 		TripCommandRepository commandRepository = new AcceptCommandRepository(state);
 		TripInviteController controller = new TripInviteController(
 			new AcceptTripInviteHandler(commandRepository, queryRepository, fixedTime()),
-			new FindTripDetailHandler(new TripAccessGuard(queryRepository), queryRepository),
+			new FindTripDetailHandler(new TripAccessGuard(queryRepository), queryRepository, org.mockito.Mockito.mock(com.soomgil.geo.application.query.handler.FindLegalRegionsByCodesHandler.class)),
 			mock(FindDisplayNameQueryHandler.class)
 		);
 

@@ -62,6 +62,11 @@ public class MyBatisTripQueryRepository implements TripQueryRepository {
 	}
 
 	@Override
+	public List<String> findTripRegionCodes(UUID tripId) {
+		return mapper.findTripRegionCodes(tripId);
+	}
+
+	@Override
 	public List<TripMemberReadModel> findTripMembers(UUID tripId, TripMemberStatus status) {
 		String statusValue = status == null ? null : status.name();
 		return mapper.findTripMembers(tripId, statusValue)
