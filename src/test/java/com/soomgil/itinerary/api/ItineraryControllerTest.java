@@ -589,7 +589,8 @@ class ItineraryControllerTest {
 				eventRepository,
 				new com.soomgil.trip.application.query.handler.TripAccessGuard(new StubTripQueryRepository()),
 				() -> Instant.parse("2026-06-17T00:00:00Z"),
-				new ObjectMapper()
+				new ObjectMapper(),
+				org.mockito.Mockito.mock(com.soomgil.itinerary.application.port.MapMatchingClient.class)
 			)
 		);
 	}

@@ -7,17 +7,28 @@ import com.soomgil.itinerary.application.command.dto.ItineraryMutationResult;
 import com.soomgil.itinerary.application.command.dto.ItineraryDayOrderCommand;
 import com.soomgil.itinerary.application.command.dto.ItineraryItemOrderCommand;
 import com.soomgil.itinerary.application.command.dto.ItineraryItemView;
+import com.soomgil.itinerary.application.command.dto.MapMatchRouteCommand;
 import com.soomgil.itinerary.application.command.dto.ReorderItineraryCommand;
+import com.soomgil.itinerary.application.command.dto.RouteSegmentView;
 import com.soomgil.itinerary.application.command.dto.UpdateItineraryItemCommand;
+import com.soomgil.itinerary.application.command.dto.UpdateRouteSegmentCommand;
 import com.soomgil.itinerary.application.command.handler.CreateItineraryDayHandler;
 import com.soomgil.itinerary.application.command.handler.CreateItineraryItemHandler;
 import com.soomgil.itinerary.application.command.handler.DeleteItineraryItemHandler;
+import com.soomgil.itinerary.application.command.handler.MapMatchRouteHandler;
 import com.soomgil.itinerary.application.command.handler.ReorderItineraryHandler;
 import com.soomgil.itinerary.application.command.handler.UpdateItineraryItemHandler;
+import com.soomgil.itinerary.application.command.handler.UpdateRouteSegmentHandler;
+import com.soomgil.itinerary.application.port.RouteCoordinate;
 import com.soomgil.itinerary.application.query.dto.FindItineraryQuery;
+import com.soomgil.itinerary.application.query.dto.ItineraryDayDetailView;
 import com.soomgil.itinerary.application.query.handler.FindItineraryHandler;
+import com.soomgil.itinerary.application.command.dto.UpdateItineraryDayCommand;
+import com.soomgil.itinerary.application.command.handler.UpdateItineraryDayHandler;
 import com.soomgil.itinerary.domain.model.ItineraryDayGroupType;
+import java.time.LocalDate;
 import com.soomgil.itinerary.domain.model.ItineraryItemType;
+import com.soomgil.itinerary.domain.model.RouteMode;
 import com.soomgil.global.error.BusinessException;
 import com.soomgil.global.error.ErrorCode;
 import java.net.URI;
@@ -40,25 +51,34 @@ public class AiItineraryToolService {
 
 	private final FindItineraryHandler itineraryHandler;
 	private final CreateItineraryDayHandler createDayHandler;
+	private final UpdateItineraryDayHandler updateDayHandler;
 	private final CreateItineraryItemHandler createItemHandler;
 	private final DeleteItineraryItemHandler deleteItemHandler;
 	private final UpdateItineraryItemHandler updateItemHandler;
 	private final ReorderItineraryHandler reorderItineraryHandler;
+	private final MapMatchRouteHandler mapMatchRouteHandler;
+	private final UpdateRouteSegmentHandler updateRouteSegmentHandler;
 
 	public AiItineraryToolService(
 		FindItineraryHandler itineraryHandler,
 		CreateItineraryDayHandler createDayHandler,
+		UpdateItineraryDayHandler updateDayHandler,
 		CreateItineraryItemHandler createItemHandler,
 		DeleteItineraryItemHandler deleteItemHandler,
 		UpdateItineraryItemHandler updateItemHandler,
-		ReorderItineraryHandler reorderItineraryHandler
+		ReorderItineraryHandler reorderItineraryHandler,
+		MapMatchRouteHandler mapMatchRouteHandler,
+		UpdateRouteSegmentHandler updateRouteSegmentHandler
 	) {
 		this.itineraryHandler = itineraryHandler;
 		this.createDayHandler = createDayHandler;
+		this.updateDayHandler = updateDayHandler;
 		this.createItemHandler = createItemHandler;
 		this.deleteItemHandler = deleteItemHandler;
 		this.updateItemHandler = updateItemHandler;
 		this.reorderItineraryHandler = reorderItineraryHandler;
+		this.mapMatchRouteHandler = mapMatchRouteHandler;
+		this.updateRouteSegmentHandler = updateRouteSegmentHandler;
 	}
 
 	/**
@@ -299,6 +319,184 @@ public class AiItineraryToolService {
 		return last;
 	}
 
+	/**
+	 * 지정한 일차의 장소들을 현재 정렬 순서대로 인접 연결한다.
+	 *
+	 * <p>이미 연결된 구간은 새 row를 만들지 않고 mode가 다를 때만 기존 route를 재계산한다.
+	 * 각 변경은 직전 결과의 itinerary version으로 이어서 적용한다.
+	 */
+	@Transactional
+	public ConnectDayRoutesResult connectDayRoutes(
+		UUID tripId,
+		UUID userId,
+		long baseVersion,
+		UUID itineraryDayId,
+		Integer dayNumber,
+		RouteMode mode
+	) {
+		if (mode == null) {
+			throw new BusinessException(ErrorCode.VALIDATION_FAILED, "Route mode is required.");
+		}
+		var itinerary = itineraryHandler.handle(new FindItineraryQuery(tripId, userId));
+		ItineraryDayDetailView day = resolveDay(itinerary, itineraryDayId, dayNumber);
+		List<ItineraryItemView> items = day.items().stream()
+			.sorted(Comparator.comparingInt(ItineraryItemView::sortOrder))
+			.toList();
+		if (items.size() < 2) {
+			throw new BusinessException(ErrorCode.VALIDATION_FAILED, "연결할 장소가 2개 이상 필요해요.");
+		}
+
+		long version = baseVersion;
+		int created = 0;
+		int updated = 0;
+		int unchanged = 0;
+		ItineraryMutationResult last = null;
+		for (int index = 0; index < items.size() - 1; index++) {
+			ItineraryItemView origin = items.get(index);
+			ItineraryItemView destination = items.get(index + 1);
+			validateCoordinates(origin, destination);
+			RouteSegmentView existing = findRouteBetween(itinerary.routes(), origin.id(), destination.id());
+			if (existing != null) {
+				if (existing.mode() == mode) {
+					unchanged++;
+					continue;
+				}
+				last = updateRouteSegmentHandler.handle(new UpdateRouteSegmentCommand(
+					tripId, userId, version, existing.id(), mode, null, null, null, null
+				));
+				version = last.itineraryVersion();
+				updated++;
+				continue;
+			}
+			last = mapMatchRouteHandler.handle(new MapMatchRouteCommand(
+				tripId, userId, version, origin.id(), destination.id(), mode,
+				List.of(
+					new RouteCoordinate(origin.lng(), origin.lat()),
+					new RouteCoordinate(destination.lng(), destination.lat())
+				),
+				null,
+				false
+			)).mutation();
+			version = last.itineraryVersion();
+			created++;
+		}
+		return new ConnectDayRoutesResult(tripId, version, day.id(), day.dayNumber(), mode, created, updated, unchanged, last);
+	}
+
+	/**
+	 * 새 일차를 만든다.
+	 *
+	 * <p>{@code dayNumber}를 주지 않으면 기존 DAY 그룹의 최대 번호 다음으로 자동 배정한다.
+	 * 같은 번호가 이미 있으면 만들지 않고 기존 일차를 그대로 반환 대상으로 삼지 않고 예외를 던진다.
+	 *
+	 * @param dayNumber 만들 일차 번호. null이면 마지막 일차 다음 번호
+	 * @param date 일정 날짜. null 허용
+	 * @param title 일차 제목. null이면 "{n}일차"
+	 */
+	@Transactional
+	public ItineraryMutationResult createDay(
+		UUID tripId,
+		UUID userId,
+		long baseVersion,
+		Integer dayNumber,
+		LocalDate date,
+		String title
+	) {
+		var itinerary = itineraryHandler.handle(new FindItineraryQuery(tripId, userId));
+		int resolvedNumber = dayNumber != null ? dayNumber : nextDayNumber(itinerary);
+		if (resolvedNumber < 1) {
+			throw new BusinessException(ErrorCode.VALIDATION_FAILED, "일차 번호는 1 이상이어야 해요.");
+		}
+		boolean duplicated = itinerary.days().stream()
+			.anyMatch(day -> day.dayNumber() != null && day.dayNumber() == resolvedNumber);
+		if (duplicated) {
+			throw new BusinessException(ErrorCode.VALIDATION_FAILED, resolvedNumber + "일차는 이미 있어요.");
+		}
+		return createDayHandler.handle(new CreateItineraryDayCommand(
+			tripId, userId, baseVersion, ItineraryDayGroupType.DAY,
+			resolvedNumber, date,
+			title == null || title.isBlank() ? resolvedNumber + "일차" : title,
+			resolvedNumber
+		));
+	}
+
+	/**
+	 * 기존 일차의 제목이나 날짜를 바꾼다.
+	 *
+	 * <p>{@code itineraryDayId}가 없으면 {@code dayNumber}로 일차를 찾는다. 둘 다 없으면 예외를 던진다.
+	 * null로 전달한 항목은 변경하지 않는다.
+	 */
+	@Transactional
+	public ItineraryMutationResult updateDay(
+		UUID tripId,
+		UUID userId,
+		long baseVersion,
+		UUID itineraryDayId,
+		Integer dayNumber,
+		LocalDate date,
+		String title
+	) {
+		if (itineraryDayId == null && dayNumber == null) {
+			throw new BusinessException(ErrorCode.VALIDATION_FAILED, "어떤 일차를 바꿀지 알려주세요.");
+		}
+		var itinerary = itineraryHandler.handle(new FindItineraryQuery(tripId, userId));
+		ItineraryDayDetailView day = resolveDay(itinerary, itineraryDayId, dayNumber);
+		if (date == null && (title == null || title.isBlank())) {
+			throw new BusinessException(ErrorCode.VALIDATION_FAILED, "바꿀 제목이나 날짜를 알려주세요.");
+		}
+		return updateDayHandler.handle(new UpdateItineraryDayCommand(
+			tripId, userId, baseVersion, day.id(),
+			day.dayNumber(), date, title == null || title.isBlank() ? null : title, null
+		));
+	}
+
+	private int nextDayNumber(com.soomgil.itinerary.application.query.dto.ItineraryView itinerary) {
+		return itinerary.days().stream()
+			.filter(day -> day.groupType() == ItineraryDayGroupType.DAY && day.dayNumber() != null)
+			.mapToInt(ItineraryDayDetailView::dayNumber)
+			.max()
+			.orElse(0) + 1;
+	}
+
+	private ItineraryDayDetailView resolveDay(
+		com.soomgil.itinerary.application.query.dto.ItineraryView itinerary,
+		UUID dayId,
+		Integer dayNumber
+	) {
+		if (dayId != null) {
+			return itinerary.days().stream().filter(day -> day.id().equals(dayId)).findFirst()
+				.orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "목표 일차를 찾지 못했어요."));
+		}
+		if (dayNumber == null) {
+			throw new BusinessException(ErrorCode.VALIDATION_FAILED, "몇 일차를 연결할지 알려주세요.");
+		}
+		return itinerary.days().stream()
+			.filter(day -> day.dayNumber() != null && day.dayNumber().equals(dayNumber))
+			.findFirst()
+			.orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, dayNumber + "일차를 찾지 못했어요."));
+	}
+
+	private RouteSegmentView findRouteBetween(List<RouteSegmentView> routes, UUID originItemId, UUID destinationItemId) {
+		return routes.stream()
+			.filter(route -> (route.originItineraryItemId().equals(originItemId)
+				&& route.destinationItineraryItemId().equals(destinationItemId))
+				|| (route.originItineraryItemId().equals(destinationItemId)
+				&& route.destinationItineraryItemId().equals(originItemId)))
+			.findFirst()
+			.orElse(null);
+	}
+
+	private void validateCoordinates(ItineraryItemView origin, ItineraryItemView destination) {
+		if (!hasCoordinate(origin) || !hasCoordinate(destination)) {
+			throw new BusinessException(ErrorCode.VALIDATION_FAILED, "경로 연결에는 좌표가 있는 장소만 사용할 수 있어요.");
+		}
+	}
+
+	private boolean hasCoordinate(ItineraryItemView item) {
+		return item.lat() != null && item.lng() != null
+			&& Double.isFinite(item.lat()) && Double.isFinite(item.lng());
+	}
+
 	/** AI 장소 추가 도구가 itinerary 모듈에 전달하는 입력. */
 
 	/** AI 장소 추가 도구가 itinerary 모듈에 전달하는 입력. */
@@ -325,6 +523,20 @@ public class AiItineraryToolService {
 		Double lat,
 		Double lng,
 		String thumbnailUrl
+	) {
+	}
+
+	/** 지정 일차 경로 자동 연결 결과. */
+	public record ConnectDayRoutesResult(
+		UUID tripId,
+		long versionAfter,
+		UUID itineraryDayId,
+		Integer dayNumber,
+		RouteMode mode,
+		int createdCount,
+		int updatedCount,
+		int unchangedCount,
+		ItineraryMutationResult lastMutation
 	) {
 	}
 }

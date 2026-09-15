@@ -5,5 +5,6 @@ package com.soomgil.itinerary.domain.model;
  */
 public enum RouteMode {
 	DRIVING,
+	CYCLING,
 	WALKING
 }

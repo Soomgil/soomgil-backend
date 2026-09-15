@@ -10,6 +10,7 @@ import java.util.UUID;
  * @param tripId 여행방 ID
  * @param routeId route ID
  * @param mode 변경할 이동 mode
+ * @param provider 재계산 결과 제공자, null이면 유지
  * @param providerProfile 변경할 provider profile
  * @param geometry 변경할 GeoJSON geometry JSON
  * @param distanceMeters 변경할 거리(m)
@@ -22,6 +23,7 @@ public record RouteSegmentUpdate(
 	UUID tripId,
 	UUID routeId,
 	RouteMode mode,
+	String provider,
 	String providerProfile,
 	String geometry,
 	Double distanceMeters,

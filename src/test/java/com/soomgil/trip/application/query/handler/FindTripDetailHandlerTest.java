@@ -2,9 +2,15 @@ package com.soomgil.trip.application.query.handler;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.soomgil.global.error.BusinessException;
 import com.soomgil.global.error.ErrorCode;
+import com.soomgil.geo.application.query.dto.LegalRegionView;
+import com.soomgil.geo.application.query.handler.FindLegalRegionsByCodesHandler;
+import com.soomgil.geo.domain.model.LegalRegionLevel;
 import com.soomgil.trip.application.port.TripAccessSnapshot;
 import com.soomgil.trip.application.port.TripInviteReadModel;
 import com.soomgil.trip.application.port.TripMemberReadModel;
@@ -30,7 +36,9 @@ class FindTripDetailHandlerTest {
 	private final UUID ownerUserId = UUID.randomUUID();
 	private final UUID memberUserId = UUID.randomUUID();
 	private final StubTripQueryRepository repository = new StubTripQueryRepository();
-	private final FindTripDetailHandler handler = new FindTripDetailHandler(new TripAccessGuard(repository), repository);
+	private final FindLegalRegionsByCodesHandler legalRegions = mock(FindLegalRegionsByCodesHandler.class);
+	private final FindTripDetailHandler handler =
+		new FindTripDetailHandler(new TripAccessGuard(repository), repository, legalRegions);
 
 	@Test
 	void activeMemberCanFindTripDetailWithDerivedOwnerMemberRole() {
@@ -122,6 +130,12 @@ class FindTripDetailHandlerTest {
 		private Optional<TripAccessSnapshot> access = Optional.empty();
 		private Optional<TripReadModel> trip = Optional.empty();
 		private List<TripMemberReadModel> members = List.of();
+		private List<String> regionCodes = List.of();
+
+		@Override
+		public List<String> findTripRegionCodes(UUID tripId) {
+			return regionCodes;
+		}
 
 		@Override
 		public Optional<TripAccessSnapshot> findTripAccess(UUID tripId, UUID userId) {
@@ -161,5 +175,37 @@ class FindTripDetailHandlerTest {
 		) {
 			return Optional.empty();
 		}
+	}
+	@Test
+	void includesTripRegionsResolvedThroughGeoInTripOrder() {
+		repository.access = Optional.of(new TripAccessSnapshot(
+			tripId, ownerUserId, TripStatus.ACTIVE, TripMemberStatus.ACTIVE, ownerUserId
+		));
+		repository.trip = Optional.of(trip(ownerUserId));
+		repository.members = List.of(member(ownerUserId, ownerUserId));
+		repository.regionCodes = List.of("5013000000", "5011000000");
+		when(legalRegions.handle(any())).thenReturn(List.of(
+			new LegalRegionView("5011000000", "제주시", "제주특별자치도 제주시", LegalRegionLevel.SIGUNGU, "5000000000", true),
+			new LegalRegionView("5013000000", "서귀포시", "제주특별자치도 서귀포시", LegalRegionLevel.SIGUNGU, "5000000000", true)
+		));
+
+		TripDetailView view = handler.handle(new FindTripDetailQuery(tripId, ownerUserId));
+
+		// 여행방에 등록한 순서(서귀포시 → 제주시)를 유지한다.
+		assertThat(view.regions()).extracting(LegalRegionView::name).containsExactly("서귀포시", "제주시");
+	}
+
+	@Test
+	void keepsRegionsEmptyWithoutGeoLookupWhenTripHasNoRegion() {
+		repository.access = Optional.of(new TripAccessSnapshot(
+			tripId, ownerUserId, TripStatus.ACTIVE, TripMemberStatus.ACTIVE, ownerUserId
+		));
+		repository.trip = Optional.of(trip(ownerUserId));
+		repository.members = List.of(member(ownerUserId, ownerUserId));
+
+		TripDetailView view = handler.handle(new FindTripDetailQuery(tripId, ownerUserId));
+
+		assertThat(view.regions()).isEmpty();
+		org.mockito.Mockito.verify(legalRegions, org.mockito.Mockito.never()).handle(any());
 	}
 }

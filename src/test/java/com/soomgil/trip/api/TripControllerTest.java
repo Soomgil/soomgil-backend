@@ -80,7 +80,7 @@ class TripControllerTest {
 			new DeleteTripHandler(new NoopTripCommandRepository(), queryRepository, fixedTime()),
 			new RemoveTripMemberHandler(new NoopTripCommandRepository(), queryRepository, fixedTime()),
 			new ListMyTripsHandler(queryRepository),
-			new FindTripDetailHandler(accessGuard, queryRepository),
+			new FindTripDetailHandler(accessGuard, queryRepository, org.mockito.Mockito.mock(com.soomgil.geo.application.query.handler.FindLegalRegionsByCodesHandler.class)),
 			new ListTripMembersHandler(accessGuard, queryRepository),
 			new ListTripInvitesHandler(accessGuard, queryRepository),
 			mock(FindDisplayNameQueryHandler.class),

@@ -23,6 +23,7 @@ import java.security.Principal;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import com.soomgil.geo.api.dto.LegalRegion;
 import java.util.Objects;
 import java.util.UUID;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -96,7 +97,16 @@ public class TripInviteController {
 			view.itineraryVersion(),
 			OffsetDateTime.ofInstant(view.createdAt(), ZoneOffset.UTC),
 			view.ownerUserId(),
-			List.of(),
+			view.regions().stream()
+				.map(region -> new LegalRegion(
+					region.code(),
+					region.name(),
+					region.fullName(),
+					com.soomgil.geo.api.dto.LegalRegionLevel.valueOf(region.level().name()),
+					region.parentCode(),
+					region.active()
+				))
+				.toList(),
 			view.members().stream().map(this::toTripMember).toList(),
 			view.retrippedFromPostId()
 		);

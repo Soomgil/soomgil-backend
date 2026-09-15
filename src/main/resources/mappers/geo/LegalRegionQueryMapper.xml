@@ -45,4 +45,17 @@
     SELECT count(*)
     <include refid="legalRegionFilter" />
   </select>
+  <select id="findLegalRegionsByCodes" resultType="com.soomgil.geo.infrastructure.persistence.row.LegalRegionRow">
+    SELECT
+      code,
+      name,
+      full_name,
+      level,
+      parent_code,
+      is_active
+    FROM geo.legal_regions
+    WHERE code IN
+    <foreach collection="codes" item="code" open="(" separator="," close=")">#{code}</foreach>
+    ORDER BY code
+  </select>
 </mapper>

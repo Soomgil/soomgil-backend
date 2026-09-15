@@ -291,11 +291,13 @@
     UPDATE itinerary.trip_routes
     SET
       mode = COALESCE(#{update.mode,jdbcType=VARCHAR}, mode),
+      provider = COALESCE(#{update.provider,jdbcType=VARCHAR}, provider),
       provider_profile = COALESCE(#{update.providerProfile,jdbcType=VARCHAR}, provider_profile),
       geometry = COALESCE(#{update.geometry,jdbcType=VARCHAR}::jsonb, geometry),
       distance_meters = COALESCE(#{update.distanceMeters,jdbcType=DOUBLE}, distance_meters),
       duration_seconds = COALESCE(#{update.durationSeconds,jdbcType=DOUBLE}, duration_seconds),
-      confidence = COALESCE(#{update.confidence,jdbcType=DOUBLE}, confidence),
+      confidence = CASE WHEN #{update.provider,jdbcType=VARCHAR} IS NOT NULL THEN #{update.confidence,jdbcType=DOUBLE}
+        ELSE COALESCE(#{update.confidence,jdbcType=DOUBLE}, confidence) END,
       updated_by_user_id = #{update.updatedByUserId},
       updated_at = #{update.updatedAt}
     WHERE trip_id = #{update.tripId}
@@ -338,6 +340,7 @@
     UPDATE itinerary.trip_routes
     SET
       mode = #{update.mode},
+      provider = COALESCE(#{update.provider,jdbcType=VARCHAR}, provider),
       provider_profile = #{update.providerProfile},
       geometry = #{update.geometry}::jsonb,
       distance_meters = #{update.distanceMeters,jdbcType=DOUBLE},

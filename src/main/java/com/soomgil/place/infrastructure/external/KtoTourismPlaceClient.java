@@ -127,7 +127,7 @@ public class KtoTourismPlaceClient implements TourismPlaceFeedClient {
 		int limit = Math.min(Math.max(request.limit(), 1), LIVE_PAGE_SIZE);
 		List<TourismPlaceFeedItem> result = new ArrayList<>();
 		for (int page = 1; page <= LIVE_MAX_PAGES && result.size() < limit; page++) {
-			JsonNode response = get(buildAreaListUri(areaCode, request.category(), LIVE_PAGE_SIZE, page));
+			JsonNode response = get(buildAreaListUri(areaCode, request.sigunguCode(), request.category(), LIVE_PAGE_SIZE, page));
 			List<TourismPlaceFeedItem> pageItems = parseList(response).stream()
 				.filter(place -> matchesQuery(place, request.q()))
 				.filter(place -> matchesBounds(place, request.bbox()))
@@ -309,21 +309,33 @@ public class KtoTourismPlaceClient implements TourismPlaceFeedClient {
 	private URI buildListUri(TourismPlaceFeedRequest request, int page) {
 		String areaCode = request.legalRegionCode() == null || request.legalRegionCode().isBlank()
 			? null : request.legalRegionCode();
-		return buildAreaListUri(areaCode, request.category(), Math.min(Math.max(request.limit(), 1), 50), page);
+		return buildAreaListUri(areaCode, null, request.category(), Math.min(Math.max(request.limit(), 1), 50), page);
 	}
 
-	private URI buildAreaListUri(String areaCode, String category, int numOfRows, int page) {
+	private URI buildAreaListUri(String areaCode, String sigunguCode, String category, int numOfRows, int page) {
 		UriComponentsBuilder builder = commonUri("/areaBasedList2")
 			.queryParam("numOfRows", numOfRows)
 			.queryParam("pageNo", page)
 			.queryParam("arrange", "Q");
+		return appendAreaParams(builder, areaCode, sigunguCode, category).build(true).toUri();
+	}
+
+	/**
+	 * 지역 필터 파라미터를 붙인다. sigunguCode는 areaCode 안에서만 의미가 있어 areaCode가 있을 때만 붙인다.
+	 */
+	static UriComponentsBuilder appendAreaParams(
+		UriComponentsBuilder builder, String areaCode, String sigunguCode, String category
+	) {
 		if (areaCode != null && !areaCode.isBlank()) {
 			builder.queryParam("areaCode", areaCode);
+			if (sigunguCode != null && !sigunguCode.isBlank()) {
+				builder.queryParam("sigunguCode", sigunguCode);
+			}
 		}
 		if (category != null && !category.isBlank() && category.chars().allMatch(Character::isDigit)) {
 			builder.queryParam("contentTypeId", category);
 		}
-		return builder.build(true).toUri();
+		return builder;
 	}
 
 	private URI buildKeywordListUri(String keyword, String category, int numOfRows, int page) {
@@ -639,10 +651,16 @@ public class KtoTourismPlaceClient implements TourismPlaceFeedClient {
 		return (int) Math.ceil((double) totalCount / pageSize);
 	}
 
-	private static String liveAreaCode(TourismPlaceLiveSearchRequest request) {
-		String legalRegionCode = request.legalRegionCode();
-		if (legalRegionCode != null && !legalRegionCode.isBlank()) {
-			return legalRegionCode.startsWith("39") ? "39" : null;
+	/**
+	 * 라이브 지역 조회에 쓸 KTO areaCode를 정한다.
+	 *
+	 * <p>호출자가 areaCode를 넘기면 그대로 쓴다. 법정동 코드는 호출 전에 KTO 코드로 바뀌어 들어오므로
+	 * 여기서 지역을 제한하지 않는다. areaCode가 없을 때만 검색어·viewport의 제주 휴리스틱으로 대체한다.
+	 */
+	static String liveAreaCode(TourismPlaceLiveSearchRequest request) {
+		String areaCode = request.legalRegionCode();
+		if (areaCode != null && !areaCode.isBlank()) {
+			return areaCode.strip();
 		}
 		String query = request.q();
 		if (query != null && query.contains("제주")) {

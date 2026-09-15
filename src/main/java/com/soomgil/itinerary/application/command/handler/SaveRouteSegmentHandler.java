@@ -137,6 +137,7 @@ public class SaveRouteSegmentHandler implements CommandHandler<SaveRouteSegmentC
 		return switch (mode) {
 			case DRIVING -> "mapbox/driving";
 			case WALKING -> "mapbox/walking";
+			case CYCLING -> "mapbox/cycling";
 		};
 	}
 

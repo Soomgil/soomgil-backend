@@ -2,6 +2,8 @@ package com.soomgil.place.infrastructure.external;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.soomgil.place.application.port.AwardPhotoCatalogClient;
+import com.soomgil.place.application.port.AwardPhotoCatalogItem;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.time.Duration;
@@ -28,11 +30,12 @@ import org.springframework.web.util.UriComponentsBuilder;
  * <p>수상작 원본 URL은 KTO가 직접 제공하므로 별도 다운로드 없이 사용한다.
  */
 @Component
-public class KtoAwardPhotoClient {
+public class KtoAwardPhotoClient implements AwardPhotoCatalogClient {
 
 	private static final Logger log = LoggerFactory.getLogger(KtoAwardPhotoClient.class);
 	private static final String CACHE_NAME = "ktoAwardPhotoCatalog";
 	private static final ZoneId KOREA_TIME = ZoneId.of("Asia/Seoul");
+	private static final int CATALOG_PAGE_SIZE = 200;
 
 	private final KtoTourismPlaceProperties properties;
 	private final ObjectMapper objectMapper;
@@ -74,8 +77,19 @@ public class KtoAwardPhotoClient {
 		}
 	}
 
+	@Override
+	public List<AwardPhotoCatalogItem> fetchCatalog() {
+		try {
+			return parseCatalog(loadCatalog());
+		}
+		catch (KtoTourismPlaceException exception) {
+			log.warn("KTO award catalog lookup failed.", exception);
+			return List.of();
+		}
+	}
+
 	private synchronized JsonNode loadCatalog() {
-		String cacheKey = "catalog-v1:" + LocalDate.now(KOREA_TIME);
+		String cacheKey = "catalog-v2:" + LocalDate.now(KOREA_TIME);
 		String cached = cache.get(cacheKey, String.class);
 		if (cached != null) {
 			try {
@@ -107,7 +121,7 @@ public class KtoAwardPhotoClient {
 			.queryParam("MobileOS", "ETC")
 			.queryParam("MobileApp", "Soomgil")
 			.queryParam("_type", "json")
-			.queryParam("numOfRows", 100)
+			.queryParam("numOfRows", CATALOG_PAGE_SIZE)
 			.queryParam("pageNo", 1)
 			.build(true)
 			.toUri();
@@ -117,6 +131,40 @@ public class KtoAwardPhotoClient {
 		if (properties.getApiKey() == null || properties.getApiKey().isBlank()) {
 			throw new KtoTourismPlaceException("KTO API key is not configured.");
 		}
+	}
+
+	/**
+	 * 수상작 목록 응답을 {@link AwardPhotoCatalogItem} 목록으로 변환한다.
+	 *
+	 * <p>원본 이미지 URL이 없는 항목은 제외한다. 저작권 구분은 필터링하지 않고 그대로 전달해
+	 * 호출자가 표시 정책을 정하도록 한다.
+	 */
+	static List<AwardPhotoCatalogItem> parseCatalog(JsonNode response) {
+		JsonNode items = successfulBody(response).path("items").path("item");
+		if (!items.isArray()) {
+			return List.of();
+		}
+		List<AwardPhotoCatalogItem> catalog = new ArrayList<>();
+		for (JsonNode item : items) {
+			String imageUrl = text(item, "orgImage");
+			if (imageUrl == null) {
+				continue;
+			}
+			catalog.add(new AwardPhotoCatalogItem(
+				text(item, "contentId"),
+				text(item, "koTitle"),
+				text(item, "koFilmst"),
+				text(item, "koCmanNm"),
+				text(item, "koWnprzDiz"),
+				text(item, "filmDay"),
+				imageUrl,
+				text(item, "thumbImage"),
+				text(item, "cpyrhtDivCd"),
+				text(item, "lDongRegnCd"),
+				text(item, "koKeyWord")
+			));
+		}
+		return List.copyOf(catalog);
 	}
 
 	static Optional<String> findBestAwardPhoto(JsonNode response, String placeName) {
