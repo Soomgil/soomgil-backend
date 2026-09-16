@@ -20,7 +20,6 @@ public final class MediaUploadPolicy {
 	private static final Set<String> MAP_OVERLAY_TYPES = Set.of("image/jpeg", "image/png", "image/webp");
 	private static final Map<MediaPurpose, Long> SIZE_LIMITS = Map.of(
 		MediaPurpose.PROFILE_IMAGE, 5 * MIB,
-		MediaPurpose.TRIP_RECORD, 100 * MIB,
 		MediaPurpose.MAP_OVERLAY, 10 * MIB,
 		MediaPurpose.COMMUNITY_POST, 10 * MIB
 	);
@@ -35,16 +34,10 @@ public final class MediaUploadPolicy {
 	}
 
 	private long sizeLimit(MediaPurpose purpose, String mimeType) {
-		if (purpose == MediaPurpose.TRIP_RECORD && !"video/mp4".equals(mimeType)) {
-			return 20 * MIB;
-		}
 		return SIZE_LIMITS.get(purpose);
 	}
 
 	private Set<String> allowedMimeTypes(MediaPurpose purpose) {
-		if (purpose == MediaPurpose.TRIP_RECORD) {
-			return Set.of("image/jpeg", "image/png", "video/mp4");
-		}
 		if (purpose == MediaPurpose.MAP_OVERLAY) {
 			return MAP_OVERLAY_TYPES;
 		}

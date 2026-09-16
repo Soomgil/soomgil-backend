@@ -172,7 +172,6 @@ public class CreateMediaFileCommandHandler implements CommandHandler<CreateMedia
 	private boolean purposeMatchesResource(MediaPurpose purpose, String resourceType) {
 		return switch (purpose) {
 			case PROFILE_IMAGE -> "USER_PROFILE".equals(resourceType);
-			case TRIP_RECORD -> "TRIP_RECORD".equals(resourceType);
 			case MAP_OVERLAY -> "TRIP".equals(resourceType);
 			case COMMUNITY_POST -> "COMMUNITY_POST".equals(resourceType);
 		};

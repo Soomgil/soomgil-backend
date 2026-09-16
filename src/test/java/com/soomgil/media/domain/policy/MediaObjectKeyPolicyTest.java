@@ -28,7 +28,7 @@ class MediaObjectKeyPolicyTest {
 
 	@Test
 	void rejectsAnotherUsersKey() {
-		StorageObjectKey key = policy.create(UUID.randomUUID(), MediaPurpose.TRIP_RECORD, OBJECT_ID, "image/png");
+		StorageObjectKey key = policy.create(UUID.randomUUID(), MediaPurpose.MAP_OVERLAY, OBJECT_ID, "image/png");
 
 		assertThatThrownBy(() -> policy.requireOwnedPurpose(USER_ID, key))
 			.isInstanceOfSatisfying(BusinessException.class, exception ->

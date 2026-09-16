@@ -13,9 +13,14 @@ class MediaUploadPolicyTest {
 	private final MediaUploadPolicy policy = new MediaUploadPolicy();
 
 	@Test
+	void noLongerAcceptsRecordUploadPurpose() {
+		assertThatThrownBy(() -> MediaPurpose.valueOf("TRIP_RECORD")).isInstanceOf(IllegalArgumentException.class);
+		assertThatThrownBy(() -> MediaPurpose.fromKeySegment("trip-record")).isInstanceOf(IllegalArgumentException.class);
+	}
+
+	@Test
 	void acceptsMimeTypeAndSizeAllowedForPurpose() {
 		policy.validate(MediaPurpose.PROFILE_IMAGE, "image/jpeg", 5 * 1024 * 1024L);
-		policy.validate(MediaPurpose.TRIP_RECORD, "video/mp4", 100 * 1024 * 1024L);
 		policy.validate(MediaPurpose.COMMUNITY_POST, "image/png", 10 * 1024 * 1024L);
 		policy.validate(MediaPurpose.MAP_OVERLAY, "image/webp", 10 * 1024 * 1024L);
 	}

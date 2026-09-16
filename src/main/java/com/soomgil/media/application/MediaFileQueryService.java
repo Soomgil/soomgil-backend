@@ -79,7 +79,7 @@ public class MediaFileQueryService {
 		return new MediaFile(
 			record.id(),
 			record.publicUrl() == null ? null : URI.create(record.publicUrl()),
-			null,
+			record.objectKey().contains("/trip-record/") ? URI.create("/api/v1/media/files/" + record.id() + "/content") : null,
 			null,
 			record.mimeType(),
 			record.byteSize(),

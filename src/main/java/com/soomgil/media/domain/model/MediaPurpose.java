@@ -3,11 +3,10 @@ package com.soomgil.media.domain.model;
 /**
  * 업로드 목적별 허용 형식과 공개 범위를 구분하는 값.
  *
- * <p>{@code TRIP_RECORD}는 여행 멤버에게만 공개될 수 있으므로 public URL을 저장하지 않는다.
+ * <p>{@code MAP_OVERLAY}는 여행 멤버에게만 공개될 수 있으므로 public URL을 저장하지 않는다.
  */
 public enum MediaPurpose {
 	PROFILE_IMAGE("profile-image", true),
-	TRIP_RECORD("trip-record", false),
 	MAP_OVERLAY("map-overlay", false),
 	COMMUNITY_POST("community-post", true);
 

@@ -24,17 +24,6 @@
     WHERE id = #{mediaFileId} AND status = 'ACTIVE'
   </update>
 
-  <select id="countAccessibleTripRecord" resultType="long">
-    SELECT COUNT(*)
-    FROM record.trip_record_entries record_entry
-    JOIN trip.trips trip_row ON trip_row.id = record_entry.trip_id AND trip_row.status = 'ACTIVE'
-    LEFT JOIN trip.trip_members member
-      ON member.trip_id = trip_row.id AND member.user_id = #{userId} AND member.status = 'ACTIVE'
-    WHERE record_entry.id = #{recordId}
-      AND record_entry.status = 'ACTIVE'
-      AND (trip_row.owner_user_id = #{userId} OR member.id IS NOT NULL)
-  </select>
-
   <select id="countAccessibleTrip" resultType="long">
     SELECT COUNT(*)
     FROM trip.trips trip_row
@@ -66,10 +55,21 @@
     WHERE mf.id = #{mediaFileId}
       AND mf.status = 'ACTIVE'
       AND mf.linked_resource_id IS NULL
-      AND NOT EXISTS (SELECT 1 FROM record.trip_record_media rm WHERE rm.media_file_id = mf.id)
       AND NOT EXISTS (SELECT 1 FROM community.post_media pm WHERE pm.media_file_id = mf.id)
       AND NOT EXISTS (SELECT 1 FROM community.thread_media tm WHERE tm.media_file_id = mf.id)
       AND NOT EXISTS (SELECT 1 FROM community.posts p WHERE p.cover_media_file_id = mf.id)
       AND NOT EXISTS (SELECT 1 FROM auth.user_profiles up WHERE up.profile_media_file_id = mf.id)
   </update>
+  <select id="countPublishedMedia" resultType="long">
+    SELECT COUNT(*) FROM (
+      SELECT p.id FROM community.posts p
+      WHERE p.deleted_at IS NULL AND p.moderation_status = 'VISIBLE' AND p.visibility = 'PUBLIC'
+        AND (p.cover_media_file_id = #{mediaFileId}
+          OR EXISTS (SELECT 1 FROM community.post_media pm WHERE pm.post_id = p.id AND pm.media_file_id = #{mediaFileId}))
+      UNION ALL
+      SELECT t.id FROM community.threads t
+      JOIN community.thread_media tm ON tm.thread_id = t.id
+      WHERE t.deleted_at IS NULL AND t.moderation_status = 'VISIBLE' AND tm.media_file_id = #{mediaFileId}
+    ) published
+  </select>
 </mapper>

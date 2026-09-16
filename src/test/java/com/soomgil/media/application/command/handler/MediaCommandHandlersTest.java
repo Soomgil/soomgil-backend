@@ -72,10 +72,11 @@ class MediaCommandHandlersTest {
 	}
 
 	@Test
-	void registersVerifiedObjectAndSuppressesPrivatePublicUrl() {
+	void registersVerifiedObjectAndSuppressesPrivatePublicUrl() throws IOException {
 		FakeStorage storage = new FakeStorage();
-		StorageObjectKey key = keyPolicy.create(USER_ID, MediaPurpose.TRIP_RECORD, GENERATED_ID, "image/png");
-		storage.storedObject = storedObject(key, "image/png", "image/png", 2048L);
+		StorageObjectKey key = keyPolicy.create(USER_ID, MediaPurpose.MAP_OVERLAY, GENERATED_ID, "image/png");
+		storage.bytes = pngBytes(800, 600);
+		storage.storedObject = storedObject(key, "image/png", "image/png", storage.bytes.length);
 		FakeRepository repository = new FakeRepository();
 		CreateMediaFileCommandHandler handler = new CreateMediaFileCommandHandler(
 			storage, repository, (userId, type, resourceId) -> true,
@@ -83,7 +84,7 @@ class MediaCommandHandlersTest {
 		);
 
 		MediaFileMetadata result = handler.handle(new CreateMediaFileCommand(
-			USER_ID, key.value(), URI.create("https://untrusted.example/file.png"), "image/png", 2048L,
+			USER_ID, key.value(), URI.create("https://untrusted.example/file.png"), "image/png", storage.bytes.length,
 			800, 600, null, null
 		));
 

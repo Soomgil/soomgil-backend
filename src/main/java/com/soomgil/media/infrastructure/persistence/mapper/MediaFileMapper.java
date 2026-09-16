@@ -18,7 +18,9 @@ public interface MediaFileMapper {
 	int markDeleted(@Param("mediaFileId") UUID mediaFileId, @Param("deletedAt") Instant deletedAt,
 		@Param("purgeAfter") Instant purgeAfter);
 
-	long countAccessibleTripRecord(@Param("userId") UUID userId, @Param("recordId") UUID recordId);
+
+	/** 삭제·숨김되지 않은 공개 커뮤니티 게시물에서 사용하는 미디어인지 확인한다. */
+	long countPublishedMedia(@Param("mediaFileId") UUID mediaFileId);
 
 	/** active 여행방 소유자 또는 멤버인지 확인한다. */
 	long countAccessibleTrip(@Param("userId") UUID userId, @Param("tripId") UUID tripId);

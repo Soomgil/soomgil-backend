@@ -15,8 +15,6 @@ import com.soomgil.planning.application.handler.GetNoteQueryHandler;
 import com.soomgil.planning.application.handler.ListChecklistsQueryHandler;
 import com.soomgil.planning.application.query.GetNoteQuery;
 import com.soomgil.planning.application.query.ListChecklistsQuery;
-import com.soomgil.record.api.dto.TripRecordEntry;
-import com.soomgil.record.application.handler.TripRecordService;
 import com.soomgil.trip.application.query.dto.FindTripDetailQuery;
 import com.soomgil.trip.application.query.dto.TripDetailView;
 import com.soomgil.trip.application.query.handler.FindTripDetailHandler;
@@ -32,13 +30,10 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class AiTripContextService {
 
-	private static final int RECENT_RECORD_LIMIT = 10;
 	private static final int MAX_NOTE_LENGTH = 1_000;
-	private static final int MAX_RECORD_CAPTION_LENGTH = 700;
 
 	private final FindTripDetailHandler tripDetailHandler;
 	private final FindItineraryHandler itineraryHandler;
-	private final TripRecordService recordService;
 	private final GetNoteQueryHandler noteHandler;
 	private final ListChecklistsQueryHandler checklistHandler;
 	private final FindDisplayNameQueryHandler displayNameHandler;
@@ -47,7 +42,6 @@ public class AiTripContextService {
 	public AiTripContextService(
 		FindTripDetailHandler tripDetailHandler,
 		FindItineraryHandler itineraryHandler,
-		TripRecordService recordService,
 		GetNoteQueryHandler noteHandler,
 		ListChecklistsQueryHandler checklistHandler,
 		FindDisplayNameQueryHandler displayNameHandler,
@@ -55,7 +49,6 @@ public class AiTripContextService {
 	) {
 		this.tripDetailHandler = tripDetailHandler;
 		this.itineraryHandler = itineraryHandler;
-		this.recordService = recordService;
 		this.noteHandler = noteHandler;
 		this.checklistHandler = checklistHandler;
 		this.displayNameHandler = displayNameHandler;
@@ -76,9 +69,6 @@ public class AiTripContextService {
 		TripDetailView trip = tripDetailHandler.handle(new FindTripDetailQuery(tripId, requesterUserId));
 		ItineraryView itinerary = itineraryHandler.handle(new FindItineraryQuery(tripId, requesterUserId));
 		Map<UUID, String> names = memberNames(trip);
-		List<TripRecordEntry> records = recordService.listRecords(
-			tripId, requesterUserId, 0, RECENT_RECORD_LIMIT, List.of("takenAt,desc", "createdAt,desc")
-		).items();
 		List<Checklist> checklists = checklistHandler.handle(new ListChecklistsQuery(
 			tripId, null, null, requesterUserId
 		));
@@ -108,7 +98,6 @@ public class AiTripContextService {
 				drawing.id(), drawing.itineraryDayId(), drawing.drawingType().name(),
 				drawing.label(), drawing.sortOrder()
 			)).toList(),
-			records.stream().map(record -> recordSummary(record, names)).toList(),
 			loadNotes(tripId, requesterUserId, itinerary),
 			checklists.stream().map(this::checklistSummary).toList()
 		);
@@ -152,17 +141,6 @@ public class AiTripContextService {
 			member.userId(), displayNameHandler.handle(new FindDisplayNameQuery(member.userId()))
 		));
 		return names;
-	}
-
-	private AiTripContext.RecordSummary recordSummary(TripRecordEntry record, Map<UUID, String> names) {
-		UUID uploaderId = record.uploadedBy().id();
-		String uploaderName = names.computeIfAbsent(
-			uploaderId, id -> displayNameHandler.handle(new FindDisplayNameQuery(id))
-		);
-		return new AiTripContext.RecordSummary(
-			record.id(), record.itineraryDayId(), record.itineraryItemId(), uploaderId, uploaderName,
-			record.title(), truncate(record.caption(), MAX_RECORD_CAPTION_LENGTH), record.locationName(), record.takenAt()
-		);
 	}
 
 	private List<AiTripContext.NoteSummary> loadNotes(UUID tripId, UUID userId, ItineraryView itinerary) {
