@@ -5,7 +5,7 @@ import com.soomgil.media.infrastructure.persistence.mapper.MediaFileMapper;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
 
-/** profile 본인 여부와 active 여행 멤버의 기록 접근 권한을 SQL로 확인한다. */
+/** profile 본인 여부와 active 여행 멤버의 접근 권한을 SQL로 확인한다. */
 @Component
 public class SqlLinkedMediaResourceAuthorizer implements LinkedMediaResourceAuthorizer {
 
@@ -18,8 +18,8 @@ public class SqlLinkedMediaResourceAuthorizer implements LinkedMediaResourceAuth
 	@Override
 	public boolean canLink(UUID userId, String resourceType, UUID resourceId) {
 		return switch (resourceType) {
-			case "USER_PROFILE" -> userId.equals(resourceId);
-			case "TRIP_RECORD" -> mapper.countAccessibleTripRecord(userId, resourceId) > 0;
+			case "USER_PROFILE" -> userId != null && userId.equals(resourceId);
+			case "PUBLISHED_MEDIA" -> mapper.countPublishedMedia(resourceId) > 0;
 			case "TRIP" -> mapper.countAccessibleTrip(userId, resourceId) > 0;
 			default -> false;
 		};

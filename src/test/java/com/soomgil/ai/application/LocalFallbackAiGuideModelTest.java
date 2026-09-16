@@ -127,7 +127,6 @@ class LocalFallbackAiGuideModelTest {
 			List.of(),
 			List.of(),
 			List.of(),
-			List.of(),
 			List.of()
 		);
 	}

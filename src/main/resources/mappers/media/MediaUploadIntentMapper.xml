@@ -39,7 +39,6 @@
     WHERE ui.status = 'COMPLETED'
       AND ui.expires_at &lt;= #{now}
       AND mf.linked_resource_id IS NULL
-      AND NOT EXISTS (SELECT 1 FROM record.trip_record_media rm WHERE rm.media_file_id = mf.id)
       AND NOT EXISTS (SELECT 1 FROM community.post_media pm WHERE pm.media_file_id = mf.id)
       AND NOT EXISTS (SELECT 1 FROM community.thread_media tm WHERE tm.media_file_id = mf.id)
       AND NOT EXISTS (SELECT 1 FROM community.posts p WHERE p.cover_media_file_id = mf.id)

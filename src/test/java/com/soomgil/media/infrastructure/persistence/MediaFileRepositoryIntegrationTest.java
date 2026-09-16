@@ -70,14 +70,15 @@ class MediaFileRepositoryIntegrationTest {
 	}
 
 	@Test
-	void authorizesSelfProfileAndActiveTripRecordMemberOnly() {
-		insertTripRecord();
+	void rejectsRemovedRecordLinksAndAuthorizesActiveTripMembers() {
+		insertTrip();
 
 		assertThat(authorizer.canLink(USER_ID, "USER_PROFILE", USER_ID)).isTrue();
 		assertThat(authorizer.canLink(USER_ID, "USER_PROFILE", UUID.randomUUID())).isFalse();
-		assertThat(authorizer.canLink(USER_ID, "TRIP_RECORD", RECORD_ID)).isTrue();
+		assertThat(authorizer.canLink(USER_ID, "TRIP_RECORD", RECORD_ID)).isFalse();
 		assertThat(authorizer.canLink(UUID.randomUUID(), "TRIP_RECORD", RECORD_ID)).isFalse();
 		assertThat(authorizer.canLink(USER_ID, "UNKNOWN", RECORD_ID)).isFalse();
+		assertThat(authorizer.canLink(USER_ID, "TRIP", TRIP_ID)).isTrue();
 	}
 
 	@Test
@@ -119,7 +120,7 @@ class MediaFileRepositoryIntegrationTest {
 		);
 	}
 
-	private void insertTripRecord() {
+	private void insertTrip() {
 		jdbcTemplate.update(
 			"INSERT INTO trip.trips (id, owner_user_id, title, status, itinerary_version, created_at, updated_at) "
 				+ "VALUES (?, ?, 'media test', 'ACTIVE', 0, ?, ?)",
@@ -130,11 +131,6 @@ class MediaFileRepositoryIntegrationTest {
 				+ "VALUES (?, ?, ?, 'MEMBER', 'ACTIVE', ?)",
 			UUID.randomUUID(), TRIP_ID, USER_ID, NOW
 		);
-		jdbcTemplate.update(
-			"INSERT INTO record.trip_record_entries "
-				+ "(id, trip_id, uploaded_by_user_id, visibility, status, created_at, updated_at) "
-				+ "VALUES (?, ?, ?, 'TRIP_MEMBERS', 'ACTIVE', ?, ?)",
-			RECORD_ID, TRIP_ID, USER_ID, NOW, NOW
-		);
+
 	}
 }

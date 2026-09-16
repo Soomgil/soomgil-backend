@@ -85,15 +85,22 @@ public class MediaController extends ApiControllerSupport {
 		if (mediaFile == null || !"ACTIVE".equals(mediaFile.status())) {
 			throw new BusinessException(ErrorCode.OBJECT_NOT_FOUND);
 		}
-		MediaPurpose purpose = keyPolicy.requireOwnedPurpose(mediaFile.ownerUserId(), mediaFile.objectKey());
-		if (!purpose.publicServingAllowed()) {
-			UUID userId = currentUserId(principal);
-			boolean readableMapOverlay = purpose == MediaPurpose.MAP_OVERLAY
-				&& "TRIP".equals(mediaFile.linkedResourceType())
-				&& mediaFile.linkedResourceId() != null
-				&& resourceAuthorizer.canLink(userId, "TRIP", mediaFile.linkedResourceId());
-			if (!readableMapOverlay) {
+		// 기록 기능 폐지 전 사진이라도 공개 게시글이 참조하면 해당 게시글 사진으로 제공한다.
+		if (mediaFile.objectKey().value().startsWith("media/" + mediaFile.ownerUserId() + "/trip-record/")) {
+			if (!resourceAuthorizer.canLink(null, "PUBLISHED_MEDIA", mediaId)) {
 				throw new BusinessException(ErrorCode.FORBIDDEN);
+			}
+		} else {
+			MediaPurpose purpose = keyPolicy.requireOwnedPurpose(mediaFile.ownerUserId(), mediaFile.objectKey());
+			if (!purpose.publicServingAllowed()) {
+				UUID userId = currentUserId(principal);
+				boolean readableMapOverlay = purpose == MediaPurpose.MAP_OVERLAY
+					&& "TRIP".equals(mediaFile.linkedResourceType())
+					&& mediaFile.linkedResourceId() != null
+					&& resourceAuthorizer.canLink(userId, "TRIP", mediaFile.linkedResourceId());
+				if (!readableMapOverlay) {
+					throw new BusinessException(ErrorCode.FORBIDDEN);
+				}
 			}
 		}
 		return ResponseEntity.ok()

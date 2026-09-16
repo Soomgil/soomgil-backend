@@ -145,6 +145,26 @@ class MediaControllerTest {
 		verify(authorizer).canLink(USER_ID, "TRIP", tripId);
 	}
 
+	@Test
+	void servesLegacyRecordPhotoOnlyWhilePubliclyPublished() {
+		MediaFileRepository repository = mock(MediaFileRepository.class);
+		ObjectStorageGateway storage = mock(ObjectStorageGateway.class);
+		LinkedMediaResourceAuthorizer authorizer = mock(LinkedMediaResourceAuthorizer.class);
+		StorageObjectKey key = new StorageObjectKey("media/" + USER_ID + "/trip-record/old.png");
+		when(repository.findById(MEDIA_ID)).thenReturn(new MediaFileMetadata(
+			MEDIA_ID, USER_ID, "S3_COMPATIBLE", "bucket", key, null, "image/png", 3L,
+			10, 10, null, null, "ACTIVE", OffsetDateTime.parse("2026-06-20T12:00:00Z"), null, null
+		));
+		when(storage.read(key)).thenReturn(new byte[] {1, 2, 3});
+		MediaController controller = new MediaController(uploadHandler, createHandler, deleteHandler,
+			repository, storage, new MediaObjectKeyPolicy(), authorizer);
+		when(authorizer.canLink(null, "PUBLISHED_MEDIA", MEDIA_ID)).thenReturn(true);
+		assertThat(controller.getContent(MEDIA_ID, null).getBody()).containsExactly(1, 2, 3);
+		when(authorizer.canLink(null, "PUBLISHED_MEDIA", MEDIA_ID)).thenReturn(false);
+		org.assertj.core.api.Assertions.assertThatThrownBy(() -> controller.getContent(MEDIA_ID, null))
+			.isInstanceOf(com.soomgil.global.error.BusinessException.class);
+	}
+
 	private Principal principal() {
 		return () -> USER_ID.toString();
 	}

@@ -38,23 +38,7 @@
   </select>
 
   <sql id="tripCoverImageSelect">
-    COALESCE(
-      (
-        SELECT mf.public_url
-        FROM record.trip_record_entries e
-        JOIN record.trip_record_media rm
-          ON rm.record_entry_id = e.id
-        JOIN media.media_files mf
-          ON mf.id = rm.media_file_id
-        WHERE e.trip_id = t.id
-          AND e.status = 'ACTIVE'
-          AND mf.status = 'ACTIVE'
-          AND mf.mime_type LIKE 'image/%'
-          AND mf.public_url IS NOT NULL
-        ORDER BY e.taken_at DESC NULLS LAST, e.created_at DESC, rm.sort_order ASC, mf.created_at DESC
-        LIMIT 1
-      ),
-      (
+    (
         SELECT i.thumbnail_url
         FROM itinerary.itinerary_items i
         JOIN itinerary.itinerary_days d
@@ -64,7 +48,6 @@
           AND i.thumbnail_url IS NOT NULL
         ORDER BY d.sort_order ASC, i.sort_order ASC, i.created_at ASC
         LIMIT 1
-      )
     ) AS cover_image_url
   </sql>
 

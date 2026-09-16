@@ -182,12 +182,7 @@ public class CommunityPostAssembler {
 	}
 
 	private MediaFile resolveCoverMedia(CommunityPostRecord post) {
-		MediaFile coverMedia = mediaFileQueryService.findById(post.coverMediaFileId()).orElse(null);
-		if (coverMedia != null || post.sourceTripId() == null) {
-			return coverMedia;
-		}
-		return mediaFileQueryService.findById(postMediaMapper.findFirstRecordImageByTripId(post.sourceTripId()))
-			.orElse(null);
+		return mediaFileQueryService.findById(post.coverMediaFileId()).orElse(null);
 	}
 
 	private URI buildShareUrl(UUID postId, String rawShareToken) {
