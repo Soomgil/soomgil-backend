@@ -96,6 +96,12 @@ class QuotaErrorTest(unittest.TestCase):
         self.assertFalse(target.is_quota_error(400, "invalid argument"))
         self.assertFalse(target.is_quota_error(500, "internal"))
 
+    def test_plain_429_is_a_rate_limit_not_a_daily_quota(self):
+        self.assertFalse(target.is_daily_quota_error(429, ""))
+        self.assertFalse(target.is_daily_quota_error(429, "Too Many Requests"))
+        self.assertTrue(target.is_daily_quota_error(429, "Quota exceeded for quota metric 'Generate Content API requests per day'"))
+        self.assertTrue(target.is_daily_quota_error(429, "일일 한도를 초과했습니다"))
+
 
 class ResumeTest(unittest.TestCase):
     def test_pending_excludes_already_tagged_places(self):

@@ -46,8 +46,8 @@ AREA_NAMES = {
     "38": "전남", "39": "제주",
 }
 DEFAULT_MODEL = "gemini-2.5-flash-lite"  # 제주 태깅 때 쓴 저가 모델
-DEFAULT_BATCH_SIZE = 10
-DEFAULT_DELAY = 2.0
+DEFAULT_BATCH_SIZE = 20  # 한 요청에 20곳(스키마 상한). 요청 수를 절반으로 줄인다
+DEFAULT_DELAY = 8.0  # 요청 사이 8초 → 분당 4회 안팎. 순간 제한(429)을 만나면 자동으로 더 늘린다
 SQL_FLUSH_EVERY = 20  # 묶음 N개마다 SQL 파일을 갱신해 중간에 꺼져도 최신 SQL이 남게 한다.
 
 
@@ -61,12 +61,20 @@ class QuotaExhausted(RuntimeError):
 
 
 QUOTA_PATTERN = re.compile(r"quota|RESOURCE_EXHAUSTED|rate ?limit|한도|too many requests", re.IGNORECASE)
+DAILY_PATTERN = re.compile(r"daily|per ?day|PerDay|일일|하루|quota exceeded|quota_exceeded", re.IGNORECASE)
+RATE_LIMIT_WAITS = (30, 60, 120, 240, 480, 600, 600)  # 순간 제한(429) 때 같은 키로 기다리는 초. 합계 ≈ 36분
+MAX_RATE_LIMIT_MINUTES = 30  # 이 시간 넘게 429만 계속 오면 그때는 오늘 한도로 본다
 
 
 def is_quota_error(status: int, body: str) -> bool:
     if status == 429:
         return True
     return bool(QUOTA_PATTERN.search(body or ""))
+
+
+def is_daily_quota_error(status: int, body: str) -> bool:
+    """하루 한도 소진인지. 429 자체는 대부분 순간 요청 제한이므로 '하루/일일/quota exceeded' 문구가 있을 때만 True."""
+    return is_quota_error(status, body) and bool(DAILY_PATTERN.search(body or ""))
 
 
 # ── 장소 추출(전국) ─────────────────────────────────────────────────────────
@@ -251,6 +259,10 @@ class GmsClient:
         ).rstrip("/")
         self.api_version = os.getenv("GMS_GEMINI_API_VERSION", "v1beta").strip("/")
         self.model = resolve_model()
+        self.extra_delay = 0.0  # 429를 만날수록 요청 간격을 늘린다(최대 20초)
+
+    def slow_down(self) -> None:
+        self.extra_delay = min(20.0, self.extra_delay + 2.0)
 
     def tag(self, key: str, places: list[dict[str, object]], tags: list[base.Tag], retries: int = 6):
         url = (
@@ -267,6 +279,7 @@ class GmsClient:
         }
         data = json.dumps(body, ensure_ascii=False).encode("utf-8")
         rate_limited = 0
+        rate_limited_seconds = 0
         for attempt in range(retries):
             request = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"}, method="POST")
             try:
@@ -282,12 +295,14 @@ class GmsClient:
                     pass
                 message = mask(f"HTTP {exc.code} {detail}", self.keys)
                 if is_quota_error(exc.code, detail):
-                    daily = re.search(r"daily|per ?day|일일|하루|quota", detail, re.IGNORECASE)
-                    rate_limited += 1
-                    if daily or rate_limited >= 3:
+                    if is_daily_quota_error(exc.code, detail) or rate_limited_seconds >= MAX_RATE_LIMIT_MINUTES * 60:
                         raise QuotaExhausted(message) from exc
-                    wait = 20 * rate_limited
-                    print(f"  잠시 한도(429). {wait}초 쉬고 같은 키로 다시 시도합니다.", flush=True)
+                    wait = RATE_LIMIT_WAITS[min(rate_limited, len(RATE_LIMIT_WAITS) - 1)]
+                    rate_limited += 1
+                    rate_limited_seconds += wait
+                    self.slow_down()
+                    print(f"  순간 요청 제한(429) {rate_limited}회. {wait}초 쉬고 같은 키로 다시 시도합니다. "
+                          f"(하루 한도 아님 · 이후 요청 간격 {self.extra_delay:g}초 추가)", flush=True)
                     time.sleep(wait)
                     continue
                 if 400 <= exc.code < 500:
@@ -402,6 +417,25 @@ def format_duration(seconds: float) -> str:
 
 
 # ── 실행 ────────────────────────────────────────────────────────────────────
+class Tee:
+    """콘솔에 찍는 내용을 output/part-X/run.log 에도 남긴다(창이 닫혀도 무슨 일이 있었는지 볼 수 있게)."""
+
+    def __init__(self, stream, path: Path) -> None:
+        self.stream = stream
+        path.parent.mkdir(parents=True, exist_ok=True)
+        self.file = path.open("a", encoding="utf-8")
+        self.file.write(chr(10) + "===== " + datetime.now(KST).isoformat(timespec="seconds") + " 시작 =====" + chr(10))
+
+    def write(self, text: str) -> None:
+        self.stream.write(text)
+        self.file.write(text)
+        self.file.flush()
+
+    def flush(self) -> None:
+        self.stream.flush()
+        self.file.flush()
+
+
 def run_part(part: str, input_path: Path, batch_size: int, delay: float, daily_limit: int | None) -> int:
     keys = load_keys()
     pool = KeyPool(keys, part, daily_limit=daily_limit)
@@ -413,6 +447,8 @@ def run_part(part: str, input_path: Path, batch_size: int, delay: float, daily_l
     my_codes = set(parts[part])
     my_places = [place for place in places if str(place["area_code"]) in my_codes]
     part_dir = OUTPUT_DIR / f"part-{part}"
+    sys.stdout = Tee(sys.stdout, part_dir / "run.log")
+    sys.stderr = Tee(sys.stderr, part_dir / "run.log")
     tagged_file = part_dir / "tagged.jsonl"
     sql_file = part_dir / f"soomgil_place_tags_{part}.sql"
     pending, completed = split_pending(my_places, tagged_file)
@@ -466,8 +502,8 @@ def run_part(part: str, input_path: Path, batch_size: int, delay: float, daily_l
             if since_flush >= SQL_FLUSH_EVERY:
                 generate_sql(ordered(), sql_file, part)
                 since_flush = 0
-            if delay > 0 and remaining_batches:
-                time.sleep(delay)
+            if remaining_batches:
+                time.sleep(delay + client.extra_delay)
     except KeyboardInterrupt:
         generate_sql(ordered(), sql_file, part)
         print(f"\n중단했습니다. 지금까지 {done:,}/{len(my_places):,}곳 저장됨. 같은 파일을 다시 실행하면 이어서 합니다.\n"
