@@ -117,7 +117,7 @@ class CreateCommunityCommentCommandHandlerTest {
 			.thenReturn(Optional.of(samplePost(postId, userId)));
 		when(commentMapper.findById(parentId))
 			.thenReturn(Optional.of(sampleComment(parentId, postId, userId, null,
-				CommunityPostPolicy.COMMENT_MAX_DEPTH)));
+				1)));
 
 		assertThatThrownBy(() -> handler.handle(new CreateCommunityCommentCommand(
 			postId, userId, parentId, "too deep"

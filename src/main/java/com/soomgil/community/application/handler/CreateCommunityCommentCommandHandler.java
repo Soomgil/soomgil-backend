@@ -60,7 +60,7 @@ public class CreateCommunityCommentCommandHandler
 				throw new CommunityException(ErrorCode.VALIDATION_FAILED);
 			}
 			depth = parent.depth() + 1;
-			if (depth > CommunityPostPolicy.COMMENT_MAX_DEPTH) {
+			if (parent.parentCommentId() != null || depth > CommunityPostPolicy.COMMENT_MAX_DEPTH) {
 				throw new CommunityException(ErrorCode.VALIDATION_FAILED);
 			}
 		}

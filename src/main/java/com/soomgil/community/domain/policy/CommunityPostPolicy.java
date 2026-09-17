@@ -22,8 +22,8 @@ public final class CommunityPostPolicy {
 	public static final int MEDIA_MAX_COUNT = 30;
 	/** 댓글 본문 최대 길이. */
 	public static final int COMMENT_CONTENT_MAX = 2000;
-	/** 댓글 중첩 최대 깊이 (0 = 최상위, 2 = 대대댓글까지 허용). */
-	public static final int COMMENT_MAX_DEPTH = 2;
+	/** 댓글 중첩 최대 깊이 (0 = 최상위, 1 = 최상위 댓글에 대한 답글만 허용). */
+	public static final int COMMENT_MAX_DEPTH = 1;
 
 	private CommunityPostPolicy() {
 	}
