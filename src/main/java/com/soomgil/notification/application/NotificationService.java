@@ -8,7 +8,7 @@ import com.soomgil.global.error.BusinessException;
 import com.soomgil.global.error.ErrorCode;
 import com.soomgil.notification.api.dto.Notification;
 import com.soomgil.notification.api.dto.PagedNotification;
-import com.soomgil.notification.api.dto.TripInviteNotificationPayload;
+import com.soomgil.notification.api.dto.NotificationPayload;
 import com.soomgil.notification.infrastructure.persistence.NotificationMapper;
 import com.soomgil.notification.infrastructure.persistence.NotificationRow;
 import com.soomgil.user.api.dto.UserSummary;
@@ -79,9 +79,9 @@ public class NotificationService {
 		UserSummary actor = row.actorUserId() == null ? null : new UserSummary(
 			row.actorUserId(), row.actorDisplayName(), uri(row.actorProfileImageUrl())
 		);
-		TripInviteNotificationPayload payload;
+		NotificationPayload payload;
 		try {
-			payload = objectMapper.readValue(row.payloadJson(), TripInviteNotificationPayload.class);
+			payload = objectMapper.readValue(row.payloadJson(), NotificationPayload.class);
 		}
 		catch (JsonProcessingException | IllegalArgumentException exception) {
 			throw new IllegalStateException("Notification payload is invalid.", exception);

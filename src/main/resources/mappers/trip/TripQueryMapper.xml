@@ -207,9 +207,9 @@
         t.display_destination AS displayDestination,
         COALESCE(
           (SELECT MIN(d.date) FROM itinerary.itinerary_days d
-            WHERE d.trip_id = t.id AND d.date >= CURRENT_DATE),
+            WHERE d.trip_id = t.id AND d.date >= (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Seoul')::date),
           (SELECT MAX(d.date) FROM itinerary.itinerary_days d
-            WHERE d.trip_id = t.id AND d.date &lt; CURRENT_DATE)
+            WHERE d.trip_id = t.id AND d.date &lt; (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Seoul')::date)
         ) AS startDate,
         (SELECT count(*) FROM trip.trip_members m2 WHERE m2.trip_id = t.id AND m2.status = 'ACTIVE') AS memberCount,
         <include refid="tripCoverImageSelect" />,
@@ -221,7 +221,7 @@
     SELECT id, title, displayDestination, startDate, memberCount, cover_image_url AS coverImageUrl
     FROM candidates
     ORDER BY
-      (startDate IS NOT NULL AND startDate >= CURRENT_DATE) DESC,
+      (startDate IS NOT NULL AND startDate >= (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Seoul')::date) DESC,
       startDate ASC NULLS LAST,
       created_at DESC
     LIMIT 1

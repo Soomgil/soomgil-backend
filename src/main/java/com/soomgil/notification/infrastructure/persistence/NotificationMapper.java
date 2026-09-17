@@ -14,6 +14,25 @@ import org.apache.ibatis.annotations.Update;
 @Mapper
 public interface NotificationMapper {
 
+    /** 세션·알림 종류·사용자에서 만든 고정 ID로 중복 생성에 안전하게 저장한다. */
+    @Insert("""
+        INSERT INTO notification.notifications(id, recipient_user_id, actor_user_id, trip_id, type, title, body, payload, created_at)
+        SELECT md5(CAST(#{sessionId} AS text) || ':' || #{type} || ':' || CAST(p.user_id AS text))::uuid,
+               p.user_id, CASE WHEN #{type} = 'VOTE_STARTED' THEN s.created_by_user_id ELSE NULL END,
+               s.trip_id, #{type}, #{title}, t.title || CASE WHEN #{type} = 'VOTE_STARTED'
+                 THEN ' · 스티커로 가고 싶은 곳을 골라주세요.' ELSE ' · 함께 고른 여행지를 확인해보세요.' END,
+               jsonb_build_object('tripId', s.trip_id, 'voteSessionId', s.id,
+                 'route', '/trips/' || s.trip_id || '/route?vote=1&voteSession=' || s.id), #{createdAt}
+        FROM voting.vote_session_participants p
+        JOIN voting.vote_sessions s ON s.id = p.vote_session_id
+        JOIN trip.trips t ON t.id = s.trip_id AND t.status = 'ACTIVE'
+        JOIN trip.trip_members m ON m.trip_id = s.trip_id AND m.user_id = p.user_id AND m.status = 'ACTIVE'
+        WHERE s.id = #{sessionId} AND s.trip_id = #{tripId}
+        ON CONFLICT(id) DO NOTHING
+        """)
+    int insertVoteNotifications(@Param("tripId") UUID tripId, @Param("sessionId") UUID sessionId,
+        @Param("type") String type, @Param("title") String title, @Param("createdAt") Instant createdAt);
+
 	@Insert("""
 		INSERT INTO notification.notifications (
 		  id, recipient_user_id, actor_user_id, trip_id, type, title, body, payload, created_at
