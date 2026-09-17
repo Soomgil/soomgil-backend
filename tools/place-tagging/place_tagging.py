@@ -46,7 +46,9 @@ AREA_NAMES = {
     "38": "전남", "39": "제주",
 }
 DEFAULT_MODEL = "gemini-2.5-flash-lite"  # 제주 태깅 때 쓴 저가 모델
-DEFAULT_BATCH_SIZE = 10  # 한 요청에 10곳. 20곳은 응답이 잘려 일부가 누락됐다
+DEFAULT_BATCH_SIZE = 20  # 시작 묶음(최대). 응답이 잘리면 반으로 줄이고, 연속 성공하면 다시 키운다(적응형)
+MIN_BATCH_SIZE = 5
+GROW_AFTER_SUCCESSES = 6  # 이 횟수 연속 성공하면 묶음을 두 배로
 DEFAULT_DELAY = 5.0  # 요청 사이 5초. 순간 제한(429)을 만나면 자동으로 더 늘린다
 SQL_FLUSH_EVERY = 20  # 묶음 N개마다 SQL 파일을 갱신해 중간에 꺼져도 최신 SQL이 남게 한다.
 
@@ -264,6 +266,7 @@ class GmsClient:
         self.api_version = os.getenv("GMS_GEMINI_API_VERSION", "v1beta").strip("/")
         self.model = resolve_model()
         self.extra_delay = 0.0  # 429를 만날수록 요청 간격을 늘린다(최대 20초)
+        self.split_happened = False  # 이번 tag() 호출에서 묶음을 쪼갰는지
 
     def slow_down(self) -> None:
         self.extra_delay = min(20.0, self.extra_delay + 2.0)
@@ -271,10 +274,11 @@ class GmsClient:
     def tag(self, key: str, places: list[dict[str, object]], tags: list[base.Tag], retries: int = 6):
         """누락 content_id 가 나오면(응답이 잘림) 묶음을 반으로 쪼개 다시 요청한다. 5곳 이하에서만 그대로 재시도."""
         try:
-            return self._tag_once(key, places, tags, retries=1 if len(places) > 5 else retries)
+            return self._tag_once(key, places, tags, retries=1 if len(places) > MIN_BATCH_SIZE else retries)
         except MissingIdsError:
-            if len(places) <= 5:
+            if len(places) <= MIN_BATCH_SIZE:
                 raise
+            self.split_happened = True
             half = (len(places) + 1) // 2
             print(f"  응답이 잘려 {len(places)}곳 → {half}곳씩 나눠 다시 요청합니다.", flush=True)
             return self.tag(key, places[:half], tags, retries) + self.tag(key, places[half:], tags, retries)
@@ -476,7 +480,7 @@ def run_part(part: str, input_path: Path, batch_size: int, delay: float, daily_l
     tags = base.load_tags()
     print(f"\n[{part}] 장소 {len(my_places):,}곳 / 완료 {len(completed):,} / 남음 {len(pending):,}"
           f" · 모델 {client.model} · 키 {len(keys)}개(기본 {pool.label(pool.order[0])})"
-          f" · 한 요청 {batch_size}곳, 요청 사이 {delay:g}초", flush=True)
+          f" · 한 요청 최대 {batch_size}곳(잘리면 줄이고 잘 되면 다시 키움), 요청 사이 {delay:g}초", flush=True)
     if daily_limit:
         print(f"  하루 요청 한도 {daily_limit:,}회/키로 계산합니다(.env GMS_DAILY_REQUEST_LIMIT).")
     else:
@@ -485,13 +489,18 @@ def run_part(part: str, input_path: Path, batch_size: int, delay: float, daily_l
     def ordered() -> list[dict[str, object]]:
         return [completed[str(p["content_id"])] for p in my_places if str(p["content_id"]) in completed]
 
-    batches = base.chunks(pending, batch_size)
     done = len(completed)
     started = time.monotonic()
+    start_done = done
     sent = 0
     since_flush = 0
+    size = batch_size
+    successes = 0
+    cursor = 0
     try:
-        for batch in batches:
+        while cursor < len(pending):
+            batch = pending[cursor:cursor + size]
+            client.split_happened = False
             while True:
                 key = pool.current()
                 if key is None:
@@ -512,14 +521,26 @@ def run_part(part: str, input_path: Path, batch_size: int, delay: float, daily_l
             base.append_results(tagged_file, results)
             for result in results:
                 completed[str(result["content_id"])] = result
+            cursor += len(batch)
             done += len(results)
             sent += 1
             since_flush += 1
+            if client.split_happened:
+                size = max(MIN_BATCH_SIZE, size // 2)
+                successes = 0
+                print(f"  묶음을 {size}곳으로 줄입니다. {GROW_AFTER_SUCCESSES}회 연속 성공하면 다시 키웁니다.", flush=True)
+            else:
+                successes += 1
+                if successes >= GROW_AFTER_SUCCESSES and size < batch_size:
+                    size = min(batch_size, size * 2)
+                    successes = 0
+                    print(f"  잘 되고 있어 묶음을 {size}곳으로 키웁니다.", flush=True)
             elapsed = time.monotonic() - started
-            remaining_batches = len(batches) - sent
-            eta = format_duration(elapsed / sent * remaining_batches) if sent else "?"
+            rate = (done - start_done) / elapsed if elapsed > 0 else 0
+            remaining_batches = len(pending) - cursor
+            eta = format_duration(remaining_batches / rate) if rate else "?"
             print(f"  [{part}] {done:,}/{len(my_places):,} ({done * 100 / len(my_places):.1f}%)"
-                  f" · 이번 실행 {sent}회 · {pool.label(key)} 오늘 {pool.requests_today(key):,}회 · 남은 예상 {eta}", flush=True)
+                  f" · 이번 실행 {sent}회 · 묶음 {len(batch)}곳 · {pool.label(key)} 오늘 {pool.requests_today(key):,}회 · 남은 예상 {eta}", flush=True)
             if since_flush >= SQL_FLUSH_EVERY:
                 generate_sql(ordered(), sql_file, part)
                 since_flush = 0
@@ -563,8 +584,8 @@ def main() -> int:
         describe_parts(places, partition_by_area(places), None)
         return 0
     part = normalize_part(args.part)
-    if not 1 <= args.batch_size <= 20:
-        raise ConfigError("batch-size는 1~20이어야 합니다.")
+    if not MIN_BATCH_SIZE <= args.batch_size <= 20:
+        raise ConfigError(f"batch-size는 {MIN_BATCH_SIZE}~20이어야 합니다.")
     load_env_files()
     limit_text = os.getenv("GMS_DAILY_REQUEST_LIMIT", "").strip()
     daily_limit = int(limit_text) if limit_text.isdigit() and int(limit_text) > 0 else None
