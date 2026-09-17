@@ -12,6 +12,8 @@ import com.soomgil.place.api.dto.PlaceProvider;
  */
 public record PlaceDetailQuery(
 	PlaceProvider provider,
-	String externalPlaceId
+	String externalPlaceId,
+    boolean includeInfo
 ) implements Query<PlaceDetail> {
+    public PlaceDetailQuery(PlaceProvider provider,String externalPlaceId) { this(provider,externalPlaceId,true); }
 }

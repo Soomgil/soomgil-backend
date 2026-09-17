@@ -16,6 +16,27 @@ class KtoTourismPlaceClientTest {
 
 	private final ObjectMapper objectMapper = new ObjectMapper();
 
+    @Test
+    void servesCollectedFeedWithoutApiCredentialsOrDetailCalls() throws Exception {
+        var stored = org.mockito.Mockito.mock(com.soomgil.place.infrastructure.persistence.repository.KtoStoredPlaces.class);
+        var responses = org.mockito.Mockito.mock(com.soomgil.place.infrastructure.persistence.repository.KtoResponseRepository.class);
+        var award = org.mockito.Mockito.mock(KtoAwardPhotoClient.class);
+        var client = new KtoTourismPlaceClient(new KtoTourismPlaceProperties(),
+            org.mockito.Mockito.mock(KtoPlaceDescriptionCache.class),
+            org.mockito.Mockito.mock(KtoPlacePhotoCache.class), award);
+        client.configurePersistence(responses, stored);
+        var places = KtoTourismPlaceClient.parseList(objectMapper.readTree("""
+            {"response":{"header":{"resultCode":"0000"},"body":{"items":{"item":[{"contentid":"126508","title":"부산","contenttypeid":"12","mapx":"129.1","mapy":"35.1"}]}}}}
+            """));
+        org.mockito.Mockito.when(stored.search(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.any()))
+            .thenReturn(places);
+        var feed = client.fetch(new com.soomgil.place.application.port.TourismPlaceFeedRequest(null,null,10,"test"));
+        assertThat(feed.items()).isEqualTo(places);
+        assertThat(client.fetchLive(new com.soomgil.place.application.port.TourismPlaceLiveSearchRequest("부산",null,null,null,10)))
+            .isEqualTo(places);
+        org.mockito.Mockito.verifyNoInteractions(responses, award);
+    }
+
 	@Test
 	void convertsKtoListAndDetailResponsesIntoFrontendPlaceData() throws Exception {
 		var listBody = objectMapper.readTree("""

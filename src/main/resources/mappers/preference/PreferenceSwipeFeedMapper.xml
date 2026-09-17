@@ -27,6 +27,8 @@
 		</constructor>
 	</resultMap>
 
+	<select id="findReactedPlaceIds" resultType="string">SELECT external_place_id FROM preference.user_place_reactions WHERE user_id=CAST(#{userId} AS uuid) AND provider='KTO'</select>
+
 	<select id="findReactions" resultMap="SwipeFeedReactionRowMap">
 		SELECT
 			external_place_id,

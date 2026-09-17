@@ -1,5 +1,8 @@
 package com.soomgil.place.infrastructure.external;
 
+import com.soomgil.place.infrastructure.persistence.repository.KtoResponseRepository;
+import com.soomgil.place.infrastructure.persistence.repository.KtoStoredPlaces;
+import org.springframework.beans.factory.annotation.Autowired;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.soomgil.place.application.port.PlaceIntroRaw;
 import com.soomgil.place.application.port.TourismPlaceFeedClient;
@@ -47,7 +50,7 @@ public class KtoTourismPlaceClient implements TourismPlaceFeedClient {
 	private static final Logger log = LoggerFactory.getLogger(KtoTourismPlaceClient.class);
 	private static final int DETAIL_CONCURRENCY = 12;
 	private static final int LIVE_PAGE_SIZE = 100;
-	private static final int LIVE_MAX_PAGES = 20;
+	private static final int LIVE_MAX_PAGES = 1;
 	private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(2);
 	private static final Duration READ_TIMEOUT = Duration.ofSeconds(4);
 	private static final double JEJU_MIN_LNG = 126.10;
@@ -72,7 +75,7 @@ public class KtoTourismPlaceClient implements TourismPlaceFeedClient {
 	private final KtoAwardPhotoClient awardPhotoClient;
 	private final RestClient restClient;
 	private final ExecutorService detailExecutor;
-	private final Map<String, TourismPlaceFeedItem> detailPlaceCache = new ConcurrentHashMap<>();
+
 
 	public KtoTourismPlaceClient(
 		KtoTourismPlaceProperties properties,
@@ -96,25 +99,34 @@ public class KtoTourismPlaceClient implements TourismPlaceFeedClient {
 		);
 	}
 
+    private KtoResponseRepository responses;
+    private KtoStoredPlaces storedPlaces;
+
+    @Autowired
+    void configurePersistence(KtoResponseRepository responses, KtoStoredPlaces storedPlaces) {
+        this.responses=responses;
+        this.storedPlaces=storedPlaces;
+    }
+
 	@Override
 	public TourismPlaceFeedResult fetch(TourismPlaceFeedRequest request) {
-		validateConfiguration();
-		String currentSeed = request.seed() == null || request.seed().isBlank()
-			? UUID.randomUUID().toString()
-			: request.seed();
-		int page = Math.floorMod(currentSeed.hashCode(), 20) + 1;
-		JsonNode listResponse = get(buildListUri(request, page));
-		List<TourismPlaceFeedItem> places = enrichDetailsConcurrently(
-			parseList(listResponse),
-			this::loadDetailSafely,
-			detailExecutor
-		);
-		return new TourismPlaceFeedResult(places, UUID.randomUUID().toString());
+        var lookup=new TourismPlaceLiveSearchRequest(null,null,request.legalRegionCode(),request.category(),request.limit());
+        if(storedPlaces!=null) {
+            var local=storedPlaces.search(lookup,request.excludedPlaceIds(),request.seed());
+            if(!local.isEmpty()) return new TourismPlaceFeedResult(local,UUID.randomUUID().toString());
+            if(!storedPlaces.search(lookup,List.of(),"").isEmpty()) return new TourismPlaceFeedResult(List.of(),null);
+        }
+        var places=parseList(get(buildListUri(request,1))).stream()
+            .filter(place->!request.excludedPlaceIds().contains(place.externalPlaceId())).toList();
+        return new TourismPlaceFeedResult(places,places.isEmpty()?null:UUID.randomUUID().toString());
 	}
 
 	@Override
 	public List<TourismPlaceFeedItem> fetchLive(TourismPlaceLiveSearchRequest request) {
-		validateConfiguration();
+        if(storedPlaces!=null) {
+            var local=storedPlaces.search(request,List.of(),"");
+            if(!local.isEmpty()) return local;
+        }
 		if (request.q() != null && !request.q().isBlank()) {
 			return fetchKeywordLive(request);
 		}
@@ -160,7 +172,6 @@ public class KtoTourismPlaceClient implements TourismPlaceFeedClient {
 
 	@Override
 	public PlaceIntroRaw fetchIntro(String contentId, String contentTypeId) {
-		validateConfiguration();
 		if (contentId == null || contentId.isBlank()) {
 			return PlaceIntroRaw.empty();
 		}
@@ -175,16 +186,24 @@ public class KtoTourismPlaceClient implements TourismPlaceFeedClient {
 		return mergeIntro(introTask.join(), barrierFreeTask.join());
 	}
 
+    @Override
+    public boolean refreshRequested(String id) {
+        return responses!=null && (responses.refreshRequested(buildDetailUri(id)) || responses.refreshRequested(buildImageUri(id)));
+    }
+
 	@Override
 	public Optional<TourismPlaceFeedItem> fetchOne(String externalPlaceId) {
-		validateConfiguration();
 		if (externalPlaceId == null || externalPlaceId.isBlank()) {
 			return Optional.empty();
 		}
-		TourismPlaceFeedItem cached = detailPlaceCache.get(externalPlaceId);
-		if (cached != null) {
-			return Optional.of(cached);
-		}
+        if(storedPlaces!=null) {
+            var local=storedPlaces.find(externalPlaceId);
+            if(local.isPresent()) {
+                var place=local.get();
+                if(place.description()==null||place.description().isBlank()||refreshRequested(externalPlaceId)) place=loadDescriptionSafely(place);
+                return Optional.of(withPhotos(place,null,loadPhotosSafely(place)));
+            }
+        }
 		try {
 			Optional<TourismPlaceFeedItem> parsed = parseDetailPlace(get(buildDetailUri(externalPlaceId)));
 			if (parsed.isEmpty()) {
@@ -196,7 +215,7 @@ public class KtoTourismPlaceClient implements TourismPlaceFeedClient {
 				awardPhotoClient.findBest(place.name()).orElse(null),
 				loadPhotosSafely(place)
 			);
-			detailPlaceCache.put(externalPlaceId, enriched);
+
 			return Optional.of(enriched);
 		}
 		catch (KtoTourismPlaceException exception) {
@@ -247,13 +266,13 @@ public class KtoTourismPlaceClient implements TourismPlaceFeedClient {
 	}
 
 	private TourismPlaceFeedItem loadDescriptionSafely(TourismPlaceFeedItem place) {
-		var cachedDescription = descriptionCache.find(place);
+		var cachedDescription = responses == null ? descriptionCache.find(place) : Optional.<String>empty();
 		if (cachedDescription.isPresent()) {
 			return withDescription(place, cachedDescription.get());
 		}
 		try {
 			TourismPlaceFeedItem enriched = withDetail(place, get(buildDetailUri(place.externalPlaceId())));
-			descriptionCache.put(place, enriched.description());
+			if (responses == null) descriptionCache.put(place, enriched.description());
 			return enriched;
 		}
 		catch (KtoTourismPlaceException exception) {
@@ -263,13 +282,13 @@ public class KtoTourismPlaceClient implements TourismPlaceFeedClient {
 	}
 
 	private List<String> loadPhotosSafely(TourismPlaceFeedItem place) {
-		var cachedPhotos = photoCache.find(place);
+		var cachedPhotos = responses == null ? photoCache.find(place) : Optional.<List<String>>empty();
 		if (cachedPhotos.isPresent()) {
 			return cachedPhotos.get();
 		}
 		try {
 			List<String> photos = parseDetailImages(get(buildImageUri(place.externalPlaceId())));
-			photoCache.put(place, photos);
+			if (responses == null) photoCache.put(place, photos);
 			return photos;
 		}
 		catch (KtoTourismPlaceException exception) {
@@ -294,7 +313,13 @@ public class KtoTourismPlaceClient implements TourismPlaceFeedClient {
 	}
 
 	private JsonNode get(URI uri) {
-		try {
+        if(responses!=null) return responses.load(uri,()->getRemote(uri));
+        return getRemote(uri);
+    }
+
+    private JsonNode getRemote(URI uri) {
+        validateConfiguration();
+        try {
 			JsonNode response = restClient.get().uri(uri).retrieve().body(JsonNode.class);
 			if (response == null) {
 				throw new KtoTourismPlaceException("KTO response is empty.");

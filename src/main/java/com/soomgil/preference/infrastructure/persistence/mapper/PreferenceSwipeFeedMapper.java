@@ -13,6 +13,8 @@ import org.apache.ibatis.annotations.Param;
 @Mapper
 public interface PreferenceSwipeFeedMapper {
 
+	List<String> findReactedPlaceIds(@Param("userId") String userId);
+
 	List<SwipeFeedReactionRow> findReactions(
 		@Param("userId") String userId,
 		@Param("externalPlaceIds") List<String> externalPlaceIds

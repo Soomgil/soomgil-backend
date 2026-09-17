@@ -219,3 +219,8 @@ src/main/resources/application-prod.yml
 !src/main/resources/mappers/**
 !src/main/resources/tourism-source/
 !src/main/resources/tourism-source/**
+
+# 관광 seed 도구의 로컬 산출물
+__pycache__/
+*.pyc
+/seeds/local/

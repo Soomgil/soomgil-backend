@@ -14,6 +14,9 @@ public interface TourismPlaceFeedClient {
 		return List.of();
 	}
 
+	/** 수동으로 표시한 장소 재수집 요청 여부. */
+    default boolean refreshRequested(String externalPlaceId) { return false; }
+
 	default Optional<TourismPlaceFeedItem> fetchOne(String externalPlaceId) {
 		return Optional.empty();
 	}

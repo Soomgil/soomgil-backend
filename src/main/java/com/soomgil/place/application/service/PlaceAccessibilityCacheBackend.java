@@ -3,13 +3,11 @@ package com.soomgil.place.application.service;
 import com.soomgil.place.application.port.TourismPlaceFeedClient;
 import com.soomgil.place.application.query.dto.PlaceAccessibilityInfo;
 import com.soomgil.place.infrastructure.persistence.repository.PlaceAccessibilityOverrideRepository;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 /**
- * 실제 KTO detailIntro 호출 + 정규화 + 캐시 저장을 담당하는 백엔드.
- * {@link PlaceAccessibilityCacheService}가 동일 bean 내에서 self-invocation으로
- * {@code @Cacheable}을 우회하는 문제를 피하기 위해 분리했다.
+ * 장소별 운영 정보 재정의를 우선 조회하고 KTO 응답을 정규화한다.
+ * 성공 응답의 영속 캐시와 실패 재시도 제한은 KTO 클라이언트에서 처리한다.
  */
 @Service
 public class PlaceAccessibilityCacheBackend {
@@ -28,7 +26,6 @@ public class PlaceAccessibilityCacheBackend {
 		this.overrideRepository = overrideRepository;
 	}
 
-	@Cacheable(value = "placeAccessibility", key = "'v2:' + #provider + ':' + #externalPlaceId")
 	public PlaceAccessibilityInfo load(String provider, String externalPlaceId, String contentTypeId) {
 		return overrideRepository.find(provider, externalPlaceId)
 			.orElseGet(() -> loadFromKto(externalPlaceId, contentTypeId));

@@ -72,7 +72,8 @@ public class PreferenceSwipeFeedQueryHandler implements SwipeFeedQueryHandler {
 			query.legalRegionCode(),
 			query.category(),
 			limit,
-			query.seed()
+			query.seed(),
+            query.excludeRecent() ? mapper.findReactedPlaceIds(userId.toString()) : List.of()
 		));
 		List<String> candidateIds = remoteFeed.items().stream()
 			.map(TourismPlaceFeedItem::externalPlaceId)
@@ -89,7 +90,7 @@ public class PreferenceSwipeFeedQueryHandler implements SwipeFeedQueryHandler {
 		Map<String, SwipeTagPreparation> tagPreparations = selectedIds.isEmpty()
 			? Map.of() : tagPreparationService.prepare(selectedPlaces);
 		Map<PlaceRef, List<UserSummary>> likedByFollowees = findLikedByFollowees(selectedPlaces);
-		Map<String, PlaceAccessibilityInfo> accessibilityMap = fetchAccessibility(selectedPlaces);
+		Map<String, PlaceAccessibilityInfo> accessibilityMap = Map.of();
 		List<SwipeFeedItem> items = selectedPlaces.stream()
 			.map(place -> toItem(place, reactions, tagPreparations, likedByFollowees, accessibilityMap))
 			.toList();

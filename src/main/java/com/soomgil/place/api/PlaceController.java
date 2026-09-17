@@ -57,8 +57,9 @@ public class PlaceController {
 	@GetMapping("/{provider}/{externalPlaceId}")
 	public PlaceDetail getPlace(
 		@PathVariable PlaceProvider provider,
-		@PathVariable String externalPlaceId
+		@PathVariable String externalPlaceId,
+        @RequestParam(defaultValue = "true") boolean includeInfo
 	) {
-		return placeDetailQueryHandler.handle(new PlaceDetailQuery(provider, externalPlaceId));
+		return placeDetailQueryHandler.handle(new PlaceDetailQuery(provider, externalPlaceId, includeInfo));
 	}
 }
