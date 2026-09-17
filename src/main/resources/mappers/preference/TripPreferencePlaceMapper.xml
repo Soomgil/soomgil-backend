@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.soomgil.preference.infrastructure.persistence.mapper.TripPreferencePlaceMapper">
+  <select id="find" resultType="com.soomgil.preference.api.dto.TripPreferencePlace">
+    WITH visible_reactions AS (
+      SELECT r.*, p.display_name, p.profile_image_url
+      FROM preference.user_place_reactions r
+      JOIN auth.user_profiles p ON p.user_id = r.user_id
+      WHERE r.reaction IN ('LIKE', 'SUPER_LIKE')
+        AND r.user_id IN <foreach collection="memberIds" item="id" open="(" close=")" separator=",">CAST(#{id} AS uuid)</foreach>
+        AND (r.user_id = CAST(#{viewerId} AS uuid) OR p.profile_visibility = 'PUBLIC'
+          OR (p.profile_visibility = 'PRIVATE' AND EXISTS (
+            SELECT 1 FROM social.user_follows f WHERE f.follower_user_id = CAST(#{viewerId} AS uuid)
+              AND f.following_user_id = r.user_id AND f.status = 'ACTIVE' AND f.deleted_at IS NULL)))
+    ), candidates AS (
+      SELECT a.* FROM tourism_source.attractions a
+      WHERE a.longitude BETWEEN #{west} AND #{east} AND a.latitude BETWEEN #{south} AND #{north}
+        AND EXISTS (SELECT 1 FROM visible_reactions r WHERE r.provider = 'KTO' AND r.external_place_id = CAST(a.content_id AS text))
+      ORDER BY a.content_id LIMIT 200
+    )
+    SELECT r.provider, r.external_place_id, a.title AS name, CONCAT_WS(' ', a.addr1, a.addr2) AS address,
+      a.latitude AS lat, a.longitude AS lng, img.public_url AS thumbnail_url, ct.content_type_name AS category,
+      CAST(r.user_id AS text) AS user_id, r.display_name, r.profile_image_url, r.reaction
+    FROM candidates a
+    JOIN visible_reactions r ON r.provider = 'KTO' AND r.external_place_id = CAST(a.content_id AS text)
+    LEFT JOIN tourism_source.contenttypes ct ON ct.content_type_id = a.content_type_id
+    LEFT JOIN LATERAL (SELECT public_url FROM tourism_source.attraction_images WHERE attraction_no = a.no AND is_active = true
+      ORDER BY display_order, created_at LIMIT 1) img ON true
+    ORDER BY a.content_id, r.user_id
+  </select>
+</mapper>
