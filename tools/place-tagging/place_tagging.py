@@ -46,14 +46,18 @@ AREA_NAMES = {
     "38": "전남", "39": "제주",
 }
 DEFAULT_MODEL = "gemini-2.5-flash-lite"  # 제주 태깅 때 쓴 저가 모델
-DEFAULT_BATCH_SIZE = 20  # 한 요청에 20곳(스키마 상한). 요청 수를 절반으로 줄인다
-DEFAULT_DELAY = 8.0  # 요청 사이 8초 → 분당 4회 안팎. 순간 제한(429)을 만나면 자동으로 더 늘린다
+DEFAULT_BATCH_SIZE = 10  # 한 요청에 10곳. 20곳은 응답이 잘려 일부가 누락됐다
+DEFAULT_DELAY = 5.0  # 요청 사이 5초. 순간 제한(429)을 만나면 자동으로 더 늘린다
 SQL_FLUSH_EVERY = 20  # 묶음 N개마다 SQL 파일을 갱신해 중간에 꺼져도 최신 SQL이 남게 한다.
 
 
 # ── 오류 분류 ──────────────────────────────────────────────────────────────
 class ConfigError(RuntimeError):
     """설정 문제. 재시도해도 소용없으니 원인을 알려주고 멈춘다."""
+
+
+class MissingIdsError(ValueError):
+    """응답이 잘려 일부 content_id 가 빠졌다. 묶음을 나눠 다시 요청한다."""
 
 
 class QuotaExhausted(RuntimeError):
@@ -265,6 +269,17 @@ class GmsClient:
         self.extra_delay = min(20.0, self.extra_delay + 2.0)
 
     def tag(self, key: str, places: list[dict[str, object]], tags: list[base.Tag], retries: int = 6):
+        """누락 content_id 가 나오면(응답이 잘림) 묶음을 반으로 쪼개 다시 요청한다. 5곳 이하에서만 그대로 재시도."""
+        try:
+            return self._tag_once(key, places, tags, retries=1 if len(places) > 5 else retries)
+        except MissingIdsError:
+            if len(places) <= 5:
+                raise
+            half = (len(places) + 1) // 2
+            print(f"  응답이 잘려 {len(places)}곳 → {half}곳씩 나눠 다시 요청합니다.", flush=True)
+            return self.tag(key, places[:half], tags, retries) + self.tag(key, places[half:], tags, retries)
+
+    def _tag_once(self, key: str, places: list[dict[str, object]], tags: list[base.Tag], retries: int = 6):
         url = (
             f"{self.base_url}/{self.api_version}/models/{urllib.parse.quote(self.model, safe='-_.')}:streamGenerateContent"
             f"?alt=sse&key={urllib.parse.quote(key, safe='')}"
@@ -273,6 +288,7 @@ class GmsClient:
             "contents": [{"role": "user", "parts": [{"text": base.build_prompt(places, tags)}]}],
             "generationConfig": {
                 "temperature": 0.2,
+                "maxOutputTokens": 16384,
                 "responseMimeType": "application/json",
                 "responseSchema": base.response_schema(tags),
             },
@@ -314,6 +330,11 @@ class GmsClient:
             except (urllib.error.URLError, TimeoutError, OSError) as exc:
                 self._sleep_before_retry(attempt, retries, mask(f"네트워크 오류: {exc}", self.keys))
             except (KeyError, IndexError, json.JSONDecodeError, ValueError) as exc:
+                if "누락 content_id" in str(exc):
+                    if attempt + 1 >= retries:
+                        raise MissingIdsError(str(exc)) from exc
+                    print(f"  응답에 일부 장소가 빠졌습니다. 다시 요청합니다 ({attempt + 1}/{retries - 1})", flush=True)
+                    continue
                 self._sleep_before_retry(attempt, retries, mask(f"응답 형식 오류: {exc}", self.keys))
         raise RuntimeError(f"GMS 호출이 {retries}회 연속 실패했습니다. 잠시 후 다시 실행하세요.")
 
