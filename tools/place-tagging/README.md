@@ -1,6 +1,6 @@
 # 전국 장소 텍스트 태깅 (3명 분담)
 
-SSAFY `SSAFY_TRIP_Dump.sql`의 **제주를 뺀 전국 장소**를 GMS(`gpt-5.5`, 제주 태깅과 같은 모델·프롬프트)로 태깅해
+SSAFY `SSAFY_TRIP_Dump.sql`의 **제주를 뺀 전국 장소**를 GMS(`gemini-2.5-flash-lite`, 제주 태깅과 같은 저가 모델·프롬프트)로 태깅해
 Soomgil PostgreSQL에 넣을 SQL을 만든다. 제주(`area_code=39`)는 `../jeju-tagging`으로 이미 끝났으므로 제외한다.
 
 ## 누가 뭘 하나
@@ -21,11 +21,12 @@ Soomgil PostgreSQL에 넣을 SQL을 만든다. 제주(`area_code=39`)는 `../jej
 1. Python 3.10+ 설치.
 2. `SSAFY_TRIP_Dump.sql`을 `내 PC\Downloads\SSAFY_HOME_TRIP_202604\`에 둔다.
    다른 곳에 있으면 그 파일을 `run-X.bat` 위로 드래그해서 실행하면 된다.
-3. 프로젝트 루트 `.env`에 GMS 키를 넣는다. 키가 2개면 두 줄 다 넣는다.
+3. **이 폴더**의 `.env.example`을 복사해 `.env`로 저장하고 GMS 키를 넣는다. 키가 2개면 두 줄 다 넣는다.
+   (프로젝트 루트 `.env`가 이미 있으면 그것도 읽지만, 이 폴더 `.env`가 우선이다. `.env`는 커밋되지 않는다.)
    ```
    GMS_API_KEY=첫번째키
    GMS_API_KEY_2=두번째키
-   GMS_CHAT_MODEL=gpt-5.5
+   GEMINI_CHAT_MODEL=gemini-2.5-flash-lite
    ```
    A와 C는 첫 키, B는 두 번째 키를 먼저 쓰고, 그 키가 막히면 자동으로 다른 키로 넘어간다.
 

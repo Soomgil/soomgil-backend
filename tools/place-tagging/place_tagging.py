@@ -45,6 +45,7 @@ AREA_NAMES = {
     "31": "경기", "32": "강원", "33": "충북", "34": "충남", "35": "경북", "36": "경남", "37": "전북",
     "38": "전남", "39": "제주",
 }
+DEFAULT_MODEL = "gemini-2.5-flash-lite"  # 제주 태깅 때 쓴 저가 모델
 DEFAULT_BATCH_SIZE = 10
 DEFAULT_DELAY = 2.0
 SQL_FLUSH_EVERY = 20  # 묶음 N개마다 SQL 파일을 갱신해 중간에 꺼져도 최신 SQL이 남게 한다.
@@ -142,7 +143,7 @@ class KeyPool:
     def __init__(self, keys: list[str], part: str, state_path: Path = QUOTA_FILE, clock=None,
                  daily_limit: int | None = None) -> None:
         if not keys:
-            raise ConfigError("루트 .env 에 GMS_API_KEY 가 없습니다. (여러 개면 GMS_API_KEY_2, GMS_API_KEY_3 …)")
+            raise ConfigError("GMS_API_KEY 가 없습니다. 이 폴더의 .env (또는 프로젝트 루트 .env) 에 넣어 주세요. (여러 개면 GMS_API_KEY_2 …)")
         self.keys = keys
         self.state_path = state_path
         self.clock = clock or (lambda: datetime.now(KST))
@@ -209,8 +210,19 @@ class KeyPool:
         return f"키#{self.keys.index(key) + 1}"
 
 
-def load_keys() -> list[str]:
+def load_env_files() -> None:
+    """이 폴더의 .env 를 먼저, 없으면 프로젝트 루트 .env 를 읽는다(먼저 읽은 값이 우선)."""
+    base.load_env(TOOL_DIR / ".env")
     base.load_env(ROOT_DIR / ".env")
+
+
+def resolve_model() -> str:
+    """제주 태깅과 같은 순서로 모델을 정한다: GMS_CHAT_MODEL → GEMINI_CHAT_MODEL → gemini-2.5-flash-lite."""
+    return (os.getenv("GMS_CHAT_MODEL") or os.getenv("GEMINI_CHAT_MODEL") or DEFAULT_MODEL).strip() or DEFAULT_MODEL
+
+
+def load_keys() -> list[str]:
+    load_env_files()
     keys: list[str] = []
     for name in ("GMS_API_KEY", "GMS_API_KEY_2", "GMS_API_KEY_3", "GMS_API_KEY_4"):
         value = os.getenv(name, "").strip()
@@ -238,8 +250,7 @@ class GmsClient:
             "GMS_GEMINI_BASE_URL", "https://gms.ssafy.io/gmsapi/generativelanguage.googleapis.com"
         ).rstrip("/")
         self.api_version = os.getenv("GMS_GEMINI_API_VERSION", "v1beta").strip("/")
-        # 제주 태깅과 같은 모델. DB의 model_name 과 맞추기 위해 기본값도 같다.
-        self.model = os.getenv("GMS_CHAT_MODEL", "gpt-5.5").strip() or "gpt-5.5"
+        self.model = resolve_model()
 
     def tag(self, key: str, places: list[dict[str, object]], tags: list[base.Tag], retries: int = 6):
         url = (
@@ -282,7 +293,7 @@ class GmsClient:
                 if 400 <= exc.code < 500:
                     raise ConfigError(
                         f"GMS가 요청을 거절했습니다: {message}\n"
-                        "  → 키가 틀렸거나(401/403) 모델명이 잘못됐을 수 있습니다. .env 의 GMS_API_KEY / GMS_CHAT_MODEL 을 확인하세요."
+                        "  → 키가 틀렸거나(401/403) 모델명이 잘못됐을 수 있습니다. .env 의 GMS_API_KEY / GEMINI_CHAT_MODEL 을 확인하세요."
                     ) from exc
                 self._sleep_before_retry(attempt, retries, message)
             except (urllib.error.URLError, TimeoutError, OSError) as exc:
@@ -304,7 +315,7 @@ class GmsClient:
 def generate_sql(rows: list[dict[str, object]], destination: Path, part: str) -> None:
     if not rows:
         return
-    model = os.getenv("GMS_CHAT_MODEL", "gpt-5.5").strip() or "gpt-5.5"
+    model = resolve_model()
     tags_by_code = {tag.code: tag for tag in base.load_tags()}
     areas = sorted({str(row.get("area_code")) for row in rows}, key=lambda code: int(code) if code.isdigit() else 0)
     area_text = ", ".join(f"{AREA_NAMES.get(code, code)}({code})" for code in areas)
@@ -497,7 +508,7 @@ def main() -> int:
     part = normalize_part(args.part)
     if not 1 <= args.batch_size <= 20:
         raise ConfigError("batch-size는 1~20이어야 합니다.")
-    base.load_env(ROOT_DIR / ".env")
+    load_env_files()
     limit_text = os.getenv("GMS_DAILY_REQUEST_LIMIT", "").strip()
     daily_limit = int(limit_text) if limit_text.isdigit() and int(limit_text) > 0 else None
     return run_part(part, args.input, args.batch_size, args.delay, daily_limit)
