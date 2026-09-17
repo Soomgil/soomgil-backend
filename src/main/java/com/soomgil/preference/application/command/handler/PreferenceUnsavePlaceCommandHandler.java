@@ -1,5 +1,6 @@
 package com.soomgil.preference.application.command.handler;
 
+import com.soomgil.global.cache.InvalidatesMyPageCache;
 import com.soomgil.common.cqrs.NoResult;
 import com.soomgil.preference.application.command.dto.UnsavePlaceCommand;
 import org.springframework.stereotype.Service;
@@ -17,6 +18,7 @@ public class PreferenceUnsavePlaceCommandHandler implements UnsavePlaceCommandHa
 	}
 
 	@Override
+	@InvalidatesMyPageCache({"saved"})
 	public NoResult handle(UnsavePlaceCommand command) {
 		return service.unsave(command);
 	}

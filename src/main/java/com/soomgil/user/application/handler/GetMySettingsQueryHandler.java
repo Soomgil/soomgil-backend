@@ -1,5 +1,6 @@
 package com.soomgil.user.application.handler;
 
+import com.soomgil.global.cache.MyPageCached;
 import com.soomgil.common.cqrs.QueryHandler;
 import com.soomgil.user.api.dto.UserSettings;
 import com.soomgil.user.application.query.GetMySettingsQuery;
@@ -31,6 +32,7 @@ public class GetMySettingsQueryHandler implements QueryHandler<GetMySettingsQuer
 	}
 
 	@Override
+	@MyPageCached("profile")
 	public UserSettings handle(GetMySettingsQuery query) {
 		UserSettingsRecord record = userSettingsMapper.findByUserId(query.userId())
 			.orElseGet(() -> defaultSettings(query.userId()));

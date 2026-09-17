@@ -21,6 +21,8 @@ spring:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
+      connect-timeout: ${REDIS_CONNECT_TIMEOUT:500ms}
+      timeout: ${REDIS_COMMAND_TIMEOUT:500ms}
   flyway:
     enabled: true
     locations: classpath:db/migration

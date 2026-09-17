@@ -1,5 +1,6 @@
 package com.soomgil.community.application.handler;
 
+import com.soomgil.global.cache.InvalidatesMyPageCache;
 import com.soomgil.common.cqrs.CommandHandler;
 import com.soomgil.community.api.dto.ContentReport;
 import com.soomgil.community.api.dto.ReportStatus;
@@ -51,6 +52,7 @@ public class ResolveReportCommandHandler
 	}
 
 	@Override
+	@InvalidatesMyPageCache({"stories"})
 	public ContentReport handle(ResolveReportCommand command) {
 		accessGuard.requireModerator(command.moderatorUserId());
 

@@ -1,5 +1,6 @@
 package com.soomgil.community.application.handler;
 
+import com.soomgil.global.cache.InvalidatesMyPageCache;
 import com.soomgil.common.cqrs.CommandHandler;
 import com.soomgil.community.api.dto.CommunityPostReactionSummary;
 import com.soomgil.community.application.command.UnlikePostCommand;
@@ -30,6 +31,7 @@ public class UnlikePostCommandHandler
 	}
 
 	@Override
+	@InvalidatesMyPageCache({"stories"})
 	public CommunityPostReactionSummary handle(UnlikePostCommand command) {
 		CommunityPostRecord post = postMapper.findById(command.postId())
 			.filter(p -> !p.isDeleted())

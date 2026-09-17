@@ -1,5 +1,6 @@
 package com.soomgil.community.application.handler;
 
+import com.soomgil.global.cache.InvalidatesMyPageCache;
 import com.soomgil.common.cqrs.CommandHandler;
 import com.soomgil.common.cqrs.NoResult;
 import com.soomgil.community.application.command.DeleteCommunityPostCommand;
@@ -29,6 +30,7 @@ public class DeleteCommunityPostCommandHandler
 	}
 
 	@Override
+	@InvalidatesMyPageCache({"stories"})
 	public NoResult handle(DeleteCommunityPostCommand command) {
 		CommunityPostRecord post = postMapper.findById(command.postId())
 			.orElseThrow(() -> new CommunityException(ErrorCode.POST_NOT_FOUND));

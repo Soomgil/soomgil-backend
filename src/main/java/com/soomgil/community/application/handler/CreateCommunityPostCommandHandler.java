@@ -1,5 +1,6 @@
 package com.soomgil.community.application.handler;
 
+import com.soomgil.global.cache.InvalidatesMyPageCache;
 import com.soomgil.common.cqrs.CommandHandler;
 import com.soomgil.community.api.dto.CommunityPostDetail;
 import com.soomgil.community.api.dto.PostVisibility;
@@ -69,6 +70,7 @@ public class CreateCommunityPostCommandHandler
 	}
 
 	@Override
+	@InvalidatesMyPageCache({"stories"})
 	public CommunityPostDetail handle(CreateCommunityPostCommand command) {
 		validateInputs(command);
 

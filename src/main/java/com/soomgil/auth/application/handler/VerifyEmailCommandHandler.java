@@ -1,5 +1,6 @@
 package com.soomgil.auth.application.handler;
 
+import com.soomgil.global.cache.InvalidatesMyPageCache;
 import com.soomgil.auth.application.command.VerifyEmailCommand;
 import com.soomgil.auth.application.service.TokenGenerator;
 import com.soomgil.auth.domain.model.AuthException;
@@ -41,6 +42,7 @@ public class VerifyEmailCommandHandler implements CommandHandler<VerifyEmailComm
 	}
 
 	@Override
+	@InvalidatesMyPageCache({"profile"})
 	public UUID handle(VerifyEmailCommand command) {
 		String hash = tokenGenerator.hash(command.token());
 

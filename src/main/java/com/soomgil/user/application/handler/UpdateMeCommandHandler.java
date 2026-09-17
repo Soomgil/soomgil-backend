@@ -1,5 +1,6 @@
 package com.soomgil.user.application.handler;
 
+import com.soomgil.global.cache.InvalidatesMyPageCache;
 import com.soomgil.auth.domain.model.AuthException;
 import com.soomgil.auth.domain.model.AuthUser;
 import com.soomgil.auth.domain.model.EmailAddress;
@@ -67,6 +68,7 @@ public class UpdateMeCommandHandler implements CommandHandler<UpdateMeCommand, U
 	}
 
 	@Override
+	@InvalidatesMyPageCache({"profile","social","stories"})
 	public User handle(UpdateMeCommand command) {
 		UserProfileRecord current = userMeMapper.findFull(command.userId())
 			.orElseThrow(() -> new UserException(ErrorCode.PROFILE_NOT_FOUND,

@@ -1,5 +1,6 @@
 package com.soomgil.trip.application.command.handler;
 
+import com.soomgil.global.cache.InvalidatesMyPageCache;
 import com.soomgil.common.cqrs.CommandHandler;
 import com.soomgil.common.id.Ids;
 import com.soomgil.common.time.TimeProvider;
@@ -33,6 +34,7 @@ public class CreateTripHandler implements CommandHandler<CreateTripCommand, Crea
 
 	@Override
 	@Transactional
+	@InvalidatesMyPageCache({"trips","stories"})
 	public CreateTripResult handle(CreateTripCommand command) {
 		Objects.requireNonNull(command.creatorUserId(), "creatorUserId must not be null");
 		Instant now = timeProvider.now();

@@ -1,5 +1,6 @@
 package com.soomgil.trip.application.command.handler;
 
+import com.soomgil.global.cache.InvalidatesMyPageCache;
 import com.soomgil.common.cqrs.CommandHandler;
 import com.soomgil.common.id.Ids;
 import com.soomgil.common.time.TimeProvider;
@@ -44,6 +45,7 @@ public class AcceptTripInviteHandler implements CommandHandler<AcceptTripInviteC
 
 	@Override
 	@Transactional
+	@InvalidatesMyPageCache({"trips","stories"})
 	public AcceptTripInviteResult handle(AcceptTripInviteCommand command) {
 		TripInviteAcceptReadModel invite = queryRepository.findTripInviteForAccept(command.inviteCode())
 			.orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "Trip invite was not found."));

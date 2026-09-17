@@ -1,5 +1,6 @@
 package com.soomgil.auth.application.handler;
 
+import com.soomgil.global.cache.MyPageCached;
 import com.soomgil.auth.application.query.GetCurrentUserQuery;
 import com.soomgil.auth.domain.model.AuthException;
 import com.soomgil.auth.domain.model.AuthUser;
@@ -49,6 +50,7 @@ public class GetCurrentUserQueryHandler implements QueryHandler<GetCurrentUserQu
 	}
 
 	@Override
+	@MyPageCached("profile")
 	public User handle(GetCurrentUserQuery query) {
 		AuthUser user = userMapper.findById(query.userId())
 			.orElseThrow(() -> new AuthException(ErrorCode.USER_NOT_FOUND));

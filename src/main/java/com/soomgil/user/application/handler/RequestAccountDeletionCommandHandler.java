@@ -1,5 +1,6 @@
 package com.soomgil.user.application.handler;
 
+import com.soomgil.global.cache.InvalidatesMyPageCache;
 import com.soomgil.common.cqrs.CommandHandler;
 import com.soomgil.common.cqrs.NoResult;
 import com.soomgil.trip.application.port.TripCommandRepository;
@@ -39,6 +40,7 @@ public class RequestAccountDeletionCommandHandler
 	}
 
 	@Override
+	@InvalidatesMyPageCache({"profile","social","stories","trips","preferences","saved"})
 	public NoResult handle(RequestAccountDeletionCommand command) {
 		OffsetDateTime deletedAt = OffsetDateTime.now();
 		if (accountCommandMapper.markDeleted(command.userId(), deletedAt) == 0) {

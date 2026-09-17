@@ -1,5 +1,6 @@
 package com.soomgil.preference.application.command.handler;
 
+import com.soomgil.global.cache.InvalidatesMyPageCache;
 import com.soomgil.common.id.Ids;
 import com.soomgil.global.security.CurrentUserProvider;
 import com.soomgil.place.api.dto.PlaceRef;
@@ -51,6 +52,7 @@ public class PreferenceUpsertSwipeReactionCommandHandler implements UpsertSwipeR
 
 	@Transactional
 	@Override
+	@InvalidatesMyPageCache({"preferences","saved"})
 	public SwipeReactionResponse handle(UpsertSwipeReactionCommand command) {
 		CurrentUserProvider provider = currentUserProvider.getIfAvailable();
 		if (provider == null) {

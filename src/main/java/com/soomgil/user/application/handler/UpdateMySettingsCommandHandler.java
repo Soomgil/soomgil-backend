@@ -1,5 +1,6 @@
 package com.soomgil.user.application.handler;
 
+import com.soomgil.global.cache.InvalidatesMyPageCache;
 import com.soomgil.common.cqrs.CommandHandler;
 import com.soomgil.global.error.ErrorCode;
 import com.soomgil.user.api.dto.UserSettings;
@@ -35,6 +36,7 @@ public class UpdateMySettingsCommandHandler implements CommandHandler<UpdateMySe
 	}
 
 	@Override
+	@InvalidatesMyPageCache({"profile"})
 	public UserSettings handle(UpdateMySettingsCommand command) {
 		UserSettingsRecord current = settingsMapper.findByUserId(command.userId())
 			.orElseThrow(() -> new UserException(ErrorCode.PROFILE_NOT_FOUND,
