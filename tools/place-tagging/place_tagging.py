@@ -274,7 +274,7 @@ class GmsClient:
     def tag(self, key: str, places: list[dict[str, object]], tags: list[base.Tag], retries: int = 6):
         """누락 content_id 가 나오면(응답이 잘림) 묶음을 반으로 쪼개 다시 요청한다. 5곳 이하에서만 그대로 재시도."""
         try:
-            return self._tag_once(key, places, tags, retries=1 if len(places) > MIN_BATCH_SIZE else retries)
+            return self._tag_once(key, places, tags, retries, split_on_missing=len(places) > MIN_BATCH_SIZE)
         except MissingIdsError:
             if len(places) <= MIN_BATCH_SIZE:
                 raise
@@ -283,7 +283,8 @@ class GmsClient:
             print(f"  응답이 잘려 {len(places)}곳 → {half}곳씩 나눠 다시 요청합니다.", flush=True)
             return self.tag(key, places[:half], tags, retries) + self.tag(key, places[half:], tags, retries)
 
-    def _tag_once(self, key: str, places: list[dict[str, object]], tags: list[base.Tag], retries: int = 6):
+    def _tag_once(self, key: str, places: list[dict[str, object]], tags: list[base.Tag], retries: int = 6,
+                  split_on_missing: bool = False):
         url = (
             f"{self.base_url}/{self.api_version}/models/{urllib.parse.quote(self.model, safe='-_.')}:streamGenerateContent"
             f"?alt=sse&key={urllib.parse.quote(key, safe='')}"
@@ -300,7 +301,8 @@ class GmsClient:
         data = json.dumps(body, ensure_ascii=False).encode("utf-8")
         rate_limited = 0
         rate_limited_seconds = 0
-        for attempt in range(retries):
+        attempt = 0
+        while attempt < retries:  # 429 대기는 재시도 횟수에 넣지 않는다
             request = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"}, method="POST")
             try:
                 with urllib.request.urlopen(request, timeout=180) as response:
@@ -314,7 +316,9 @@ class GmsClient:
                 except Exception:  # noqa: BLE001
                     pass
                 message = mask(f"HTTP {exc.code} {detail}", self.keys)
+                attempt += 1
                 if is_quota_error(exc.code, detail):
+                    attempt -= 1
                     if is_daily_quota_error(exc.code, detail) or rate_limited_seconds >= MAX_RATE_LIMIT_MINUTES * 60:
                         raise QuotaExhausted(message) from exc
                     wait = RATE_LIMIT_WAITS[min(rate_limited, len(RATE_LIMIT_WAITS) - 1)]
@@ -332,22 +336,25 @@ class GmsClient:
                     ) from exc
                 self._sleep_before_retry(attempt, retries, message)
             except (urllib.error.URLError, TimeoutError, OSError) as exc:
+                attempt += 1
                 self._sleep_before_retry(attempt, retries, mask(f"네트워크 오류: {exc}", self.keys))
             except (KeyError, IndexError, json.JSONDecodeError, ValueError) as exc:
+                attempt += 1
                 if "누락 content_id" in str(exc):
-                    if attempt + 1 >= retries:
+                    if split_on_missing or attempt >= retries:
                         raise MissingIdsError(str(exc)) from exc
-                    print(f"  응답에 일부 장소가 빠졌습니다. 다시 요청합니다 ({attempt + 1}/{retries - 1})", flush=True)
+                    print(f"  응답에 일부 장소가 빠졌습니다. 다시 요청합니다 ({attempt}/{retries - 1})", flush=True)
                     continue
                 self._sleep_before_retry(attempt, retries, mask(f"응답 형식 오류: {exc}", self.keys))
         raise RuntimeError(f"GMS 호출이 {retries}회 연속 실패했습니다. 잠시 후 다시 실행하세요.")
 
     @staticmethod
     def _sleep_before_retry(attempt: int, retries: int, message: str) -> None:
-        if attempt + 1 >= retries:
+        """attempt 는 지금까지 실패한 횟수(1부터)."""
+        if attempt >= retries:
             raise RuntimeError(message)
-        delay = min(90.0, 3 * 2 ** attempt + random.random())
-        print(f"  재시도 {attempt + 1}/{retries - 1}: {message[:160]} ({delay:.0f}초 후)", flush=True)
+        delay = min(90.0, 3 * 2 ** (attempt - 1) + random.random())
+        print(f"  재시도 {attempt}/{retries - 1}: {message[:160]} ({delay:.0f}초 후)", flush=True)
         time.sleep(delay)
 
 
