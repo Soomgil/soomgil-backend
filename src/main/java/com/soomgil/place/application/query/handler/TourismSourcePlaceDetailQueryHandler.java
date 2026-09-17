@@ -56,13 +56,24 @@ public class TourismSourcePlaceDetailQueryHandler implements PlaceDetailQueryHan
 			item.phone(),
 			item.sourceUpdatedAt(),
 			item.enriched(),
-			accessibility(item)
+			query.includeInfo() ? accessibility(item) : PlaceAccessibilityInfo.unknown()
 		);
 	}
 
 	private PlaceDetailItem findDetail(PlaceDetailQuery query) {
 		try {
-			return repository.find(query);
+			var item=repository.find(query);
+            boolean refresh=liveClient.refreshRequested(query.externalPlaceId());
+            if(refresh || item.photos().size()<2 || item.description()==null || item.description().isBlank()) {
+                var collected=liveClient.fetchOne(query.externalPlaceId());
+                if(collected.isPresent()) {
+                    var fresh=toDetailItem(collected.get());
+                    var photos=java.util.stream.Stream.concat(item.photos().stream(),fresh.photos().stream()).distinct().toList();
+                    return new PlaceDetailItem(item.externalPlaceId(),item.name(),item.address(),item.lat(),item.lng(),item.thumbnailUrl(),photos,item.category(),item.sourceStatus(),
+                        refresh && fresh.description()!=null ? fresh.description() : item.description()==null||item.description().isBlank()?fresh.description():item.description(),item.phone(),item.sourceUpdatedAt(),item.enriched());
+                }
+            }
+            return item;
 		}
 		catch (BusinessException exception) {
 			if (exception.errorCode() != ErrorCode.RESOURCE_NOT_FOUND || query.provider() != PlaceProvider.KTO) {

@@ -67,14 +67,15 @@ class PreferenceSwipeFeedApiCompositionTest {
 		);
 		var response = handler.handle(new SwipeFeedQuery(null, null, 20, false, "seed"));
 
+		org.mockito.Mockito.verifyNoInteractions(accessibilityCacheService);
 		assertThat(response.nextSeed()).isEqualTo("next-seed");
 		assertThat(response.items()).singleElement().satisfies(item -> {
 			assertThat(item.place().externalPlaceId()).isEqualTo("126508");
 			assertThat(item.place().description()).isEqualTo("넓은 백사장이 있는 해수욕장");
 			assertThat(item.place().photos()).hasSize(2);
 			assertThat(item.place().tags()).containsExactly("바다·해안", "산책");
-			assertThat(item.place().accessibility().openingHours()).isEqualTo("09:00~18:00");
-			assertThat(item.place().accessibility().flags()).containsExactly(AccessibilityFlag.WHEELCHAIR);
+			assertThat(item.place().accessibility().openingHours()).isNull();
+			assertThat(item.place().accessibility().flags()).isEmpty();
 			assertThat(item.myReaction().name()).isEqualTo("LIKE");
 		});
 	}

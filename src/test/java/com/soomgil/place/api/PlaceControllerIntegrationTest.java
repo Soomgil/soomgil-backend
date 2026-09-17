@@ -13,10 +13,12 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.annotation.Transactional;
 
 @Import(TestcontainersConfiguration.class)
 @SpringBootTest
 @AutoConfigureMockMvc(addFilters = false)
+@Transactional
 class PlaceControllerIntegrationTest {
 
 	@Autowired
@@ -56,7 +58,7 @@ class PlaceControllerIntegrationTest {
 				126508,
 				'Haeundae Beach',
 				12,
-				26,
+				6,
 				0,
 				35.1587,
 				129.1604,
@@ -91,7 +93,7 @@ class PlaceControllerIntegrationTest {
 		mockMvc.perform(get("/api/v1/places/search")
 				.param("q", "Beach")
 				.param("bbox", "129.0,35.0,130.0,36.0")
-				.param("legalRegionCode", "26000")
+				.param("legalRegionCode", "6")
 				.param("category", "ATTRACTION")
 				.param("page", "0")
 				.param("size", "20"))

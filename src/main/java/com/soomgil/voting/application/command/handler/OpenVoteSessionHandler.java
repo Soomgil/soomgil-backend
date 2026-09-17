@@ -33,6 +33,7 @@ import com.soomgil.trip.application.query.dto.TripMemberView;
 import com.soomgil.trip.application.query.handler.ListTripMembersHandler;
 import com.soomgil.trip.domain.model.TripMemberStatus;
 import java.time.Instant;
+import com.soomgil.voting.application.port.VoteNotificationPublisher;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -63,6 +64,7 @@ public class OpenVoteSessionHandler implements CommandHandler<OpenVoteSessionCom
 	private final FindLegalRegionsByCodesHandler legalRegionsHandler;
 	private final VoteSessionAssembler assembler;
 	private final TimeProvider timeProvider;
+	private final VoteNotificationPublisher notifications;
 
 	public OpenVoteSessionHandler(
 		VoteSessionRepository repository,
@@ -73,7 +75,8 @@ public class OpenVoteSessionHandler implements CommandHandler<OpenVoteSessionCom
 		ListTripRegionCodesHandler regionCodesHandler,
 		FindLegalRegionsByCodesHandler legalRegionsHandler,
 		VoteSessionAssembler assembler,
-		TimeProvider timeProvider
+		TimeProvider timeProvider,
+		VoteNotificationPublisher notifications
 	) {
 		this.repository = Objects.requireNonNull(repository, "repository must not be null");
 		this.tripAccessGuard = Objects.requireNonNull(tripAccessGuard, "tripAccessGuard must not be null");
@@ -84,6 +87,7 @@ public class OpenVoteSessionHandler implements CommandHandler<OpenVoteSessionCom
 		this.legalRegionsHandler = Objects.requireNonNull(legalRegionsHandler, "legalRegionsHandler must not be null");
 		this.assembler = Objects.requireNonNull(assembler, "assembler must not be null");
 		this.timeProvider = Objects.requireNonNull(timeProvider, "timeProvider must not be null");
+		this.notifications = Objects.requireNonNull(notifications, "notifications must not be null");
 	}
 
 	@Override
@@ -200,6 +204,7 @@ public class OpenVoteSessionHandler implements CommandHandler<OpenVoteSessionCom
 			));
 		}
 		repository.insertParticipants(participants);
+		notifications.publish(command.tripId(), sessionId, false, now);
 
 		return assembler.toDetail(session, candidates, participants, regions);
 	}

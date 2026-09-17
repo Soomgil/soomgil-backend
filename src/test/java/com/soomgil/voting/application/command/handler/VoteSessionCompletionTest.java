@@ -3,6 +3,7 @@ package com.soomgil.voting.application.command.handler;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -38,6 +39,7 @@ import com.soomgil.voting.domain.model.VoteCompletionReason;
 import com.soomgil.voting.domain.model.VoteParticipantStatus;
 import com.soomgil.voting.domain.model.VoteSessionStatus;
 import java.time.Instant;
+import com.soomgil.voting.application.port.VoteNotificationPublisher;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -50,6 +52,7 @@ class VoteSessionCompletionTest {
 
 	private static final Instant NOW = Instant.parse("2026-08-24T10:00:00Z");
 
+	private final VoteNotificationPublisher notifications = mock(VoteNotificationPublisher.class);
 	private final VoteSessionRepository repository = mock(VoteSessionRepository.class);
 	private final TripAccessGuard tripAccessGuard = mock(TripAccessGuard.class);
 	private final AddPlacesToUnscheduledHandler itineraryHandler = mock(AddPlacesToUnscheduledHandler.class);
@@ -57,7 +60,7 @@ class VoteSessionCompletionTest {
 		mock(ApplyTripVotePreferenceCommandHandler.class);
 
 	private final CompleteVoteSessionService completeService = new CompleteVoteSessionService(
-		repository, itineraryHandler, preferenceHandler, () -> NOW
+		repository, itineraryHandler, preferenceHandler, () -> NOW, notifications
 	);
 	private final VoteSessionAssembler assembler = new VoteSessionAssembler();
 	private final VoteStickerPlacementService placementService = new VoteStickerPlacementService(repository);
@@ -212,6 +215,7 @@ class VoteSessionCompletionTest {
 		verify(repository, never()).completeIfOpen(any(UUID.class), any(), any(), any(Instant.class));
 		verify(itineraryHandler, never()).handle(any(AddPlacesToUnscheduledCommand.class));
 		verify(preferenceHandler, never()).handle(any(ApplyTripVotePreferenceCommand.class));
+		verify(notifications, never()).publish(any(), any(), anyBoolean(), any());
 	}
 
 	@Test
@@ -223,6 +227,7 @@ class VoteSessionCompletionTest {
 
 		verify(itineraryHandler, never()).handle(any(AddPlacesToUnscheduledCommand.class));
 		verify(preferenceHandler, never()).handle(any(ApplyTripVotePreferenceCommand.class));
+		verify(notifications, never()).publish(any(), any(), anyBoolean(), any());
 	}
 
 	@Test
@@ -235,6 +240,7 @@ class VoteSessionCompletionTest {
 		completeService.complete(openSession(), VoteCompletionReason.ALL_SUBMITTED, null);
 		completeService.complete(openSession(), VoteCompletionReason.OWNER_EARLY_CLOSE, ownerId);
 
+		verify(notifications, times(1)).publish(tripId, sessionId, true, NOW);
 		verify(itineraryHandler, times(1)).handle(any(AddPlacesToUnscheduledCommand.class));
 		verify(preferenceHandler, times(2)).handle(any(ApplyTripVotePreferenceCommand.class));
 	}

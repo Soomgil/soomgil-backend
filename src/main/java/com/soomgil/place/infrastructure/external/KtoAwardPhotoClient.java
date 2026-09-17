@@ -1,6 +1,8 @@
 package com.soomgil.place.infrastructure.external;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.soomgil.place.infrastructure.persistence.repository.KtoResponseRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.soomgil.place.application.port.AwardPhotoCatalogClient;
 import com.soomgil.place.application.port.AwardPhotoCatalogItem;
@@ -61,6 +63,10 @@ public class KtoAwardPhotoClient implements AwardPhotoCatalogClient {
 		}
 	}
 
+    private KtoResponseRepository responses;
+    @Autowired
+    void configurePersistence(KtoResponseRepository responses) { this.responses=responses; }
+
 	/**
 	 * 촬영지·제목·키워드에 장소명이 명확히 포함된 Type1 또는 Type3 수상작을 조회한다.
 	 */
@@ -89,6 +95,11 @@ public class KtoAwardPhotoClient implements AwardPhotoCatalogClient {
 	}
 
 	private synchronized JsonNode loadCatalog() {
+        if(responses!=null) return responses.load(buildCatalogUri(),()->{
+            validateConfiguration();
+            try { return restClient.get().uri(buildCatalogUri()).retrieve().body(JsonNode.class); }
+            catch(RestClientException error) { throw new KtoTourismPlaceException("KTO award request failed.",error); }
+        });
 		String cacheKey = "catalog-v2:" + LocalDate.now(KOREA_TIME);
 		String cached = cache.get(cacheKey, String.class);
 		if (cached != null) {

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -44,6 +45,7 @@ import com.soomgil.voting.application.service.VoteSessionAssembler;
 import com.soomgil.voting.domain.model.VoteParticipantStatus;
 import com.soomgil.voting.domain.model.VoteSessionStatus;
 import java.time.Instant;
+import com.soomgil.voting.application.port.VoteNotificationPublisher;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -57,6 +59,7 @@ class OpenVoteSessionHandlerTest {
 
 	private static final Instant NOW = Instant.parse("2026-08-24T10:00:00Z");
 
+	private final VoteNotificationPublisher notifications = mock(VoteNotificationPublisher.class);
 	private final VoteSessionRepository repository = mock(VoteSessionRepository.class);
 	private final TripAccessGuard tripAccessGuard = mock(TripAccessGuard.class);
 	private final ListTripMembersHandler membersHandler = mock(ListTripMembersHandler.class);
@@ -68,7 +71,7 @@ class OpenVoteSessionHandlerTest {
 
 	private final OpenVoteSessionHandler handler = new OpenVoteSessionHandler(
 		repository, tripAccessGuard, membersHandler, tripDetailHandler, candidatesHandler,
-		regionCodesHandler, legalRegionsHandler, new VoteSessionAssembler(), () -> NOW
+		regionCodesHandler, legalRegionsHandler, new VoteSessionAssembler(), () -> NOW, notifications
 	);
 
 	private final UUID tripId = UUID.randomUUID();
@@ -96,6 +99,7 @@ class OpenVoteSessionHandlerTest {
 		@SuppressWarnings("unchecked")
 		ArgumentCaptor<List<VoteParticipantRecord>> captor = ArgumentCaptor.forClass(List.class);
 		verify(repository).insertParticipants(captor.capture());
+		verify(notifications).publish(eq(tripId), any(UUID.class), eq(false), eq(NOW));
 		assertThat(captor.getValue()).hasSize(2);
 		assertThat(captor.getValue())
 			.extracting(VoteParticipantRecord::userId)

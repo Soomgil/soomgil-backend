@@ -20,7 +20,7 @@ public record Notification(
 	String body,
 	@Valid
 	@NotNull
-	TripInviteNotificationPayload payload,
+	NotificationPayload payload,
 	OffsetDateTime readAt,
 	@NotNull
 	OffsetDateTime createdAt
