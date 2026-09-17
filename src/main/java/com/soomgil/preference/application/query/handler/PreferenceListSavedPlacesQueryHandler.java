@@ -1,5 +1,6 @@
 package com.soomgil.preference.application.query.handler;
 
+import com.soomgil.global.cache.MyPageCached;
 import com.soomgil.preference.api.dto.PagedSavedPlace;
 import com.soomgil.preference.application.command.handler.PreferenceSavedPlaceService;
 import com.soomgil.preference.application.query.dto.ListSavedPlacesQuery;
@@ -18,6 +19,7 @@ public class PreferenceListSavedPlacesQueryHandler implements ListSavedPlacesQue
 	}
 
 	@Override
+	@MyPageCached("saved")
 	public PagedSavedPlace handle(ListSavedPlacesQuery query) {
 		return service.list(query);
 	}

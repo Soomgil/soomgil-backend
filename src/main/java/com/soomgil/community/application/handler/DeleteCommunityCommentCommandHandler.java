@@ -1,5 +1,6 @@
 package com.soomgil.community.application.handler;
 
+import com.soomgil.global.cache.InvalidatesMyPageCache;
 import com.soomgil.common.cqrs.CommandHandler;
 import com.soomgil.common.cqrs.NoResult;
 import com.soomgil.community.application.command.DeleteCommunityCommentCommand;
@@ -29,6 +30,7 @@ public class DeleteCommunityCommentCommandHandler
 	}
 
 	@Override
+	@InvalidatesMyPageCache({"stories"})
 	public NoResult handle(DeleteCommunityCommentCommand command) {
 		CommunityCommentRecord comment = commentMapper.findById(command.commentId())
 			.orElseThrow(() -> new CommunityException(ErrorCode.RESOURCE_NOT_FOUND));

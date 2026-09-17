@@ -1,5 +1,6 @@
 package com.soomgil.community.application.handler;
 
+import com.soomgil.global.cache.MyPageCached;
 import com.soomgil.common.api.dto.PageMeta;
 import com.soomgil.common.cqrs.QueryHandler;
 import com.soomgil.community.api.dto.CommunityPostSummary;
@@ -39,6 +40,7 @@ public class ListCommunityPostsQueryHandler
 	}
 
 	@Override
+	@MyPageCached("stories")
 	public PagedCommunityPostSummary handle(ListCommunityPostsQuery query) {
 		int size = sanitizeSize(query.size());
 		int page = Math.max(0, query.page());

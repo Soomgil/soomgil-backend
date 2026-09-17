@@ -1,5 +1,6 @@
 package com.soomgil.preference.application.command.handler;
 
+import com.soomgil.global.cache.InvalidatesMyPageCache;
 import com.soomgil.preference.api.dto.SavedPlace;
 import com.soomgil.preference.application.command.dto.SavePlaceCommand;
 import org.springframework.stereotype.Service;
@@ -17,6 +18,7 @@ public class PreferenceSavePlaceCommandHandler implements SavePlaceCommandHandle
 	}
 
 	@Override
+	@InvalidatesMyPageCache({"saved"})
 	public SavedPlace handle(SavePlaceCommand command) {
 		return service.save(command);
 	}

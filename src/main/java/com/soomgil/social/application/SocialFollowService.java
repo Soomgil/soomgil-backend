@@ -1,5 +1,7 @@
 package com.soomgil.social.application;
 
+import com.soomgil.global.cache.MyPageCached;
+import com.soomgil.global.cache.InvalidatesMyPageCache;
 import com.soomgil.common.api.dto.PageMeta;
 import com.soomgil.common.time.TimeProvider;
 import com.soomgil.global.error.BusinessException;
@@ -34,6 +36,7 @@ public class SocialFollowService {
 	}
 
 	@Transactional
+	@InvalidatesMyPageCache({"social"})
 	public Follow follow(UUID currentUserId, UUID targetUserId) {
 		if (currentUserId.equals(targetUserId)) {
 			throw new BusinessException(ErrorCode.CANNOT_FOLLOW_SELF);
@@ -47,6 +50,7 @@ public class SocialFollowService {
 	}
 
 	@Transactional
+	@InvalidatesMyPageCache({"social"})
 	public void unfollow(UUID currentUserId, UUID targetUserId) {
 		if (!repository.delete(currentUserId, targetUserId, null, timeProvider.now())) {
 			throw new BusinessException(ErrorCode.FOLLOW_NOT_FOUND);
@@ -73,6 +77,7 @@ public class SocialFollowService {
 	 * <p>PUBLIC 프로필은 비로그인 사용자도 조회할 수 있다. PRIVATE 프로필은 본인과 승인된 팔로워가 조회할 수 있다.
 	 */
 	@Transactional(readOnly = true)
+	@MyPageCached("social")
 	public PagedUserSummary listFollowers(UUID viewerUserId, UUID targetUserId, int page, int size) {
 		validateFollowListAccess(viewerUserId, targetUserId, page, size);
 		long total = repository.countFollowers(targetUserId);
@@ -88,6 +93,7 @@ public class SocialFollowService {
 	 * <p>PUBLIC 프로필은 비로그인 사용자도 조회할 수 있다. PRIVATE 프로필은 본인과 승인된 팔로워가 조회할 수 있다.
 	 */
 	@Transactional(readOnly = true)
+	@MyPageCached("social")
 	public PagedUserSummary listFollowing(UUID viewerUserId, UUID targetUserId, int page, int size) {
 		validateFollowListAccess(viewerUserId, targetUserId, page, size);
 		long total = repository.countFollowing(targetUserId);
@@ -98,6 +104,7 @@ public class SocialFollowService {
 	}
 
 	@Transactional
+	@InvalidatesMyPageCache({"social"})
 	public Follow accept(UUID currentUserId, UUID followerUserId) {
 		Instant now = timeProvider.now();
 		if (!repository.activatePending(followerUserId, currentUserId, now)) {
@@ -107,6 +114,7 @@ public class SocialFollowService {
 	}
 
 	@Transactional
+	@InvalidatesMyPageCache({"social"})
 	public void reject(UUID currentUserId, UUID followerUserId) {
 		if (!repository.delete(followerUserId, currentUserId, "PENDING", timeProvider.now())) {
 			throw new BusinessException(ErrorCode.FOLLOW_REQUEST_NOT_FOUND);

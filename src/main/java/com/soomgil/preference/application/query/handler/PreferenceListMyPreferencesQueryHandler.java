@@ -1,5 +1,6 @@
 package com.soomgil.preference.application.query.handler;
 
+import com.soomgil.global.cache.MyPageCached;
 import com.soomgil.preference.api.dto.MyPreferenceSummary;
 import com.soomgil.preference.application.query.dto.ListMyPreferencesQuery;
 import org.springframework.stereotype.Service;
@@ -17,6 +18,7 @@ public class PreferenceListMyPreferencesQueryHandler implements ListMyPreference
 	}
 
 	@Override
+	@MyPageCached("preferences")
 	public MyPreferenceSummary handle(ListMyPreferencesQuery query) {
 		return service.listMyPreferences();
 	}

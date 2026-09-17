@@ -1,5 +1,6 @@
 package com.soomgil.trip.application.command.handler;
 
+import com.soomgil.global.cache.InvalidatesMyPageCache;
 import com.soomgil.common.cqrs.CommandHandler;
 import com.soomgil.common.cqrs.NoResult;
 import com.soomgil.common.time.TimeProvider;
@@ -34,6 +35,7 @@ public class DeleteTripHandler implements CommandHandler<DeleteTripCommand, NoRe
 
 	@Override
 	@Transactional
+	@InvalidatesMyPageCache({"trips","stories"})
 	public NoResult handle(DeleteTripCommand command) {
 		Objects.requireNonNull(command.tripId(), "tripId must not be null");
 		Objects.requireNonNull(command.actorUserId(), "actorUserId must not be null");

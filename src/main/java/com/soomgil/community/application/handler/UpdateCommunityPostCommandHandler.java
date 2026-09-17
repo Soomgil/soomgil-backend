@@ -1,5 +1,6 @@
 package com.soomgil.community.application.handler;
 
+import com.soomgil.global.cache.InvalidatesMyPageCache;
 import com.soomgil.common.cqrs.CommandHandler;
 import com.soomgil.community.api.dto.CommunityPostDetail;
 import com.soomgil.community.api.dto.PostVisibility;
@@ -57,6 +58,7 @@ public class UpdateCommunityPostCommandHandler
 	}
 
 	@Override
+	@InvalidatesMyPageCache({"stories"})
 	public CommunityPostDetail handle(UpdateCommunityPostCommand command) {
 		CommunityPostRecord post = postMapper.findById(command.postId())
 			.filter(p -> !p.isDeleted())

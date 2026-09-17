@@ -1,5 +1,6 @@
 package com.soomgil.community.application.handler;
 
+import com.soomgil.global.cache.InvalidatesMyPageCache;
 import com.soomgil.common.cqrs.CommandHandler;
 import com.soomgil.community.api.dto.ModerationAction;
 import com.soomgil.community.application.command.CreateModerationActionCommand;
@@ -42,6 +43,7 @@ public class CreateModerationActionCommandHandler
 	}
 
 	@Override
+	@InvalidatesMyPageCache({"stories"})
 	public ModerationAction handle(CreateModerationActionCommand command) {
 		accessGuard.requireModerator(command.moderatorUserId());
 

@@ -1,5 +1,6 @@
 package com.soomgil.trip.application.query.handler;
 
+import com.soomgil.global.cache.MyPageCached;
 import com.soomgil.common.cqrs.QueryHandler;
 import com.soomgil.global.error.BusinessException;
 import com.soomgil.global.error.ErrorCode;
@@ -31,6 +32,7 @@ public class ListMyTripsHandler implements QueryHandler<ListMyTripsQuery, PagedT
 
 	@Override
 	@Transactional(readOnly = true)
+	@MyPageCached("trips")
 	public PagedTripSummaryView handle(ListMyTripsQuery query) {
 		if (query.page() < 0) {
 			throw new BusinessException(ErrorCode.VALIDATION_FAILED, "Page must be greater than or equal to 0.");

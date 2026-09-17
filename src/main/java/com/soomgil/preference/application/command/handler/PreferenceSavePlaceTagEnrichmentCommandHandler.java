@@ -1,5 +1,6 @@
 package com.soomgil.preference.application.command.handler;
 
+import com.soomgil.global.cache.InvalidatesMyPageCache;
 import com.soomgil.common.id.Ids;
 import com.soomgil.preference.application.command.dto.SavePlaceTagCandidateCommand;
 import com.soomgil.preference.application.command.dto.SavePlaceTagEnrichmentCommand;
@@ -47,6 +48,7 @@ public class PreferenceSavePlaceTagEnrichmentCommandHandler implements SavePlace
 
 	@Transactional
 	@Override
+	@InvalidatesMyPageCache({"preferences","saved"})
 	public SavePlaceTagEnrichmentResult handle(SavePlaceTagEnrichmentCommand command) {
 		UUID enrichmentId = Ids.newUuid();
 		List<SavePlaceTagCandidateCommand> candidates = candidates(command);

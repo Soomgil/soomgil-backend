@@ -1,5 +1,6 @@
 package com.soomgil.community.application.handler;
 
+import com.soomgil.global.cache.InvalidatesMyPageCache;
 import com.soomgil.common.cqrs.CommandHandler;
 import com.soomgil.community.api.dto.CommunityComment;
 import com.soomgil.community.application.command.CreateCommunityCommentCommand;
@@ -42,6 +43,7 @@ public class CreateCommunityCommentCommandHandler
 	}
 
 	@Override
+	@InvalidatesMyPageCache({"stories"})
 	public CommunityComment handle(CreateCommunityCommentCommand command) {
 		CommunityPostRecord post = postMapper.findById(command.postId())
 			.filter(p -> !p.isDeleted())
@@ -60,7 +62,7 @@ public class CreateCommunityCommentCommandHandler
 				throw new CommunityException(ErrorCode.VALIDATION_FAILED);
 			}
 			depth = parent.depth() + 1;
-			if (depth > CommunityPostPolicy.COMMENT_MAX_DEPTH) {
+			if (parent.parentCommentId() != null || depth > CommunityPostPolicy.COMMENT_MAX_DEPTH) {
 				throw new CommunityException(ErrorCode.VALIDATION_FAILED);
 			}
 		}
