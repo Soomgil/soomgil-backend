@@ -20,6 +20,7 @@ import com.soomgil.preference.infrastructure.persistence.row.UserSwipeEventInser
 import com.soomgil.preference.infrastructure.persistence.row.UserTagEvidenceAdjustmentRow;
 import com.soomgil.preference.infrastructure.persistence.row.UserTagPreferenceScoreSourceRow;
 import com.soomgil.preference.infrastructure.persistence.row.UserTagPreferenceScoreUpdateRow;
+import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -62,6 +63,8 @@ public class PreferenceUpsertSwipeReactionCommandHandler implements UpsertSwipeR
 		UUID userId = provider.currentUserId();
 		String placeProvider = command.provider().name();
 		String reaction = command.reaction().name();
+		String source = command.source().name();
+		BigDecimal evidenceMultiplier = command.source().evidenceMultiplier();
 		UserPlaceReactionRow previous = mapper.findReaction(
 			userId.toString(),
 			placeProvider,
@@ -87,7 +90,10 @@ public class PreferenceUpsertSwipeReactionCommandHandler implements UpsertSwipeR
 				command.externalPlaceId(),
 				reaction,
 				currentEnrichmentId,
-				command.sourceModifiedAt()
+				command.sourceModifiedAt(),
+				source,
+				command.sourceResourceId(),
+				evidenceMultiplier
 			));
 		}
 		else {
@@ -95,7 +101,10 @@ public class PreferenceUpsertSwipeReactionCommandHandler implements UpsertSwipeR
 				previous.id(),
 				reaction,
 				currentEnrichmentId,
-				command.sourceModifiedAt()
+				command.sourceModifiedAt(),
+				source,
+				command.sourceResourceId(),
+				evidenceMultiplier
 			));
 		}
 
@@ -106,10 +115,13 @@ public class PreferenceUpsertSwipeReactionCommandHandler implements UpsertSwipeR
 			reaction,
 			previous == null ? null : previous.reaction(),
 			currentEnrichmentId,
-			command.sourceModifiedAt()
+			command.sourceModifiedAt(),
+			source,
+			command.sourceResourceId(),
+			evidenceMultiplier
 		));
 		synchronizeSavedPlace(userId, placeProvider, command.externalPlaceId(), command.reaction());
-		addCurrentEvidence(userId, reaction, currentEvidence);
+		addCurrentEvidence(userId, reaction, currentEvidence, evidenceMultiplier);
 		recalculatePreferenceScores(userId, previousEvidence, currentEvidence);
 
 		return new SwipeReactionResponse(
@@ -150,7 +162,7 @@ public class PreferenceUpsertSwipeReactionCommandHandler implements UpsertSwipeR
 			mapper.removeUserTagEvidence(new UserTagEvidenceAdjustmentRow(
 				userId.toString(),
 				evidence.tagId(),
-				evidence.value(),
+				evidence.value().multiply(previous.evidenceMultiplier()),
 				previous.reaction()
 			));
 		}
@@ -159,13 +171,14 @@ public class PreferenceUpsertSwipeReactionCommandHandler implements UpsertSwipeR
 	private void addCurrentEvidence(
 		UUID userId,
 		String reaction,
-		List<PlaceTagEvidence> currentEvidence
+		List<PlaceTagEvidence> currentEvidence,
+		BigDecimal evidenceMultiplier
 	) {
 		for (PlaceTagEvidence evidence : currentEvidence) {
 			mapper.addUserTagEvidence(new UserTagEvidenceAdjustmentRow(
 				userId.toString(),
 				evidence.tagId(),
-				evidence.value(),
+				evidence.value().multiply(evidenceMultiplier),
 				reaction
 			));
 		}
@@ -225,11 +238,12 @@ public class PreferenceUpsertSwipeReactionCommandHandler implements UpsertSwipeR
 			List<PlaceTagEvidence> previousEvidence = reaction.placeTagEnrichmentId() == null
 				? List.of() : calculateEvidence(mapper.findConfirmedTagsByEnrichment(reaction.placeTagEnrichmentId()));
 			UserPlaceReactionRow previous = new UserPlaceReactionRow(
-				reaction.id(), reaction.reaction(), reaction.placeTagEnrichmentId()
+				reaction.id(), reaction.reaction(), reaction.placeTagEnrichmentId(),
+				reaction.source(), reaction.sourceResourceId(), reaction.evidenceMultiplier()
 			);
 			removePreviousEvidence(userId, previous, previousEvidence);
 			mapper.updateReactionEnrichment(reaction.id(), enrichmentId, sourceModifiedAt);
-			addCurrentEvidence(userId, reaction.reaction(), currentEvidence);
+			addCurrentEvidence(userId, reaction.reaction(), currentEvidence, reaction.evidenceMultiplier());
 			recalculatePreferenceScores(userId, previousEvidence, currentEvidence);
 		}
 	}

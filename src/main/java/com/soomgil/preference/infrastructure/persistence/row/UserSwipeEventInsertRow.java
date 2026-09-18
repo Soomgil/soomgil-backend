@@ -1,5 +1,6 @@
 package com.soomgil.preference.infrastructure.persistence.row;
 
+import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 
 /**
@@ -12,6 +13,9 @@ public record UserSwipeEventInsertRow(
 	String reaction,
 	String previousReaction,
 	String placeTagEnrichmentId,
-	OffsetDateTime sourceModifiedAt
+	OffsetDateTime sourceModifiedAt,
+	String source,
+	String sourceResourceId,
+	BigDecimal evidenceMultiplier
 ) {
 }
