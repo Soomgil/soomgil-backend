@@ -9,9 +9,11 @@ import com.soomgil.preference.api.dto.SwipeReactionRequest;
 import com.soomgil.preference.api.dto.SwipeReactionResponse;
 import com.soomgil.preference.api.dto.SwipeTagStatus;
 import com.soomgil.preference.application.command.dto.SavePlaceCommand;
+import com.soomgil.preference.application.command.dto.RemoveSwipeReactionCommand;
 import com.soomgil.preference.application.command.dto.UnsavePlaceCommand;
 import com.soomgil.preference.application.command.dto.UpsertSwipeReactionCommand;
 import com.soomgil.preference.application.command.handler.SavePlaceCommandHandler;
+import com.soomgil.preference.application.command.handler.RemoveSwipeReactionCommandHandler;
 import com.soomgil.preference.application.command.handler.UnsavePlaceCommandHandler;
 import com.soomgil.preference.application.command.handler.UpsertSwipeReactionCommandHandler;
 import com.soomgil.preference.application.query.dto.ListSavedPlacesQuery;
@@ -42,6 +44,7 @@ public class SwipeController {
 
 	private final SwipeFeedQueryHandler swipeFeedQueryHandler;
 	private final UpsertSwipeReactionCommandHandler upsertSwipeReactionCommandHandler;
+	private final RemoveSwipeReactionCommandHandler removeSwipeReactionCommandHandler;
 	private final SavePlaceCommandHandler savePlaceCommandHandler;
 	private final UnsavePlaceCommandHandler unsavePlaceCommandHandler;
 	private final ListSavedPlacesQueryHandler listSavedPlacesQueryHandler;
@@ -51,6 +54,7 @@ public class SwipeController {
 	public SwipeController(
 		SwipeFeedQueryHandler swipeFeedQueryHandler,
 		UpsertSwipeReactionCommandHandler upsertSwipeReactionCommandHandler,
+		RemoveSwipeReactionCommandHandler removeSwipeReactionCommandHandler,
 		SavePlaceCommandHandler savePlaceCommandHandler,
 		UnsavePlaceCommandHandler unsavePlaceCommandHandler,
 		ListSavedPlacesQueryHandler listSavedPlacesQueryHandler,
@@ -59,6 +63,7 @@ public class SwipeController {
 	) {
 		this.swipeFeedQueryHandler = swipeFeedQueryHandler;
 		this.upsertSwipeReactionCommandHandler = upsertSwipeReactionCommandHandler;
+		this.removeSwipeReactionCommandHandler = removeSwipeReactionCommandHandler;
 		this.savePlaceCommandHandler = savePlaceCommandHandler;
 		this.unsavePlaceCommandHandler = unsavePlaceCommandHandler;
 		this.listSavedPlacesQueryHandler = listSavedPlacesQueryHandler;
@@ -102,6 +107,18 @@ public class SwipeController {
 			request.reaction(),
 			null
 		));
+	}
+
+	@DeleteMapping({
+		"/places/{provider}/{externalPlaceId}/preference-reaction",
+		"/places/{provider}/{externalPlaceId}/swipe-reaction"
+	})
+	@ResponseStatus(HttpStatus.NO_CONTENT)
+	public void removeSwipeReaction(
+		@PathVariable PlaceProvider provider,
+		@PathVariable String externalPlaceId
+	) {
+		removeSwipeReactionCommandHandler.handle(new RemoveSwipeReactionCommand(provider, externalPlaceId));
 	}
 
 	@GetMapping("/me/saved-places")
