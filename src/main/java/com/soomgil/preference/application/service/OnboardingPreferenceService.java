@@ -139,9 +139,6 @@ public class OnboardingPreferenceService {
 	) {
 		Map<PlaceKey, OnboardingPreferenceAnswer> answers = new LinkedHashMap<>();
 		for (OnboardingPreferenceAnswer answer : responses) {
-			if (answer.reaction() != SwipeReaction.LIKE && answer.reaction() != SwipeReaction.NOPE) {
-				throw invalid("가입 취향 설문은 LIKE 또는 NOPE만 허용합니다.");
-			}
 			PlaceKey key = new PlaceKey(answer.provider().name(), answer.externalPlaceId());
 			if (answers.putIfAbsent(key, answer) != null) {
 				throw invalid("같은 관광지 응답을 중복 제출할 수 없습니다.");
