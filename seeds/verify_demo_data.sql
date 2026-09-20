@@ -204,6 +204,16 @@ BEGIN
   JOIN visible_trips vt ON vt.id = i.trip_id
   WHERE i.deleted_at IS NULL;
 
+  WITH demo_user AS (
+    SELECT user_id FROM auth.user_email_addresses
+    WHERE normalized_email = 'demo01@soomgil.local'
+  ), visible_trips AS (
+    SELECT t.id
+    FROM trip.trips t
+    JOIN trip.trip_members tm ON tm.trip_id = t.id AND tm.status = 'ACTIVE'
+    JOIN demo_user du ON du.user_id = tm.user_id
+    WHERE t.status != 'DELETED'
+  )
   SELECT count(*) INTO invalid_demo_saved_place_count
   FROM preference.user_saved_places s
   WHERE s.user_id IN (SELECT md5('demo-user:' || n)::uuid FROM generate_series(1, 120) n)

@@ -9,6 +9,9 @@
 			<arg column="id" javaType="java.lang.String"/>
 			<arg column="reaction" javaType="java.lang.String"/>
 			<arg column="place_tag_enrichment_id" javaType="java.lang.String"/>
+			<arg column="last_source" javaType="java.lang.String"/>
+			<arg column="last_source_resource_id" javaType="java.lang.String"/>
+			<arg column="evidence_multiplier" javaType="java.math.BigDecimal"/>
 		</constructor>
 	</resultMap>
 
@@ -39,6 +42,9 @@
 			<arg column="user_id" javaType="java.lang.String"/>
 			<arg column="reaction" javaType="java.lang.String"/>
 			<arg column="place_tag_enrichment_id" javaType="java.lang.String"/>
+			<arg column="last_source" javaType="java.lang.String"/>
+			<arg column="last_source_resource_id" javaType="java.lang.String"/>
+			<arg column="evidence_multiplier" javaType="java.math.BigDecimal"/>
 		</constructor>
 	</resultMap>
 
@@ -46,7 +52,10 @@
 		SELECT
 			CAST(id AS text) AS id,
 			reaction,
-			CAST(place_tag_enrichment_id AS text) AS place_tag_enrichment_id
+			CAST(place_tag_enrichment_id AS text) AS place_tag_enrichment_id,
+			last_source,
+			last_source_resource_id,
+			evidence_multiplier
 		FROM preference.user_place_reactions
 		WHERE user_id = CAST(#{userId} AS uuid)
 			AND provider = #{provider}
@@ -62,7 +71,10 @@
 			reaction,
 			reaction_count,
 			place_tag_enrichment_id,
-			source_modified_at
+			source_modified_at,
+			last_source,
+			last_source_resource_id,
+			evidence_multiplier
 		)
 		VALUES (
 			CAST(#{id} AS uuid),
@@ -72,7 +84,10 @@
 			#{reaction},
 			1,
 			CAST(#{placeTagEnrichmentId} AS uuid),
-			#{sourceModifiedAt}
+			#{sourceModifiedAt},
+			#{source},
+			#{sourceResourceId},
+			#{evidenceMultiplier}
 		)
 	</insert>
 
@@ -82,7 +97,10 @@
 			reaction_count = reaction_count + 1,
 			last_reacted_at = now(),
 			place_tag_enrichment_id = CAST(#{placeTagEnrichmentId} AS uuid),
-			source_modified_at = #{sourceModifiedAt}
+			source_modified_at = #{sourceModifiedAt},
+			last_source = #{source},
+			last_source_resource_id = #{sourceResourceId},
+			evidence_multiplier = #{evidenceMultiplier}
 		WHERE id = CAST(#{id} AS uuid)
 	</update>
 
@@ -95,7 +113,10 @@
 		SELECT CAST(id AS text) AS id,
 		       CAST(user_id AS text) AS user_id,
 		       reaction,
-		       CAST(place_tag_enrichment_id AS text) AS place_tag_enrichment_id
+		       CAST(place_tag_enrichment_id AS text) AS place_tag_enrichment_id,
+		       last_source,
+		       last_source_resource_id,
+		       evidence_multiplier
 		FROM preference.user_place_reactions
 		WHERE provider = #{provider}
 		  AND external_place_id = #{externalPlaceId}
@@ -117,7 +138,10 @@
 			reaction,
 			previous_reaction,
 			place_tag_enrichment_id,
-			source_modified_at
+			source_modified_at,
+			source,
+			source_resource_id,
+			evidence_multiplier
 		)
 		VALUES (
 			CAST(#{userId} AS uuid),
@@ -126,7 +150,10 @@
 			#{reaction},
 			#{previousReaction},
 			CAST(#{placeTagEnrichmentId} AS uuid),
-			#{sourceModifiedAt}
+			#{sourceModifiedAt},
+			#{source},
+			#{sourceResourceId},
+			#{evidenceMultiplier}
 		)
 	</insert>
 

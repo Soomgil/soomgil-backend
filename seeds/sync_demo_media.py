@@ -98,7 +98,7 @@ COPY (
 
     UNION ALL
 
-    SELECT 'record', m.object_key,
+    SELECT 'trip', m.object_key,
            COALESCE(t.display_destination, '대한민국 여행'),
            abs(hashtext(m.object_key)) % 5
     FROM media.media_files m

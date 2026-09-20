@@ -8,6 +8,7 @@ import com.soomgil.global.security.CurrentUserProvider;
 import com.soomgil.place.api.dto.PlaceProvider;
 import com.soomgil.preference.api.dto.SwipeReaction;
 import com.soomgil.preference.application.command.dto.UpsertSwipeReactionCommand;
+import com.soomgil.preference.domain.policy.PreferenceSource;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
@@ -143,6 +144,35 @@ class SwipeReactionPreferenceEvidenceIntegrationTest {
 		assertThat(jdbcTemplate.queryForObject(
 			"SELECT count(*) FROM preference.user_swipe_events WHERE user_id = ?", Integer.class, USER_ID
 		)).isEqualTo(1);
+	}
+
+	@Test
+	void appliesAndReversesTripleOnboardingEvidence() {
+		handler.handle(new UpsertSwipeReactionCommand(
+			PlaceProvider.KTO,
+			"126508",
+			SwipeReaction.LIKE,
+			null,
+			PreferenceSource.ONBOARDING,
+			"survey-v1:126508"
+		));
+
+		assertEvidence("park", "1.20000000", "0.00000000", "0.937500", 1, 0, 0);
+		assertEvidence("museum", "1.80000000", "0.00000000", "0.612903", 1, 0, 0);
+
+		// 같은 장소에서 일반 반응으로 바뀌면 기존 3배 근거를 제거하고 1배만 다시 적용한다.
+		react(SwipeReaction.LIKE);
+		assertEvidence("park", "0.40000000", "0.00000000", "0.846154", 1, 0, 0);
+		assertEvidence("museum", "0.60000000", "0.00000000", "0.478261", 1, 0, 0);
+
+		Map<String, Object> reaction = jdbcTemplate.queryForMap("""
+			SELECT last_source, evidence_multiplier
+			FROM preference.user_place_reactions
+			WHERE user_id = ? AND provider = 'KTO' AND external_place_id = '126508'
+			""", USER_ID);
+		assertThat(reaction)
+			.containsEntry("last_source", "HOME_BACKGROUND");
+		assertThat((BigDecimal) reaction.get("evidence_multiplier")).isEqualByComparingTo("1.00");
 	}
 
 	private void react(SwipeReaction reaction) {
