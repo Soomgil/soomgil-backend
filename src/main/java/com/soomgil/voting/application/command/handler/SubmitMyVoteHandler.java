@@ -10,6 +10,7 @@ import com.soomgil.voting.application.command.dto.SubmitMyVoteCommand;
 import com.soomgil.voting.application.port.VoteParticipantRecord;
 import com.soomgil.voting.application.port.VoteSessionRecord;
 import com.soomgil.voting.application.port.VoteSessionRepository;
+import com.soomgil.voting.application.port.VoteRealtimePublisher;
 import com.soomgil.voting.application.port.VoteStickerRecord;
 import com.soomgil.voting.application.service.CompleteVoteSessionService;
 import com.soomgil.voting.application.service.VoteSessionAssembler;
@@ -42,6 +43,7 @@ public class SubmitMyVoteHandler implements CommandHandler<SubmitMyVoteCommand, 
 	private final CompleteVoteSessionService completeVoteSessionService;
 	private final VoteSessionAssembler assembler;
 	private final TimeProvider timeProvider;
+	private final VoteRealtimePublisher realtimePublisher;
 
 	public SubmitMyVoteHandler(
 		VoteSessionRepository repository,
@@ -49,7 +51,8 @@ public class SubmitMyVoteHandler implements CommandHandler<SubmitMyVoteCommand, 
 		VoteStickerPlacementService placementService,
 		CompleteVoteSessionService completeVoteSessionService,
 		VoteSessionAssembler assembler,
-		TimeProvider timeProvider
+		TimeProvider timeProvider,
+		VoteRealtimePublisher realtimePublisher
 	) {
 		this.repository = Objects.requireNonNull(repository, "repository must not be null");
 		this.tripAccessGuard = Objects.requireNonNull(tripAccessGuard, "tripAccessGuard must not be null");
@@ -58,6 +61,7 @@ public class SubmitMyVoteHandler implements CommandHandler<SubmitMyVoteCommand, 
 			Objects.requireNonNull(completeVoteSessionService, "completeVoteSessionService must not be null");
 		this.assembler = Objects.requireNonNull(assembler, "assembler must not be null");
 		this.timeProvider = Objects.requireNonNull(timeProvider, "timeProvider must not be null");
+		this.realtimePublisher = Objects.requireNonNull(realtimePublisher, "realtimePublisher must not be null");
 	}
 
 	@Override
@@ -91,7 +95,9 @@ public class SubmitMyVoteHandler implements CommandHandler<SubmitMyVoteCommand, 
 			);
 		}
 
-		autoCompleteIfEveryoneSubmitted(session);
+		if (!autoCompleteIfEveryoneSubmitted(session)) {
+			realtimePublisher.publish(session.tripId(), session.id(), VoteSessionStatus.OPEN);
+		}
 		return currentState(session.id(), command.actorUserId());
 	}
 
@@ -101,12 +107,14 @@ public class SubmitMyVoteHandler implements CommandHandler<SubmitMyVoteCommand, 
 			.sum();
 	}
 
-	private void autoCompleteIfEveryoneSubmitted(VoteSessionRecord session) {
+	private boolean autoCompleteIfEveryoneSubmitted(VoteSessionRecord session) {
 		int total = repository.findParticipants(session.id()).size();
 		int submitted = repository.countSubmittedParticipants(session.id());
 		if (VoteSessionPolicy.shouldAutoComplete(submitted, total)) {
 			completeVoteSessionService.complete(session, VoteCompletionReason.ALL_SUBMITTED, null);
+			return true;
 		}
+		return false;
 	}
 
 	private TripVoteSessionState currentState(java.util.UUID sessionId, java.util.UUID userId) {

@@ -40,6 +40,7 @@ import com.soomgil.voting.domain.model.VoteParticipantStatus;
 import com.soomgil.voting.domain.model.VoteSessionStatus;
 import java.time.Instant;
 import com.soomgil.voting.application.port.VoteNotificationPublisher;
+import com.soomgil.voting.application.port.VoteRealtimePublisher;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -53,6 +54,7 @@ class VoteSessionCompletionTest {
 	private static final Instant NOW = Instant.parse("2026-08-24T10:00:00Z");
 
 	private final VoteNotificationPublisher notifications = mock(VoteNotificationPublisher.class);
+	private final VoteRealtimePublisher realtimePublisher = mock(VoteRealtimePublisher.class);
 	private final VoteSessionRepository repository = mock(VoteSessionRepository.class);
 	private final TripAccessGuard tripAccessGuard = mock(TripAccessGuard.class);
 	private final AddPlacesToUnscheduledHandler itineraryHandler = mock(AddPlacesToUnscheduledHandler.class);
@@ -60,13 +62,13 @@ class VoteSessionCompletionTest {
 		mock(ApplyTripVotePreferenceCommandHandler.class);
 
 	private final CompleteVoteSessionService completeService = new CompleteVoteSessionService(
-		repository, itineraryHandler, preferenceHandler, () -> NOW, notifications
+		repository, itineraryHandler, preferenceHandler, () -> NOW, notifications, realtimePublisher
 	);
 	private final VoteSessionAssembler assembler = new VoteSessionAssembler();
 	private final VoteStickerPlacementService placementService = new VoteStickerPlacementService(repository);
 
 	private final SubmitMyVoteHandler submitHandler = new SubmitMyVoteHandler(
-		repository, tripAccessGuard, placementService, completeService, assembler, () -> NOW
+		repository, tripAccessGuard, placementService, completeService, assembler, () -> NOW, realtimePublisher
 	);
 	private final CloseVoteSessionHandler closeHandler = new CloseVoteSessionHandler(
 		repository, tripAccessGuard, completeService, new VoteResultViewFactory()

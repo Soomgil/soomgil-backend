@@ -62,7 +62,8 @@ class TripSubscriptionInterceptorTest {
 			"route-matching",
 			"chat",
 			"planning",
-			"ai"
+			"ai",
+			"voting"
 		)) {
 			Message<?> message = message(StompCommand.SUBSCRIBE, "/topic/trips/" + TRIP_ID + "/" + topic, true);
 
