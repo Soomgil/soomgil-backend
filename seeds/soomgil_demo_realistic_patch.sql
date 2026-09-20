@@ -37,7 +37,7 @@ WITH profile_context AS (
 UPDATE auth.user_profiles p
 SET bio = phrases.openers[1 + ((c.rn - 1) % 12)] || ' ' ||
           format(phrases.closers[1 + (((c.rn - 1) / 12)::int % 10)], c.favorite_place),
-    profile_image_url = 'https://daobk0bynum21.cloudfront.net/demo/profiles/' || p.user_id || '.png',
+    profile_image_url = :'public_media_base_url' || '/demo/profiles/' || p.user_id || '.png',
     updated_at = now()
 FROM profile_context c CROSS JOIN phrases
 WHERE p.user_id = c.user_id;
@@ -184,7 +184,7 @@ INSERT INTO itinerary.itinerary_items
 SELECT md5('demo-dashboard-unscheduled-place:' || p.external_place_id)::uuid,
        p.trip_id, d.id, p.sort_order, 'PLACE', 'KTO', p.external_place_id,
        p.place_name, p.address, p.lat, p.lng,
-       'https://daobk0bynum21.cloudfront.net/demo/legacy-places/' ||
+       :'public_media_base_url' || '/demo/legacy-places/' ||
          md5('KTO:' || p.external_place_id) || '/cover.jpg',
        'AVAILABLE', now(), now()
 FROM places p
@@ -522,6 +522,7 @@ WHERE like_rank <= target_count
 ON CONFLICT DO NOTHING;
 
 -- Diversify trip record writing using its actual place and capture time.
+\if :record_feature_enabled
 WITH copy AS (
   SELECT ARRAY[
     '%s에서 시작한 느린 아침', '%s, 계획보다 오래 머문 곳', '%s에서 우리끼리 찾은 장면',
@@ -585,9 +586,9 @@ INSERT INTO media.media_files
 SELECT md5('demo-portrait-media:' || record_id)::uuid,
        uploaded_by_user_id,
        'S3_COMPATIBLE',
-       'soomgil-media-dev-337872593610-ap-northeast-2-an',
+       :'media_bucket',
        'demo/records/' || record_id || '/portrait-v2.jpg',
-       'https://daobk0bynum21.cloudfront.net/demo/records/' || record_id || '/portrait-v2.jpg',
+       :'public_media_base_url' || '/demo/records/' || record_id || '/portrait-v2.jpg',
        'image/jpeg', 420000, 900, 1350, 'TRIP_RECORD', record_id, 'ACTIVE', now()
 FROM portrait_targets
 ON CONFLICT (id) DO UPDATE SET
@@ -652,48 +653,49 @@ WHERE rp.record_entry_id = rm.record_entry_id
 -- Move one repeated landscape record photo to a fresh object key for cache-safe replacement.
 UPDATE media.media_files
 SET object_key = 'demo/records/babfeef3-afc7-faa3-2a4a-7b4d8f494a52/cover-v2.jpg',
-    public_url = 'https://daobk0bynum21.cloudfront.net/demo/records/babfeef3-afc7-faa3-2a4a-7b4d8f494a52/cover-v2.jpg'
+    public_url = :'public_media_base_url' || '/demo/records/babfeef3-afc7-faa3-2a4a-7b4d8f494a52/cover-v2.jpg'
 WHERE id = '2cbad789-f9b3-bbc8-e43a-fef0af5af740';
+\endif
 
 -- All demo URLs point to real objects uploaded by sync-demo-media.py.
 UPDATE auth.user_profiles p
-SET profile_image_url = 'https://daobk0bynum21.cloudfront.net/demo/profiles/' || p.user_id || '.png',
+SET profile_image_url = :'public_media_base_url' || '/demo/profiles/' || p.user_id || '.png',
     updated_at = now()
 WHERE p.user_id::text LIKE 'a0000000-%';
 
 UPDATE media.media_files m
-SET bucket = 'soomgil-media-dev-337872593610-ap-northeast-2-an',
+SET bucket = :'media_bucket',
     object_key = 'demo/profiles/' || m.linked_resource_id || '.png',
-    public_url = 'https://daobk0bynum21.cloudfront.net/demo/profiles/' || m.linked_resource_id || '.png',
+    public_url = :'public_media_base_url' || '/demo/profiles/' || m.linked_resource_id || '.png',
     mime_type = 'image/png'
 WHERE m.linked_resource_type = 'auth.users'
   AND m.linked_resource_id::text LIKE 'a0000000-%';
 
 UPDATE media.media_files m
-SET bucket = 'soomgil-media-dev-337872593610-ap-northeast-2-an',
+SET bucket = :'media_bucket',
     object_key = 'demo/trips/' || m.linked_resource_id || '/' || m.id || '.jpg',
-    public_url = 'https://daobk0bynum21.cloudfront.net/demo/trips/' || m.linked_resource_id || '/' || m.id || '.jpg'
+    public_url = :'public_media_base_url' || '/demo/trips/' || m.linked_resource_id || '/' || m.id || '.jpg'
 WHERE m.linked_resource_type = 'trip.trips'
   AND m.linked_resource_id::text LIKE 'c0000000-%';
 
 UPDATE tourism_source.attractions
-SET first_image1 = 'https://daobk0bynum21.cloudfront.net/demo/places/' || content_id || '/cover.jpg',
-    first_image2 = 'https://daobk0bynum21.cloudfront.net/demo/places/' || content_id || '/detail.jpg'
+SET first_image1 = :'public_media_base_url' || '/demo/places/' || content_id || '/cover.jpg',
+    first_image2 = :'public_media_base_url' || '/demo/places/' || content_id || '/detail.jpg'
 WHERE content_id BETWEEN 10001 AND 10040 OR content_id BETWEEN 20001 AND 20028;
 
 UPDATE tourism_source.attraction_images ai
 SET storage_provider = 'S3_COMPATIBLE',
-    bucket = 'soomgil-media-dev-337872593610-ap-northeast-2-an',
+    bucket = :'media_bucket',
     object_key = 'demo/places/' || a.content_id || '/cover.jpg',
-    public_url = 'https://daobk0bynum21.cloudfront.net/demo/places/' || a.content_id || '/cover.jpg',
+    public_url = :'public_media_base_url' || '/demo/places/' || a.content_id || '/cover.jpg',
     updated_at = now()
 FROM tourism_source.attractions a
 WHERE ai.attraction_no = a.no
   AND (a.content_id BETWEEN 10001 AND 10040 OR a.content_id BETWEEN 20001 AND 20028);
 
 UPDATE media.media_files
-SET bucket = 'soomgil-media-dev-337872593610-ap-northeast-2-an',
-    public_url = 'https://daobk0bynum21.cloudfront.net/' || object_key
+SET bucket = :'media_bucket',
+    public_url = :'public_media_base_url' || '/' || object_key
 WHERE object_key LIKE 'demo/%';
 
 WITH posts_without_media AS (
@@ -709,9 +711,9 @@ INSERT INTO media.media_files
 SELECT md5('demo-legacy-community-cover:' || p.id)::uuid,
        p.published_by_user_id,
        'S3_COMPATIBLE',
-       'soomgil-media-dev-337872593610-ap-northeast-2-an',
+       :'media_bucket',
        'demo/legacy-community/' || p.id || '/cover.jpg',
-       'https://daobk0bynum21.cloudfront.net/demo/legacy-community/' || p.id || '/cover.jpg',
+       :'public_media_base_url' || '/demo/legacy-community/' || p.id || '/cover.jpg',
        'image/jpeg', 420000, 1400, 900, 'COMMUNITY_POST', p.id, 'ACTIVE', p.published_at
 FROM posts_without_media p
 ON CONFLICT (id) DO UPDATE SET
@@ -756,12 +758,24 @@ WHERE i.place_provider = 'KTO' AND i.external_place_id = a.content_id::text
   AND (a.content_id BETWEEN 10001 AND 10040 OR a.content_id BETWEEN 20001 AND 20028);
 
 UPDATE itinerary.itinerary_items i
-SET thumbnail_url = 'https://daobk0bynum21.cloudfront.net/demo/legacy-places/' ||
+SET thumbnail_url = :'public_media_base_url' || '/demo/legacy-places/' ||
       md5(COALESCE(i.place_provider, 'CUSTOM') || ':' || COALESCE(i.external_place_id, i.id::text)) ||
       '/cover.jpg',
     updated_at = now()
 WHERE i.thumbnail_url LIKE 'https://cdn.soomgil.test/%'
    OR (i.thumbnail_url IS NULL AND i.trip_id::text LIKE 'c0000000-%');
+
+-- These two legacy dashboard aliases represent seeded Seoul places that already
+-- have canonical demo objects. Reuse those objects instead of generating orphan
+-- legacy keys that are not part of the media bundle.
+UPDATE itinerary.itinerary_items
+SET thumbnail_url = :'public_media_base_url' || CASE external_place_id
+      WHEN 'dashboard-seoul-forest' THEN '/demo/places/10010/cover.jpg'
+      WHEN 'dashboard-seongsu-cafe' THEN '/demo/places/10011/cover.jpg'
+    END,
+    updated_at = now()
+WHERE place_provider = 'KTO'
+  AND external_place_id IN ('dashboard-seoul-forest', 'dashboard-seongsu-cafe');
 
 UPDATE community.post_snapshot_items i
 SET thumbnail_url = a.first_image1
@@ -770,10 +784,18 @@ WHERE i.place_provider = 'KTO' AND i.external_place_id = a.content_id::text
   AND (a.content_id BETWEEN 10001 AND 10040 OR a.content_id BETWEEN 20001 AND 20028);
 
 UPDATE community.post_snapshot_items i
-SET thumbnail_url = 'https://daobk0bynum21.cloudfront.net/demo/legacy-places/' ||
+SET thumbnail_url = :'public_media_base_url' || '/demo/legacy-places/' ||
       md5(COALESCE(i.place_provider, 'CUSTOM') || ':' || COALESCE(i.external_place_id, i.id::text)) ||
       '/cover.jpg'
 WHERE i.thumbnail_url LIKE 'https://cdn.soomgil.test/%';
+
+UPDATE community.post_snapshot_items
+SET thumbnail_url = :'public_media_base_url' || CASE external_place_id
+      WHEN 'dashboard-seoul-forest' THEN '/demo/places/10010/cover.jpg'
+      WHEN 'dashboard-seongsu-cafe' THEN '/demo/places/10011/cover.jpg'
+    END
+WHERE place_provider = 'KTO'
+  AND external_place_id IN ('dashboard-seoul-forest', 'dashboard-seongsu-cafe');
 
 -- Refresh the immutable-looking post payload after replacing itinerary and profile images.
 UPDATE community.posts p

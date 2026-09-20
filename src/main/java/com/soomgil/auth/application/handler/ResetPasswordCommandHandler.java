@@ -61,7 +61,7 @@ public class ResetPasswordCommandHandler implements CommandHandler<ResetPassword
 		}
 
 		passwordResetTokenMapper.markUsed(token.id(), Instant.now());
-		passwordCredentialMapper.updatePasswordHash(token.userId(), passwordHasher.hash(command.newPassword()));
+		passwordCredentialMapper.upsertPasswordHash(token.userId(), passwordHasher.hash(command.newPassword()));
 		userSessionMapper.revokeAllForUser(token.userId(), Instant.now(), "PASSWORD_RESET");
 
 		return NoResult.INSTANCE;

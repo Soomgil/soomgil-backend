@@ -268,6 +268,8 @@ public class TripController extends ApiControllerSupport {
 			TripStatus.valueOf(result.status().name()),
 			TripAccessRole.OWNER,
 			result.itineraryVersion(),
+			null,
+			null,
 			OffsetDateTime.ofInstant(result.createdAt(), ZoneOffset.UTC),
 			result.ownerUserId(),
 			List.of(),
@@ -314,6 +316,8 @@ public class TripController extends ApiControllerSupport {
 			TripStatus.valueOf(view.status().name()),
 			TripAccessRole.valueOf(view.myRole().name()),
 			view.itineraryVersion(),
+			view.startDate(),
+			view.endDate(),
 			OffsetDateTime.ofInstant(view.createdAt(), ZoneOffset.UTC),
 			view.ownerUserId(),
 			view.regions().stream()

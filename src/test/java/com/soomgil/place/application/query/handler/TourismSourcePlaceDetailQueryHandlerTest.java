@@ -127,6 +127,47 @@ class TourismSourcePlaceDetailQueryHandlerTest {
 		assertThat(result.enriched()).isFalse();
 	}
 
+	@Test
+	void replacesRetiredDemoCdnImagesWithCollectedKtoImages() {
+		repository.item = new PlaceDetailItem(
+			"20021",
+			"Euneungjeongi Street",
+			"Daejeon",
+			36.328650,
+			127.426820,
+			URI.create("https://daobk0bynum21.cloudfront.net/demo/places/20021/cover.jpg"),
+			List.of(URI.create("https://daobk0bynum21.cloudfront.net/demo/places/20021/cover.jpg")),
+			"ATTRACTION",
+			PlaceSourceStatus.AVAILABLE,
+			"A downtown pedestrian street.",
+			null,
+			OffsetDateTime.parse("2026-06-01T00:00:00Z"),
+			false
+		);
+		liveClient.item = new TourismPlaceFeedItem(
+			"20021",
+			"Euneungjeongi Street",
+			"Daejeon",
+			36.328650,
+			127.426820,
+			"https://tong.visitkorea.or.kr/20021/cover.jpg",
+			"ATTRACTION",
+			"Collected from KTO.",
+			List.of("https://tong.visitkorea.or.kr/20021/detail.jpg"),
+			OffsetDateTime.parse("2026-06-20T00:00:00Z")
+		);
+
+		PlaceDetail result = handler.handle(new PlaceDetailQuery(PlaceProvider.KTO, "20021"));
+
+		assertThat(liveClient.lastExternalPlaceId).isEqualTo("20021");
+		assertThat(result.thumbnailUrl()).hasToString("https://tong.visitkorea.or.kr/20021/cover.jpg");
+		assertThat(result.photos()).containsExactly(
+			URI.create("https://tong.visitkorea.or.kr/20021/cover.jpg"),
+			URI.create("https://tong.visitkorea.or.kr/20021/detail.jpg")
+		);
+		assertThat(result.photos()).noneMatch(uri -> "daobk0bynum21.cloudfront.net".equals(uri.getHost()));
+	}
+
 	private static final class RecordingPlaceAccessibilityCacheService extends PlaceAccessibilityCacheService {
 
 		private List<PlaceRef> lastRefs = List.of();

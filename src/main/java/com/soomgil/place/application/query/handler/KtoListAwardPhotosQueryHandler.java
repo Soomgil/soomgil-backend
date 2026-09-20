@@ -15,7 +15,7 @@ import org.springframework.stereotype.Service;
 /**
  * 관광공사 수상작 카탈로그를 화면용 DTO로 변환해 반환한다.
  *
- * <p>수상작 전체 규모가 100건 내외로 작아 페이징 대신 매일 회전하는 offset으로 노출 순서를 바꾼다.
+	 * <p>수상작 전체 규모가 100건 내외로 작아 페이징 대신 매일 5칸씩 회전하는 offset으로 노출 순서를 바꾼다.
  * 같은 날 같은 조건이면 항상 같은 결과를 반환하므로 화면 간 순서가 어긋나지 않는다.
  */
 @Service
@@ -24,6 +24,7 @@ public class KtoListAwardPhotosQueryHandler implements ListAwardPhotosQueryHandl
 	private static final ZoneId KOREA_TIME = ZoneId.of("Asia/Seoul");
 	private static final int DEFAULT_LIMIT = 10;
 	private static final int MAX_LIMIT = 100;
+	private static final int DAILY_ROTATION_STEP = 5;
 
 	private final AwardPhotoCatalogClient catalogClient;
 	private final Clock clock;
@@ -48,7 +49,8 @@ public class KtoListAwardPhotosQueryHandler implements ListAwardPhotosQueryHandl
 		}
 
 		int limit = Math.min(normalizeLimit(query.limit()), catalog.size());
-		int offset = Math.floorMod(LocalDate.now(clock).getDayOfYear(), catalog.size());
+		int elapsedDays = LocalDate.now(clock).getDayOfYear() - 1;
+		int offset = Math.floorMod(elapsedDays * DAILY_ROTATION_STEP, catalog.size());
 		List<AwardPhoto> selected = new ArrayList<>(limit);
 		for (int index = 0; index < limit; index++) {
 			selected.add(toAwardPhoto(catalog.get((offset + index) % catalog.size())));

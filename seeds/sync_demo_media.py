@@ -17,7 +17,7 @@ import sys
 import threading
 import time
 from typing import Any, Optional
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
@@ -72,8 +72,7 @@ COPY (
            p.display_name search_term,
            0 variant
     FROM auth.user_profiles p
-    WHERE p.profile_image_url LIKE
-      'https://daobk0bynum21.cloudfront.net/demo/profiles/%'
+    WHERE p.profile_image_url LIKE '%/demo/profiles/%'
 
     UNION ALL
 
@@ -84,12 +83,11 @@ COPY (
     UNION ALL
 
     SELECT 'place',
-           replace(i.thumbnail_url, 'https://daobk0bynum21.cloudfront.net/', ''),
+           regexp_replace(i.thumbnail_url, '^.*/demo/legacy-places/', 'demo/legacy-places/'),
            min(i.place_name) || ' 대한민국 여행',
            abs(hashtext(i.thumbnail_url)) % 5
     FROM itinerary.itinerary_items i
-    WHERE i.thumbnail_url LIKE
-      'https://daobk0bynum21.cloudfront.net/demo/legacy-places/%'
+    WHERE i.thumbnail_url LIKE '%/demo/legacy-places/%'
     GROUP BY i.thumbnail_url
 
     UNION ALL
@@ -100,23 +98,12 @@ COPY (
 
     UNION ALL
 
-    SELECT 'record', m.object_key, COALESCE(r.location_name, '대한민국 여행'),
-           abs(hashtext(m.object_key)) % 5
-    FROM media.media_files m
-    JOIN record.trip_record_entries r ON m.linked_resource_type = 'TRIP_RECORD'
-      AND m.linked_resource_id = r.id
-    WHERE m.object_key LIKE 'demo/%'
-
-    UNION ALL
-
     SELECT 'record', m.object_key,
-           COALESCE(r.location_name, t.display_destination, '대한민국 여행'),
+           COALESCE(t.display_destination, '대한민국 여행'),
            abs(hashtext(m.object_key)) % 5
     FROM media.media_files m
     JOIN trip.trips t ON m.linked_resource_type = 'trip.trips'
       AND m.linked_resource_id = t.id
-    LEFT JOIN record.trip_record_media rm ON rm.media_file_id = m.id
-    LEFT JOIN record.trip_record_entries r ON r.id = rm.record_entry_id
     WHERE m.object_key LIKE 'demo/trips/%'
 
     UNION ALL
@@ -259,7 +246,9 @@ def download(url: str, expected_mime: str) -> tuple[bytes, str]:
     return result
 
 
-def sync_asset(s3: Any, bucket: str, asset: dict[str, Any], dry_run: bool) -> dict[str, Any]:
+def sync_asset(
+    s3: Any, bucket: str, asset: dict[str, Any], dry_run: bool, cache_control: str
+) -> dict[str, Any]:
     source = asset.get("_source") or resolve_source(asset)
     data, content_type = download(source["url"], source["mime_type"])
     sha256 = hashlib.sha256(data).hexdigest()
@@ -269,7 +258,7 @@ def sync_asset(s3: Any, bucket: str, asset: dict[str, Any], dry_run: bool) -> di
             Key=asset["object_key"],
             Body=io.BytesIO(data),
             ContentType=content_type,
-            CacheControl="public, max-age=31536000, immutable",
+            CacheControl=cache_control,
             Metadata={"sha256": sha256},
         )
         head = s3.head_object(Bucket=bucket, Key=asset["object_key"])
@@ -305,13 +294,53 @@ def read_manifest() -> list[dict[str, str]]:
         return list(csv.DictReader(handle))
 
 
+def head_object_or_none(s3: Any, bucket: str, object_key: str) -> Optional[dict[str, Any]]:
+    try:
+        return s3.head_object(Bucket=bucket, Key=object_key)
+    except Exception as exc:
+        response = getattr(exc, "response", {})
+        error = response.get("Error", {}) if isinstance(response, dict) else {}
+        if str(error.get("Code", "")) in {"404", "NoSuchKey", "NotFound"}:
+            return None
+        raise
+
+
+def object_matches_manifest(
+    s3: Any, bucket: str, asset: dict[str, Any], manifest_row: Optional[dict[str, str]]
+) -> bool:
+    if not manifest_row or not manifest_row.get("sha256"):
+        return False
+    head = head_object_or_none(s3, bucket, asset["object_key"])
+    if head is None:
+        return False
+    metadata_sha = (head.get("Metadata") or {}).get("sha256", "").lower()
+    expected_sha = manifest_row["sha256"].lower()
+    expected_size = manifest_row.get("byte_size", "")
+    size_matches = not expected_size or head.get("ContentLength") == int(expected_size)
+    return metadata_sha == expected_sha and size_matches
+
+
+def manifest_source(row: dict[str, str]) -> dict[str, str]:
+    return {
+        "url": row["url"],
+        "mime_type": row.get("content_type") or "image/jpeg",
+        "source_page": row.get("source_page", ""),
+        "license": row.get("license", ""),
+        "artist": row.get("artist", ""),
+    }
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--container", default="soomgil-postgres-1")
     parser.add_argument("--workers", type=int, default=8)
     parser.add_argument("--limit", type=int)
     parser.add_argument("--dry-run", action="store_true")
-    parser.add_argument("--new-only", action="store_true")
+    parser.add_argument("--kind", action="append", choices=["profile", "place", "record", "community"])
+    selection = parser.add_mutually_exclusive_group()
+    selection.add_argument("--new-only", action="store_true")
+    selection.add_argument("--repair-mismatched", action="store_true")
+    parser.add_argument("--refresh-sources", action="store_true")
     args = parser.parse_args()
 
     config = {
@@ -323,13 +352,39 @@ def main() -> None:
     region = required(config, "S3_REGION")
     access_key = required(config, "S3_ACCESS_KEY")
     secret_key = required(config, "S3_SECRET_KEY")
+    endpoint_url = config.get("S3_ENDPOINT") or None
+    endpoint_host = urlparse(endpoint_url).hostname if endpoint_url else None
+    default_cache_control = (
+        "no-cache"
+        if endpoint_host in {"localhost", "127.0.0.1", "minio"}
+        else "public, max-age=31536000, immutable"
+    )
+    cache_control = config.get("DEMO_MEDIA_CACHE_CONTROL", default_cache_control)
     db_user = config.get("DB_USERNAME", "soomgil")
     db_name = config.get("DB_NAME", "soomgil")
     assets = query_assets(args.container, db_user, db_name)
+    if args.kind:
+        selected_kinds = set(args.kind)
+        assets = [asset for asset in assets if asset["kind"] in selected_kinds]
     existing_manifest = read_manifest()
+    manifest_by_key = {row["object_key"]: row for row in existing_manifest}
+    s3 = boto3.client(
+        "s3",
+        region_name=region,
+        aws_access_key_id=access_key,
+        aws_secret_access_key=secret_key,
+        endpoint_url=endpoint_url,
+    )
     if args.new_only:
-        existing_keys = {row["object_key"] for row in existing_manifest}
-        assets = [asset for asset in assets if asset["object_key"] not in existing_keys]
+        assets = [
+            asset for asset in assets
+            if head_object_or_none(s3, bucket, asset["object_key"]) is None
+        ]
+    elif args.repair_mismatched:
+        assets = [
+            asset for asset in assets
+            if not object_matches_manifest(s3, bucket, asset, manifest_by_key.get(asset["object_key"]))
+        ]
     if args.limit:
         assets = assets[: args.limit]
     if not assets:
@@ -344,23 +399,23 @@ def main() -> None:
     }
     print(f"Resolving image sources for {len(assets)} objects ...")
     for index, asset in enumerate(assets, start=1):
-        asset["_source"] = resolve_source(asset, used_source_pages)
+        previous = manifest_by_key.get(asset["object_key"])
+        if previous and previous.get("url") and not args.refresh_sources:
+            asset["_source"] = manifest_source(previous)
+        else:
+            asset["_source"] = resolve_source(asset, used_source_pages)
         used_source_pages.add(asset["_source"]["source_page"])
         if index % 50 == 0 or index == len(assets):
             print(f"  {index}/{len(assets)} sources resolved")
 
-    s3 = boto3.client(
-        "s3",
-        region_name=region,
-        aws_access_key_id=access_key,
-        aws_secret_access_key=secret_key,
-        endpoint_url=config.get("S3_ENDPOINT") or None,
-    )
     print(f"Syncing {len(assets)} objects to s3://{bucket}/ ...")
     completed: list[dict[str, Any]] = []
     failures: list[tuple[str, str]] = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=args.workers) as executor:
-        futures = {executor.submit(sync_asset, s3, bucket, asset, args.dry_run): asset for asset in assets}
+        futures = {
+            executor.submit(sync_asset, s3, bucket, asset, args.dry_run, cache_control): asset
+            for asset in assets
+        }
         for index, future in enumerate(concurrent.futures.as_completed(futures), start=1):
             asset = futures[future]
             try:

@@ -1,8 +1,10 @@
 -- Soomgil local demo dataset: Seoul + Daejeon
--- Target schema: Flyway V1..V37
+-- Target schema: current Flyway schema (record feature may be absent since V51).
 -- Safe to re-run: deterministic identifiers and ON CONFLICT clauses are used throughout.
 -- Apply after migrations:
 --   docker compose exec -T postgres psql -U soomgil -d soomgil < seeds/soomgil_demo_seoul_daejeon.sql
+
+SELECT (to_regclass('record.trip_record_entries') IS NOT NULL) AS record_feature_enabled \gset
 
 BEGIN;
 
@@ -478,6 +480,7 @@ FROM msg ON CONFLICT (id) DO NOTHING;
 -- ---------------------------------------------------------------------------
 -- Trip records and media from completed journeys
 -- ---------------------------------------------------------------------------
+\if :record_feature_enabled
 WITH completed(k) AS (VALUES ('seoul-palace'),('seoul-night'),('seongsu-picnic'),('daejeon-science'),
  ('daejeon-bread'),('daejeon-green'),('seoul-modern')),
 items AS (
@@ -514,6 +517,7 @@ SELECT r.id,md5('demo-record-media:'||r.id)::uuid,0,'여행에서 직접 남긴 
 FROM record.trip_record_entries r
 WHERE r.id IN (SELECT md5('demo-record:'||i.id)::uuid FROM itinerary.itinerary_items i)
 ON CONFLICT DO NOTHING;
+\endif
 
 -- ---------------------------------------------------------------------------
 -- Community feed: published trip snapshots, media, hashtags and engagement
@@ -1005,6 +1009,7 @@ FROM bulk b JOIN itinerary.itinerary_items i ON i.trip_id=md5('demo-trip:'||b.k)
 ON CONFLICT(id) DO NOTHING;
 
 -- Four records per derived trip create a substantial record gallery.
+\if :record_feature_enabled
 WITH ranked AS (
  SELECT i.*,row_number()OVER(PARTITION BY i.trip_id ORDER BY d.sort_order,i.sort_order)rn,d.date,
   t.owner_user_id FROM itinerary.itinerary_items i JOIN itinerary.itinerary_days d ON d.id=i.itinerary_day_id
@@ -1034,6 +1039,7 @@ INSERT INTO record.trip_record_media(record_entry_id,media_file_id,sort_order,ca
 SELECT r.id,md5('demo-bulk-record-media:'||r.id)::uuid,0,'여행자가 직접 남긴 기록',r.created_at
 FROM record.trip_record_entries r WHERE r.id IN(SELECT md5('demo-bulk-record:'||i.id)::uuid FROM itinerary.itinerary_items i)
 ON CONFLICT DO NOTHING;
+\endif
 
 -- Fifty more feed posts backed by real itineraries.
 INSERT INTO community.posts
@@ -1194,9 +1200,6 @@ UNION ALL SELECT 'trips',count(*) FROM trip.trips WHERE display_destination LIKE
 UNION ALL SELECT 'itinerary_items',count(*) FROM itinerary.itinerary_items WHERE place_provider='KTO' AND
  external_place_id ~ '^[0-9]+$' AND
  (external_place_id::int BETWEEN 10001 AND 10040 OR external_place_id::int BETWEEN 20001 AND 20028)
-UNION ALL SELECT 'records',count(*) FROM record.trip_record_entries WHERE id IN (
- SELECT md5('demo-record:'||i.id)::uuid FROM itinerary.itinerary_items i UNION ALL
- SELECT md5('demo-bulk-record:'||i.id)::uuid FROM itinerary.itinerary_items i)
 UNION ALL SELECT 'community_posts',count(*) FROM community.posts WHERE id IN (
  SELECT md5('demo-bulk-post:'||g)::uuid FROM generate_series(1,50)g UNION ALL
  SELECT md5('demo-post:'||k)::uuid FROM (VALUES ('palace-post'),('night-post'),('seongsu-post'),('science-post'),('bread-post'),('green-post'),('modern-post'),('family-post'),('autumn-post'))x(k))
