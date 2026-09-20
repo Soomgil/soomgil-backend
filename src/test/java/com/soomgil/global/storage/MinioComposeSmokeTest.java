@@ -30,8 +30,10 @@ class MinioComposeSmokeTest {
 			"S3_CONSOLE_PORT", "0"
 		);
 		try {
-			run(compose, project, environment, List.of("up", "-d", "minio", "minio-init"));
-			run(compose, project, environment, List.of("wait", "minio-init"));
+			run(compose, project, environment, List.of("up", "-d", "minio"));
+			// Compose 5.x의 wait는 이미 정상 종료된 one-shot 컨테이너를 찾지 못하는 경우가 있다.
+			// 초기화 작업을 전경 실행해 프로세스 종료 코드로 성공 여부를 직접 검증한다.
+			run(compose, project, environment, List.of("run", "--rm", "minio-init"));
 			String portOutput = run(compose, project, environment, List.of("port", "minio", "9000")).trim();
 			int port = Integer.parseInt(portOutput.substring(portOutput.lastIndexOf(':') + 1));
 			S3StorageProperties properties = new S3StorageProperties(

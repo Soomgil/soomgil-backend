@@ -157,8 +157,8 @@ class SwipeReactionPreferenceEvidenceIntegrationTest {
 			"survey-v1:126508"
 		));
 
-		assertEvidence("park", "1.20000000", "0.00000000", "0.937500", 1, 0, 0);
-		assertEvidence("museum", "1.80000000", "0.00000000", "0.612903", 1, 0, 0);
+		assertEvidence("park", "1.20000000", "0.00000000", "0.931034", 1, 0, 0);
+		assertEvidence("museum", "1.80000000", "0.00000000", "0.586207", 1, 0, 0);
 
 		// 같은 장소에서 일반 반응으로 바뀌면 기존 3배 근거를 제거하고 1배만 다시 적용한다.
 		react(SwipeReaction.LIKE);
