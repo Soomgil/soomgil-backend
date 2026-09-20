@@ -55,7 +55,9 @@ class OnboardingPreferenceServiceTest {
 				.map(place -> new OnboardingPreferenceAnswer(
 					PlaceProvider.KTO,
 					place.externalPlaceId(),
-					place.sortOrder() % 2 == 0 ? SwipeReaction.NOPE : SwipeReaction.LIKE
+					place.sortOrder() == 1
+						? SwipeReaction.SUPER_LIKE
+						: place.sortOrder() % 2 == 0 ? SwipeReaction.NOPE : SwipeReaction.LIKE
 				))
 				.toList()
 		);
@@ -71,6 +73,7 @@ class OnboardingPreferenceServiceTest {
 				assertThat(command.source().evidenceMultiplier()).isEqualByComparingTo("3.0");
 				assertThat(command.sourceResourceId()).startsWith(SURVEY_ID.toString() + ":");
 			});
+		assertThat(commandCaptor.getAllValues().getFirst().reaction()).isEqualTo(SwipeReaction.SUPER_LIKE);
 		verify(mapper, times(10)).upsertResponse(any(), any(), any(), any(), any());
 		verify(mapper).markCompleted(USER_ID);
 		assertThat(result.completedAt()).isEqualTo(completedAt);

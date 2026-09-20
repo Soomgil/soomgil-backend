@@ -7,7 +7,8 @@ import jakarta.validation.constraints.NotNull;
 /**
  * 가입 설문 관광지 하나에 대한 사용자의 최종 반응.
  *
- * <p>가입 설문에서는 {@link SwipeReaction#LIKE}와 {@link SwipeReaction#NOPE}만 허용한다.
+ * <p>일반 취향 수집과 같은 세 방향 제스처를 사용하므로
+ * {@link SwipeReaction#LIKE}, {@link SwipeReaction#NOPE}, {@link SwipeReaction#SUPER_LIKE}를 허용한다.
  */
 public record OnboardingPreferenceAnswer(
 	@NotNull PlaceProvider provider,
