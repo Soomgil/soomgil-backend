@@ -11,8 +11,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.function.Supplier;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 abstract class AiToolSupport implements AiExecutableTools {
+	private static final Logger log = LoggerFactory.getLogger(AiToolSupport.class);
 	protected final UUID tripId;
 	protected final UUID userId;
 	protected final AiGuideRequest request;
@@ -52,6 +55,8 @@ abstract class AiToolSupport implements AiExecutableTools {
 		}
 		catch (RuntimeException exception) {
 			auditService.fail(callId, exception);
+			// Spring AI는 도구 예외를 모델에 돌려주기만 하므로, 여기서 남기지 않으면 원인이 로그에 전혀 안 보인다.
+			log.warn("AI tool '{}' failed: {}", toolName, exception.toString());
 			throw exception;
 		}
 	}

@@ -142,6 +142,9 @@ public class SpringAiGuideModel implements AiGuideModel {
 		String mode = switch (decision.intent()) {
 			case SUMMARIZE_ITINERARY -> "등록된 조회 도구로 현재 일정을 먼저 확인한 뒤, 3~5줄로 핵심 코스를 요약하거나 분석 조언을 작성하세요. "
 				+ "일차별 대표 장소, 이동 거리, 특징을 한국어로 구체적으로 담으세요.";
+			case RECOMMEND_PLACES -> "recommendPlaces 도구를 즉시 호출해 결과를 바탕으로 답하세요. "
+				+ "지도 범위(bbox)는 서버가 현재 지도 범위 또는 여행방 지역으로 자동 결정하므로 bbox를 비워 호출하고, "
+				+ "사용자에게 도시나 지도 범위를 되묻지 마세요. 추천 이유를 한 줄씩 덧붙이세요.";
 			default -> "등록된 조회 도구만 사용하세요. 데이터를 변경하지 마세요. 요청을 답하려면 조회 결과를 먼저 확인하세요.";
 		};
 		return replyWithTools(request, decision, mode);
@@ -158,7 +161,7 @@ public class SpringAiGuideModel implements AiGuideModel {
 			case MOVE_ITINERARY_ITEM -> "현재 여행 맥락 JSON에서 사용자가 말한 장소와 목표 일차를 확인하고 "
 				+ "moveItineraryItem 도구에 placeName과 targetDayNumber를 전달하세요. UUID를 추측하지 마세요.";
 			case ADD_RECOMMENDED_PLACES_TO_ITINERARY -> "사용자가 추천 장소를 일정에 추가하라고 명시했을 때만 "
-				+ "addRecommendedPlacesToItinerary 도구를 사용하세요. 현재 지도 viewport가 있으면 bbox로 전달하고, "
+				+ "addRecommendedPlacesToItinerary 도구를 사용하세요. bbox는 비워두면 서버가 현재 지도 범위 또는 여행방 지역으로 자동 결정하니 되묻지 말고 바로 호출하고, "
 				+ "일차가 명확하지 않으면 itineraryDayId를 null로 두어 일차 미정에 추가하세요. "
 				+ "limit는 사용자가 말한 개수 또는 3개로 제한하세요.";
 			case FILTER_PLACES_BY_CONDITION -> "여행 맥락 JSON의 days[].items[] 에서 placeName·address 로 삭제 대상을 직접 판별해 "
@@ -214,6 +217,18 @@ public class SpringAiGuideModel implements AiGuideModel {
 			&& !content.contains("？");
 	}
 
+	/**
+	 * 추천처럼 도구 결과가 곧 답인 조회 intent에서, 모델이 "찾아볼게요"처럼 예고만 하고 도구를 호출하지 않은 경우.
+	 * 되물음(물음표)은 정상이므로 제외한다. 이때는 결정적 경로로 주 도구를 직접 실행해 실제 결과를 돌려준다.
+	 */
+	private boolean announcedWithoutCallingReadTool(AiIntentDecision decision, List<AiToolCall> calls, String content) {
+		return decision.intent() == AiIntent.RECOMMEND_PLACES
+			&& calls.isEmpty()
+			&& content != null
+			&& !content.contains("?")
+			&& !content.contains("？");
+	}
+
 	private AiGuideReply replyWithTools(AiGuideRequest request, AiIntentDecision decision, String mode) {
 		List<AiExecutableTools> tools = toolsFactory.create(request, decision.intent());
 		if (tools.isEmpty()) {
@@ -242,6 +257,14 @@ public class SpringAiGuideModel implements AiGuideModel {
 				log.warn("AI reply (tools) answered without calling any write tool for intent={}, retrying deterministically.",
 					decision.intent());
 				AiGuideReply retried = fallback.replyWithWriteTools(request, decision);
+				if (!retried.toolCalls().isEmpty()) {
+					return retried;
+				}
+			}
+			if (announcedWithoutCallingReadTool(decision, calls, content)) {
+				log.warn("AI reply (tools) announced but did not call the read tool for intent={}, running it deterministically.",
+					decision.intent());
+				AiGuideReply retried = fallback.replyWithReadTools(request, decision);
 				if (!retried.toolCalls().isEmpty()) {
 					return retried;
 				}
@@ -286,6 +309,18 @@ public class SpringAiGuideModel implements AiGuideModel {
 		}
 		if (request.tripContext() != null) {
 			context.append("현재 여행 맥락 JSON: ").append(json(request.tripContext())).append('\n');
+		}
+		var viewport = request.viewport();
+		if (viewport != null && viewport.minLng() != null && viewport.minLat() != null
+			&& viewport.maxLng() != null && viewport.maxLat() != null) {
+			context.append("현재 지도 범위(bbox minLng,minLat,maxLng,maxLat): ")
+				.append(viewport.minLng()).append(',').append(viewport.minLat()).append(',')
+				.append(viewport.maxLng()).append(',').append(viewport.maxLat())
+				.append(" — 추천/검색 도구 호출 시 bbox를 비워도 서버가 이 범위를 사용한다.\n");
+		}
+		else {
+			context.append("현재 지도 범위 없음 — 추천/검색 도구는 bbox를 비워 호출하면 서버가 여행방에 등록된 지역으로 자동 결정한다. ")
+				.append("도시나 지도 범위를 사용자에게 되묻지 말고 바로 도구를 호출한다.\n");
 		}
 		var turns = new ArrayList<>(request.recentMessages());
 		Collections.reverse(turns);

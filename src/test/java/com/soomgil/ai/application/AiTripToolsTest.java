@@ -5,8 +5,14 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.soomgil.common.api.dto.PageMeta;
+import com.soomgil.geo.api.dto.Viewport;
+import com.soomgil.global.error.BusinessException;
+import com.soomgil.place.api.dto.RegionViewportResponse;
+import com.soomgil.place.application.query.handler.RegionViewportQueryHandler;
+import com.soomgil.trip.application.port.TripQueryRepository;
 import com.soomgil.itinerary.application.command.dto.ItineraryMutationResult;
 import com.soomgil.itinerary.application.query.dto.FindItineraryQuery;
 import com.soomgil.itinerary.application.query.dto.ItineraryView;
@@ -62,7 +68,7 @@ class AiTripToolsTest {
 		UUID userId = UUID.randomUUID();
 		ListPlaceRecommendationsQueryHandler recommendationHandler = mock(ListPlaceRecommendationsQueryHandler.class);
 		AiPlaceRecommendationTools tools = new AiPlaceRecommendationTools(
-			request(tripId, userId), audit(), recommendationHandler
+			request(tripId, userId), audit(), recommendationHandler, viewportResolver()
 		);
 
 		tools.recommendPlaces(new AiPlaceRecommendationTools.RecommendPlacesInput(
@@ -208,7 +214,7 @@ class AiTripToolsTest {
 			.thenReturn(new ItineraryMutationResult(tripId, 8L, null, null, null, null, List.of()))
 			.thenReturn(new ItineraryMutationResult(tripId, 9L, null, null, null, null, List.of()));
 		AiAddRecommendedPlacesTools tools = new AiAddRecommendedPlacesTools(
-			request(tripId, userId), audit(), recommendationHandler, itineraryToolService
+			request(tripId, userId), audit(), recommendationHandler, itineraryToolService, viewportResolver()
 		);
 
 		Object result = tools.addRecommendedPlacesToItinerary(
@@ -289,6 +295,74 @@ class AiTripToolsTest {
 			.collect(Collectors.toSet());
 	}
 
+	@Test
+	void recommendPlacesFallsBackToTheRequestViewportWhenBboxIsMissing() {
+		UUID tripId = UUID.randomUUID();
+		UUID userId = UUID.randomUUID();
+		ListPlaceRecommendationsQueryHandler recommendationHandler = mock(ListPlaceRecommendationsQueryHandler.class);
+		AiGuideRequest request = new AiGuideRequest(
+			tripId, userId, UUID.randomUUID(), UUID.randomUUID(), null,
+			List.of(), "추천해줘", null, new Viewport(126.8, 37.4, 127.2, 37.6), null
+		);
+		AiPlaceRecommendationTools tools = new AiPlaceRecommendationTools(
+			request, audit(), recommendationHandler, viewportResolver()
+		);
+
+		tools.recommendPlaces(new AiPlaceRecommendationTools.RecommendPlacesInput(null, null, null, null, 5));
+
+		verify(recommendationHandler).handle(new ListPlaceRecommendationsQuery(
+			tripId, "126.8,37.4,127.2,37.6", 37.5, 127.0, RecommendationTab.BASIC, 0, 5
+		));
+	}
+
+	@Test
+	void recommendPlacesFallsBackToTheTripRegionViewportWhenNoMapViewportIsKnown() {
+		UUID tripId = UUID.randomUUID();
+		UUID userId = UUID.randomUUID();
+		ListPlaceRecommendationsQueryHandler recommendationHandler = mock(ListPlaceRecommendationsQueryHandler.class);
+		TripQueryRepository tripRepository = mock(TripQueryRepository.class);
+		RegionViewportQueryHandler regionViewportHandler = mock(RegionViewportQueryHandler.class);
+		when(tripRepository.findTripRegionCodes(tripId)).thenReturn(List.of("1111000000"));
+		when(regionViewportHandler.handle("1111000000")).thenReturn(Optional.of(
+			new RegionViewportResponse(37.5, 127.0, 37.4, 126.8, 37.6, 127.2, 42L)
+		));
+		AiPlaceRecommendationTools tools = new AiPlaceRecommendationTools(
+			request(tripId, userId), audit(), recommendationHandler,
+			new AiRecommendationViewportResolver(tripRepository, regionViewportHandler)
+		);
+
+		// 모델이 bbox를 비우고 탭도 임의 표현("recommended")으로 넘겨도 지역 viewport로 채우고 BASIC으로 해석한다.
+		tools.recommendPlaces(new AiPlaceRecommendationTools.RecommendPlacesInput(null, null, null, "recommended", null));
+
+		verify(recommendationHandler).handle(new ListPlaceRecommendationsQuery(
+			tripId, "126.8,37.4,127.2,37.6", 37.5, 127.0, RecommendationTab.BASIC, 0, 10
+		));
+	}
+
+	@Test
+	void recommendPlacesFailsClearlyWhenNoRangeCanBeResolved() {
+		AiPlaceRecommendationTools tools = new AiPlaceRecommendationTools(
+			request(UUID.randomUUID(), UUID.randomUUID()), audit(), mock(ListPlaceRecommendationsQueryHandler.class), viewportResolver()
+		);
+
+		assertThatThrownBy(() -> tools.recommendPlaces(
+			new AiPlaceRecommendationTools.RecommendPlacesInput(null, null, null, null, null)
+		)).isInstanceOf(BusinessException.class);
+	}
+
+	@Test
+	void recommendationTabParsingIsTolerantToModelWording() {
+		assertThat(AiRecommendationViewportResolver.parseTab(null)).isEqualTo(RecommendationTab.BASIC);
+		assertThat(AiRecommendationViewportResolver.parseTab("recommended")).isEqualTo(RecommendationTab.BASIC);
+		assertThat(AiRecommendationViewportResolver.parseTab("super like")).isEqualTo(RecommendationTab.SUPER_LIKE);
+		assertThat(AiRecommendationViewportResolver.parseTab("SUPERLIKE")).isEqualTo(RecommendationTab.SUPER_LIKE);
+		assertThat(AiRecommendationViewportResolver.parseTab("Super_Like")).isEqualTo(RecommendationTab.SUPER_LIKE);
+	}
+
+	private AiRecommendationViewportResolver viewportResolver() {
+		return new AiRecommendationViewportResolver(mock(TripQueryRepository.class), mock(RegionViewportQueryHandler.class));
+	}
+
 	private AiTripToolsFactory factory() {
 		return new AiTripToolsFactory(
 			mock(FindItineraryHandler.class), mock(PlaceSearchQueryHandler.class),
@@ -296,7 +370,7 @@ class AiTripToolsTest {
 			mock(UpsertChecklistCommandHandler.class), mock(CreateChecklistItemCommandHandler.class),
 			mock(com.soomgil.planning.application.handler.ListChecklistsQueryHandler.class),
 			mock(com.soomgil.planning.application.handler.GetNoteQueryHandler.class),
-			mock(AiItineraryToolService.class), audit()
+			mock(AiItineraryToolService.class), audit(), viewportResolver()
 		);
 	}
 

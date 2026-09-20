@@ -11,6 +11,13 @@ spring:
       chat:
         options:
           model: ${OPENAI_CHAT_MODEL:gpt-5.6-terra}
+          # GPT-5/o 계열 추론 모델은 temperature를 기본값(1) 외엔 거부한다(400 unsupported_value).
+          # Spring AI 기본값 0.7이 그대로 나가면 모든 AI 기능이 실패하므로 1.0을 명시한다.
+          temperature: 1.0
+          # gpt-5.6-terra는 chat/completions에서 function tools + reasoning_effort 조합을 거부한다
+          # ("Function tools with reasoning_effort are not supported ... set reasoning_effort to none").
+          # AI 가이드가 일정 조작 tools를 쓰므로 none으로 고정한다.
+          reasoning-effort: none
     google:
       genai:
         api-key: ${GMS_API_KEY:}

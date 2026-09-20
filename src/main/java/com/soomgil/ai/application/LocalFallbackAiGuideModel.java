@@ -179,11 +179,9 @@ public class LocalFallbackAiGuideModel implements AiGuideModel {
 	}
 
 	private AiGuideReply addRecommendedPlaces(AiGuideRequest request, AiAddRecommendedPlacesTools tools) {
+		// bbox가 없어도 도구가 현재 viewport → 여행방 지역 순으로 스스로 채우므로 여기서 미리 막지 않는다.
 		String bbox = viewport(request);
 		if (bbox == null) bbox = inferredBbox(request);
-		if (bbox == null) {
-			return new AiGuideReply("추천 장소를 넣으려면 지도 범위나 기존 일정 위치가 필요해요. 먼저 지도에서 지역을 잡아주세요.", List.of());
-		}
 		tools.addRecommendedPlacesToItinerary(new AiAddRecommendedPlacesTools.AddRecommendedPlacesInput(
 			request.baseVersion(), bbox, null, null, "BASIC", requestedLimit(request.question()), dayId(request), null
 		));

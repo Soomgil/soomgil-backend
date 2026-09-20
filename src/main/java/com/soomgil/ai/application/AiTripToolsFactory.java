@@ -33,6 +33,7 @@ public class AiTripToolsFactory {
 	private final GetNoteQueryHandler getNoteHandler;
 	private final AiItineraryToolService itineraryToolService;
 	private final AiToolAuditService auditService;
+	private final AiRecommendationViewportResolver viewportResolver;
 
 	public AiTripToolsFactory(
 		FindItineraryHandler itineraryHandler,
@@ -44,7 +45,8 @@ public class AiTripToolsFactory {
 		ListChecklistsQueryHandler listChecklistsHandler,
 		GetNoteQueryHandler getNoteHandler,
 		AiItineraryToolService itineraryToolService,
-		AiToolAuditService auditService
+		AiToolAuditService auditService,
+		AiRecommendationViewportResolver viewportResolver
 	) {
 		this.itineraryHandler = itineraryHandler;
 		this.placeSearchHandler = placeSearchHandler;
@@ -56,6 +58,7 @@ public class AiTripToolsFactory {
 		this.getNoteHandler = getNoteHandler;
 		this.itineraryToolService = itineraryToolService;
 		this.auditService = auditService;
+		this.viewportResolver = viewportResolver;
 	}
 
 	public List<AiExecutableTools> create(AiGuideRequest request, AiIntent intent) {
@@ -72,7 +75,7 @@ public class AiTripToolsFactory {
 				new AiPlaceSearchTools(request, auditService, placeSearchHandler)
 			);
 			case RECOMMEND_PLACES -> List.of(
-				new AiPlaceRecommendationTools(request, auditService, recommendationHandler)
+				new AiPlaceRecommendationTools(request, auditService, recommendationHandler, viewportResolver)
 			);
 			case SUMMARIZE_ITINERARY -> List.of(
 				new AiSummarizeItineraryTools(request, auditService, itineraryHandler),
@@ -93,7 +96,7 @@ public class AiTripToolsFactory {
 				itineraryRead(request)
 			);
 			case ADD_RECOMMENDED_PLACES_TO_ITINERARY -> List.of(
-				new AiAddRecommendedPlacesTools(request, auditService, recommendationHandler, itineraryToolService),
+				new AiAddRecommendedPlacesTools(request, auditService, recommendationHandler, itineraryToolService, viewportResolver),
 				itineraryRead(request)
 			);
 			case DELETE_ITINERARY_ITEM -> List.of(
