@@ -22,6 +22,8 @@ import com.soomgil.voting.domain.policy.VoteResultSelectionPolicy;
 import java.net.URI;
 import java.time.Instant;
 import com.soomgil.voting.application.port.VoteNotificationPublisher;
+import com.soomgil.voting.application.port.VoteRealtimePublisher;
+import com.soomgil.voting.domain.model.VoteSessionStatus;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -54,13 +56,15 @@ public class CompleteVoteSessionService {
 	private final VoteResultSelectionPolicy selectionPolicy;
 	private final TimeProvider timeProvider;
 	private final VoteNotificationPublisher notifications;
+	private final VoteRealtimePublisher realtimePublisher;
 
 	public CompleteVoteSessionService(
 		VoteSessionRepository repository,
 		AddPlacesToUnscheduledHandler addPlacesToUnscheduledHandler,
 		ApplyTripVotePreferenceCommandHandler applyTripVotePreferenceCommandHandler,
 		TimeProvider timeProvider,
-		VoteNotificationPublisher notifications
+		VoteNotificationPublisher notifications,
+		VoteRealtimePublisher realtimePublisher
 	) {
 		this.repository = Objects.requireNonNull(repository, "repository must not be null");
 		this.addPlacesToUnscheduledHandler =
@@ -71,6 +75,7 @@ public class CompleteVoteSessionService {
 		this.selectionPolicy = new VoteResultSelectionPolicy();
 		this.timeProvider = Objects.requireNonNull(timeProvider, "timeProvider must not be null");
 		this.notifications = Objects.requireNonNull(notifications, "notifications must not be null");
+		this.realtimePublisher = Objects.requireNonNull(realtimePublisher, "realtimePublisher must not be null");
 	}
 
 	/**
@@ -139,6 +144,7 @@ public class CompleteVoteSessionService {
 			addSelectedPlacesToItinerary(session, candidates, selected, now);
 		applyPreferences(session, stickers);
 		notifications.publish(session.tripId(), session.id(), true, now);
+		realtimePublisher.publish(session.tripId(), session.id(), VoteSessionStatus.COMPLETED);
 
 		return new CompletionOutcome(
 			stickerCountByCandidate,

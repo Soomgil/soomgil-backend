@@ -2,12 +2,14 @@ package com.soomgil.social.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
 
 import com.soomgil.common.time.TimeProvider;
 import com.soomgil.global.error.BusinessException;
 import com.soomgil.global.error.ErrorCode;
 import com.soomgil.social.api.dto.FollowStatus;
 import com.soomgil.social.application.port.SocialFollowRepository;
+import com.soomgil.social.application.port.SocialNotificationPublisher;
 import com.soomgil.social.domain.model.SocialFollowRecord;
 import com.soomgil.social.domain.model.SocialFollowRequestRecord;
 import com.soomgil.social.domain.model.SocialFollowUserRecord;
@@ -24,7 +26,9 @@ class SocialFollowServiceTest {
 	private static final Instant NOW = Instant.parse("2026-06-20T12:00:00Z");
 	private final FakeRepository repository = new FakeRepository();
 	private final TimeProvider time = () -> NOW;
-	private final SocialFollowService service = new SocialFollowService(repository, time);
+	private final SocialFollowService service = new SocialFollowService(
+		repository, time, mock(SocialNotificationPublisher.class)
+	);
 
 	@Test
 	void followsPublicProfileImmediatelyAndPrivateProfileAsRequest() {

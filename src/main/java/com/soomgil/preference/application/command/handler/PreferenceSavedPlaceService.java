@@ -95,9 +95,23 @@ public class PreferenceSavedPlaceService {
 
 	@Transactional(readOnly = true)
 	public PagedSavedPlace list(ListSavedPlacesQuery query) {
-		UUID userId = currentUserId();
-		int page = normalizePage(query.page());
-		int size = normalizeSize(query.size());
+		return listForUser(currentUserId(), query.page(), query.size());
+	}
+
+	/**
+	 * 지정한 사용자의 슈퍼라이크 저장 장소를 조회한다.
+	 *
+	 * <p>타인 공개 여부 검사는 호출부에서 선행해야 한다.
+	 *
+	 * @param userId 조회 대상 사용자 식별자
+	 * @param requestedPage 0 기반 page 번호
+	 * @param requestedSize page 크기
+	 * @return 저장 장소 page
+	 */
+	@Transactional(readOnly = true)
+	public PagedSavedPlace listForUser(UUID userId, int requestedPage, int requestedSize) {
+		int page = normalizePage(requestedPage);
+		int size = normalizeSize(requestedSize);
 		long totalElements = mapper.countSavedPlaces(userId.toString());
 		List<SavedPlace> items = mapper.listSavedPlaces(userId.toString(), size, page * size)
 			.stream()

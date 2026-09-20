@@ -11,6 +11,7 @@ import com.soomgil.notification.api.dto.PagedNotification;
 import com.soomgil.notification.api.dto.NotificationPayload;
 import com.soomgil.notification.infrastructure.persistence.NotificationMapper;
 import com.soomgil.notification.infrastructure.persistence.NotificationRow;
+import com.soomgil.notification.application.port.NotificationRealtimePublisher;
 import com.soomgil.user.api.dto.UserSummary;
 import java.net.URI;
 import java.time.Instant;
@@ -29,10 +30,13 @@ public class NotificationService {
 	private static final List<String> SORT = List.of("createdAt,desc", "id,desc");
 	private final NotificationMapper mapper;
 	private final ObjectMapper objectMapper;
+	private final NotificationRealtimePublisher realtimePublisher;
 
-	public NotificationService(NotificationMapper mapper, ObjectMapper objectMapper) {
+	public NotificationService(NotificationMapper mapper, ObjectMapper objectMapper,
+		NotificationRealtimePublisher realtimePublisher) {
 		this.mapper = Objects.requireNonNull(mapper, "mapper must not be null");
 		this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper must not be null");
+		this.realtimePublisher = Objects.requireNonNull(realtimePublisher, "realtimePublisher must not be null");
 	}
 
 	@Transactional(readOnly = true)
@@ -52,12 +56,16 @@ public class NotificationService {
 		if (mapper.markRead(notificationId, userId, Instant.now()) == 0) {
 			throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "Notification was not found.");
 		}
-		return toDto(requireOwned(userId, notificationId));
+		Notification notification = toDto(requireOwned(userId, notificationId));
+		realtimePublisher.publishChanged(userId);
+		return notification;
 	}
 
 	@Transactional
 	public BulkUpdateResult markAllRead(UUID userId) {
-		return new BulkUpdateResult(mapper.markAllRead(userId, Instant.now()));
+		BulkUpdateResult result = new BulkUpdateResult(mapper.markAllRead(userId, Instant.now()));
+		realtimePublisher.publishChanged(userId);
+		return result;
 	}
 
 	@Transactional
@@ -65,6 +73,7 @@ public class NotificationService {
 		if (mapper.deleteOwned(notificationId, userId) == 0) {
 			throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "Notification was not found.");
 		}
+		realtimePublisher.publishChanged(userId);
 	}
 
 	private NotificationRow requireOwned(UUID userId, UUID notificationId) {

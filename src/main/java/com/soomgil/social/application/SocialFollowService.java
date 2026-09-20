@@ -11,6 +11,7 @@ import com.soomgil.social.api.dto.FollowRequest;
 import com.soomgil.social.api.dto.FollowStatus;
 import com.soomgil.social.api.dto.PagedFollowRequest;
 import com.soomgil.social.application.port.SocialFollowRepository;
+import com.soomgil.social.application.port.SocialNotificationPublisher;
 import com.soomgil.social.domain.model.SocialFollowRecord;
 import com.soomgil.user.api.dto.PagedUserSummary;
 import com.soomgil.user.api.dto.UserSummary;
@@ -29,10 +30,13 @@ public class SocialFollowService {
 
 	private final SocialFollowRepository repository;
 	private final TimeProvider timeProvider;
+	private final SocialNotificationPublisher notifications;
 
-	public SocialFollowService(SocialFollowRepository repository, TimeProvider timeProvider) {
+	public SocialFollowService(SocialFollowRepository repository, TimeProvider timeProvider,
+		SocialNotificationPublisher notifications) {
 		this.repository = repository;
 		this.timeProvider = timeProvider;
+		this.notifications = notifications;
 	}
 
 	@Transactional
@@ -46,7 +50,13 @@ public class SocialFollowService {
 			throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "User was not found.");
 		}
 		String status = "PRIVATE".equals(visibility) ? "PENDING" : "ACTIVE";
-		return toFollow(repository.upsert(currentUserId, targetUserId, status, timeProvider.now()));
+		Instant now = timeProvider.now();
+		SocialFollowRecord previous = repository.find(currentUserId, targetUserId);
+		Follow follow = toFollow(repository.upsert(currentUserId, targetUserId, status, now));
+		if (previous == null || previous.deletedAt() != null || !status.equals(previous.status())) {
+			notifications.publishFollowed(currentUserId, targetUserId, "PENDING".equals(status), now);
+		}
+		return follow;
 	}
 
 	@Transactional
@@ -110,6 +120,7 @@ public class SocialFollowService {
 		if (!repository.activatePending(followerUserId, currentUserId, now)) {
 			throw new BusinessException(ErrorCode.FOLLOW_REQUEST_NOT_FOUND);
 		}
+		notifications.publishAccepted(currentUserId, followerUserId, now);
 		return toFollow(repository.find(followerUserId, currentUserId));
 	}
 

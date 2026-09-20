@@ -9,6 +9,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.soomgil.auth.application.service.MailService;
 import com.soomgil.notification.infrastructure.persistence.NotificationMapper;
 import com.soomgil.notification.infrastructure.persistence.TripInviteEmailRecipientMapper;
+import com.soomgil.notification.application.port.NotificationRealtimePublisher;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -18,8 +19,9 @@ class TripInviteNotificationPublisherAdapterTest {
 	private final NotificationMapper notificationMapper = mock(NotificationMapper.class);
 	private final TripInviteEmailRecipientMapper recipientMapper = mock(TripInviteEmailRecipientMapper.class);
 	private final MailService mailService = mock(MailService.class);
+	private final NotificationRealtimePublisher realtimePublisher = mock(NotificationRealtimePublisher.class);
 	private final TripInviteNotificationPublisherAdapter publisher = new TripInviteNotificationPublisherAdapter(
-		notificationMapper, new ObjectMapper(), recipientMapper, mailService
+		notificationMapper, new ObjectMapper(), recipientMapper, mailService, realtimePublisher
 	);
 
 	@Test

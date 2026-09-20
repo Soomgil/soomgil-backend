@@ -62,12 +62,20 @@ class TripSubscriptionInterceptorTest {
 			"route-matching",
 			"chat",
 			"planning",
-			"ai"
+			"ai",
+			"voting"
 		)) {
 			Message<?> message = message(StompCommand.SUBSCRIBE, "/topic/trips/" + TRIP_ID + "/" + topic, true);
 
 			assertThat(interceptor.preSend(message, channel)).isSameAs(message);
 		}
+	}
+
+	@Test
+	void allowsAuthenticatedUserToSubscribeToPersonalNotifications() {
+		Message<?> message = message(StompCommand.SUBSCRIBE, "/user/queue/notifications", true);
+
+		assertThat(interceptor.preSend(message, channel)).isSameAs(message);
 	}
 
 	@Test
