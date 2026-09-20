@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.soomgil.notification.api.dto.TripInviteNotificationPayload;
 import com.soomgil.notification.infrastructure.persistence.NotificationMapper;
 import com.soomgil.notification.infrastructure.persistence.TripInviteEmailRecipientMapper;
+import com.soomgil.notification.application.port.NotificationRealtimePublisher;
 import com.soomgil.auth.application.service.MailService;
 import com.soomgil.trip.application.port.TripInviteNotificationPublisher;
 import java.time.Instant;
@@ -23,13 +24,16 @@ public class TripInviteNotificationPublisherAdapter implements TripInviteNotific
 	private final ObjectMapper objectMapper;
 	private final TripInviteEmailRecipientMapper emailRecipientMapper;
 	private final MailService mailService;
+	private final NotificationRealtimePublisher realtimePublisher;
 
 	public TripInviteNotificationPublisherAdapter(NotificationMapper mapper, ObjectMapper objectMapper,
-		TripInviteEmailRecipientMapper emailRecipientMapper, MailService mailService) {
+		TripInviteEmailRecipientMapper emailRecipientMapper, MailService mailService,
+		NotificationRealtimePublisher realtimePublisher) {
 		this.mapper = Objects.requireNonNull(mapper, "mapper must not be null");
 		this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper must not be null");
 		this.emailRecipientMapper = Objects.requireNonNull(emailRecipientMapper, "emailRecipientMapper must not be null");
 		this.mailService = Objects.requireNonNull(mailService, "mailService must not be null");
+		this.realtimePublisher = Objects.requireNonNull(realtimePublisher, "realtimePublisher must not be null");
 	}
 
 	@Override
@@ -54,6 +58,7 @@ public class TripInviteNotificationPublisherAdapter implements TripInviteNotific
 			UUID.randomUUID(), recipientUserId, actorUserId, tripId, "TRIP_INVITE",
 			"여행 초대가 도착했습니다.", null, payload, createdAt
 		);
+		realtimePublisher.publishChanged(recipientUserId);
 
 		String recipientEmail = emailRecipientMapper.findOptedInVerifiedEmail(recipientUserId);
 		if (recipientEmail != null) {

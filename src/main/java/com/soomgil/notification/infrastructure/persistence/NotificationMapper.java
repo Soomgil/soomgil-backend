@@ -33,6 +33,18 @@ public interface NotificationMapper {
     int insertVoteNotifications(@Param("tripId") UUID tripId, @Param("sessionId") UUID sessionId,
         @Param("type") String type, @Param("title") String title, @Param("createdAt") Instant createdAt);
 
+	@Select("""
+		SELECT participant.user_id
+		FROM voting.vote_session_participants participant
+		JOIN trip.trip_members member
+		  ON member.trip_id = #{tripId}
+		 AND member.user_id = participant.user_id
+		 AND member.status = 'ACTIVE'
+		WHERE participant.vote_session_id = #{sessionId}
+		""")
+	List<UUID> findVoteNotificationRecipientUserIds(@Param("tripId") UUID tripId,
+		@Param("sessionId") UUID sessionId);
+
 	@Insert("""
 		INSERT INTO notification.notifications (
 		  id, recipient_user_id, actor_user_id, trip_id, type, title, body, payload, created_at
