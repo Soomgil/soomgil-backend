@@ -1,6 +1,6 @@
 package com.soomgil.preference.infrastructure.persistence.mapper;
 
-import com.soomgil.preference.infrastructure.persistence.row.OnboardingSurveyPlaceRow;
+import com.soomgil.preference.infrastructure.persistence.row.OnboardingSurveyPlaceRefRow;
 import com.soomgil.preference.infrastructure.persistence.row.OnboardingSurveyVersionRow;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -29,40 +29,12 @@ public interface OnboardingPreferenceMapper {
 		SELECT
 			place.provider,
 			place.external_place_id AS externalPlaceId,
-			attraction.title AS name,
-			trim(concat_ws(' ', attraction.addr1, attraction.addr2)) AS address,
-			attraction.first_image1 AS thumbnailUrl,
-			content_type.content_type_name AS category,
-			attraction.overview AS description,
-			coalesce((
-				SELECT string_agg(tag.display_name, '|' ORDER BY enrichment_tag.rank_order)
-				FROM preference.place_tag_enrichments enrichment
-				JOIN preference.place_tag_enrichment_tags enrichment_tag
-					ON enrichment_tag.enrichment_id = enrichment.id
-				JOIN preference.preference_tags tag ON tag.id = enrichment_tag.tag_id
-				WHERE enrichment.provider = place.provider
-					AND enrichment.external_place_id = place.external_place_id
-					AND enrichment.status = 'SUCCEEDED'
-					AND enrichment.id = (
-						SELECT latest.id
-						FROM preference.place_tag_enrichments latest
-						WHERE latest.provider = place.provider
-							AND latest.external_place_id = place.external_place_id
-							AND latest.status = 'SUCCEEDED'
-						ORDER BY latest.enriched_at DESC NULLS LAST, latest.created_at DESC, latest.id
-						LIMIT 1
-					)
-			), '') AS tagLabels,
 			place.sort_order AS sortOrder
 		FROM preference.onboarding_survey_places place
-		JOIN tourism_source.attractions attraction
-			ON CAST(attraction.content_id AS varchar) = place.external_place_id
-		LEFT JOIN tourism_source.contenttypes content_type
-			ON content_type.content_type_id = attraction.content_type_id
 		WHERE place.survey_version_id = #{surveyVersionId}
 		ORDER BY place.sort_order
 		""")
-	List<OnboardingSurveyPlaceRow> findPlaces(@Param("surveyVersionId") UUID surveyVersionId);
+	List<OnboardingSurveyPlaceRefRow> findPlaces(@Param("surveyVersionId") UUID surveyVersionId);
 
 	@Select("SELECT onboarding_completed_at FROM auth.users WHERE id = #{userId}")
 	OffsetDateTime findCompletedAt(@Param("userId") UUID userId);

@@ -19,7 +19,7 @@ class JejuPlaceDataSeedIntegrationTest {
 	private JdbcTemplate jdbcTemplate;
 
 	@Test
-	void seedsJejuTagEnrichmentsFromMigration() {
+	void seedsNationwideTagEnrichmentsFromMigrations() {
 		Integer enrichmentCount = jdbcTemplate.queryForObject("""
 			SELECT count(*)
 			FROM preference.place_tag_enrichments
@@ -37,8 +37,9 @@ class JejuPlaceDataSeedIntegrationTest {
 				AND enrichment.status = 'SUCCEEDED'
 			""", Integer.class);
 
-		assertThat(enrichmentCount).isEqualTo(2335);
-		assertThat(selectedTagCount).isEqualTo(4701);
+		// V40의 제주 2,335건에 V55 전국 데이터가 더해진 현재 기준이다.
+		assertThat(enrichmentCount).isGreaterThanOrEqualTo(50_000);
+		assertThat(selectedTagCount).isGreaterThanOrEqualTo(4_701);
 	}
 
 	@Test
@@ -95,8 +96,9 @@ class JejuPlaceDataSeedIntegrationTest {
 			""", String.class);
 
 		assertThat(placeCount).isGreaterThanOrEqualTo(80);
-		assertThat(imageCount).isGreaterThanOrEqualTo(80);
+		// V59는 실제 원천에 이미지가 있는 관광지만 보존한다.
+		assertThat(imageCount).isGreaterThanOrEqualTo(40);
 		assertThat(taggedPlaceCount).isGreaterThanOrEqualTo(40);
-		assertThat(seongsanTitle).isEqualTo("성산일출봉");
+		assertThat(seongsanTitle).startsWith("성산일출봉");
 	}
 }

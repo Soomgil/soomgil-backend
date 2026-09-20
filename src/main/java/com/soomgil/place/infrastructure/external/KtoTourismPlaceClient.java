@@ -224,6 +224,37 @@ public class KtoTourismPlaceClient implements TourismPlaceFeedClient {
 		}
 	}
 
+	@Override
+	public List<TourismPlaceFeedItem> fetchFixedPlaces(List<String> externalPlaceIds) {
+		if (externalPlaceIds == null || externalPlaceIds.isEmpty()) {
+			return List.of();
+		}
+		List<CompletableFuture<Optional<TourismPlaceFeedItem>>> tasks = externalPlaceIds.stream()
+			.filter(id -> id != null && !id.isBlank())
+			.distinct()
+			.map(id -> CompletableFuture.supplyAsync(() -> fetchRemotePlace(id), detailExecutor))
+			.toList();
+		return tasks.stream()
+			.map(CompletableFuture::join)
+			.flatMap(Optional::stream)
+			.toList();
+	}
+
+	private Optional<TourismPlaceFeedItem> fetchRemotePlace(String externalPlaceId) {
+		try {
+			Optional<TourismPlaceFeedItem> parsed = parseDetailPlace(get(buildDetailUri(externalPlaceId)));
+			if (parsed.isEmpty()) {
+				return Optional.empty();
+			}
+			TourismPlaceFeedItem place = parsed.get();
+			return Optional.of(withPhotos(place, null, loadPhotosSafely(place)));
+		}
+		catch (KtoTourismPlaceException exception) {
+			log.warn("KTO fixed place detail failed for contentId={}", externalPlaceId, exception);
+			return Optional.empty();
+		}
+	}
+
 	private PlaceIntroRaw fetchIntroSafely(String contentId, String contentTypeId) {
 		try {
 			return parseIntro(get(buildIntroUri(contentId, contentTypeId)), contentTypeId);
@@ -502,7 +533,7 @@ public class KtoTourismPlaceClient implements TourismPlaceFeedClient {
 			if (!("Type1".equalsIgnoreCase(license) || "Type3".equalsIgnoreCase(license))) {
 				continue;
 			}
-			String image = firstNonBlank(text(item, "originimgurl"), text(item, "smallimageurl"));
+			String image = secureImageUrl(firstNonBlank(text(item, "originimgurl"), text(item, "smallimageurl")));
 			if (image != null) {
 				photos.add(image);
 			}
@@ -782,7 +813,14 @@ public class KtoTourismPlaceClient implements TourismPlaceFeedClient {
 
 	private static String preferredImage(JsonNode item) {
 		String original = text(item, "firstimage");
-		return original == null ? text(item, "firstimage2") : original;
+		return secureImageUrl(original == null ? text(item, "firstimage2") : original);
+	}
+
+	private static String secureImageUrl(String value) {
+		if (value == null) return null;
+		return value.startsWith("http://tong.visitkorea.or.kr/")
+			? "https://" + value.substring("http://".length())
+			: value;
 	}
 
 	private static List<String> distinctUrls(String... values) {

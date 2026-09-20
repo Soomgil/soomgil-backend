@@ -179,13 +179,26 @@ public class AiChatService {
 		if (normalized.matches("(고마워|고마워요|고맙습니다|감사|감사해|감사해요|감사합니다|thanks|thankyou)")) {
 			return decision.force(AiIntent.GENERAL_CHAT, "단순 감사는 도구를 사용하지 않습니다.");
 		}
-		if (normalized.matches(".*(뭐할수있어|무엇을할수있어|어떤걸할수있어|사용법|기능알려줘|howtouse).*")) {
+		if (normalized.matches(".*(뭐할수있어|무엇을할수있어|어떤걸할수있어|무슨기능|어떤기능|사용법|기능알려줘|howtouse).*")) {
 			return decision.force(AiIntent.HELP, "사용법 질문은 도구를 사용하지 않습니다.");
+		}
+		if (isConditionBasedRemovalRequest(normalized)
+			&& normalized.matches(".*(빼|삭제|제거|없애).*")) {
+			return decision.force(
+				AiIntent.FILTER_PLACES_BY_CONDITION,
+				"접근성·요금·운영상태 조건이 포함된 제거 요청은 조건 필터 도구로만 처리합니다."
+			);
 		}
 		if (isRecommendedPlaceAddRequest(normalized)) {
 			return decision.force(
 				AiIntent.ADD_RECOMMENDED_PLACES_TO_ITINERARY,
 				"장소 이름 없이 여행지 개수를 지정한 추가 요청은 추천 장소 추가로 처리합니다."
+			);
+		}
+		if (isNamedPlaceAddRequest(normalized)) {
+			return decision.force(
+				AiIntent.ADD_PLACE_TO_ITINERARY,
+				"특정 일차에 이름이 지정된 장소를 넣는 요청은 장소 추가 도구로 처리합니다."
 			);
 		}
 		if (isDeleteItineraryItemRequest(normalized)) {
@@ -312,11 +325,18 @@ public class AiChatService {
 	 * 생성·수정 동사가 함께 있고 장소 추가 표현이 없을 때만 인정한다.
 	 */
 	private boolean isDayManagementRequest(String question) {
-		boolean dayCreation = question.matches(".*\\d+일차.*(추가|만들|생성|늘려).*")
-			|| question.matches(".*(하루|일차).*(더|추가|만들|생성|늘려).*");
+		boolean dayCreation = question.matches(".*\\d+일차(를|을)?(하나|하루)?(더)?(추가|만들|생성|늘려).*")
+			|| question.matches(".*하루(를|을)?(더)?(추가|만들|생성|늘려).*")
+			|| question.matches(".*일차(를|을)?더(추가|만들|생성|늘려)?.*");
 		boolean dayEdit = question.matches(".*\\d+일차.*(이름|제목|날짜).*(바꿔|수정|변경|로).*")
 			|| question.matches(".*(이름|제목|날짜).*\\d+일차.*(바꿔|수정|변경).*");
 		return (dayCreation || dayEdit) && !question.matches(".*(장소|여행지|맛집|카페).*");
+	}
+
+	private boolean isNamedPlaceAddRequest(String question) {
+		if (isRecommendedPlaceAddRequest(question)) return false;
+		return question.matches(".*\\d+일차(일정)?(에|으로|로).*(추가|넣어|등록).*")
+			|| question.matches(".*(추가|넣어|등록).*\\d+일차(일정)?(에|으로|로).*");
 	}
 
 	private boolean isRouteConnectionRequest(String question) {

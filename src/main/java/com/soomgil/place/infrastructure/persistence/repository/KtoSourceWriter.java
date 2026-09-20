@@ -46,28 +46,46 @@ public class KtoSourceWriter {
                       tel=coalesce(excluded.tel,attractions.tel),addr1=coalesce(excluded.addr1,attractions.addr1),addr2=coalesce(excluded.addr2,attractions.addr2),
                       overview=coalesce(excluded.overview,attractions.overview),
                       source_modified_at=coalesce(excluded.source_modified_at,attractions.source_modified_at),imported_at=now()
-                    WHERE attractions.source_modified_at IS NULL OR excluded.source_modified_at>=attractions.source_modified_at
-                    """,id,title,type,integer(item,"areacode"),integer(item,"sigungucode"),text(item,"firstimage"),text(item,"firstimage2"),
+                    WHERE attractions.source_modified_at IS NULL
+                       OR excluded.source_modified_at>=attractions.source_modified_at
+                       OR attractions.first_image1 LIKE 'https://picsum.photos/%'
+                    """,id,title,type,integer(item,"areacode"),integer(item,"sigungucode"),image(item,"firstimage"),image(item,"firstimage2"),
                     number(item,"mapy"),number(item,"mapx"),text(item,"tel"),text(item,"addr1"),text(item,"addr2"),text(item,"overview"),modified(text(item,"modifiedtime")));
                 // 수정 시각이 없는 응답도 누락된 소개만 보완할 수 있다.
                 jdbc.update("UPDATE tourism_source.attractions SET overview=? WHERE content_id=? AND nullif(overview,'') IS NULL",text(item,"overview"),id);
+				if (image(item, "firstimage") != null) {
+					jdbc.update("""
+						DELETE FROM tourism_source.attraction_images image
+						USING tourism_source.attractions attraction
+						WHERE image.attraction_no = attraction.no
+						  AND attraction.content_id = ?
+						  AND image.public_url LIKE 'https://picsum.photos/%'
+						""", id);
+				}
             }
-            String image=text(item,"originimgurl");
-            if (image != null) {
+			String imageUrl=image(item,"originimgurl");
+			if (imageUrl != null) {
                 String license=text(item,"cpyrhtDivCd");
                 if (!("Type1".equalsIgnoreCase(license) || "Type3".equalsIgnoreCase(license))) continue;
             }
-            if (image==null) image=text(item,"firstimage");
-            if (image!=null) {
+			if (imageUrl==null) imageUrl=image(item,"firstimage");
+			if (imageUrl!=null) {
                 jdbc.update("""
                     INSERT INTO tourism_source.attraction_images(id,attraction_no,source_provider,source_type,original_url,public_url,display_order)
                     SELECT ?,a.no,'KTO','TOUR_API',?,?,100 FROM tourism_source.attractions a
                     WHERE a.content_id=? AND NOT EXISTS(SELECT 1 FROM tourism_source.attraction_images i WHERE i.attraction_no=a.no AND i.public_url=?)
-                    """,UUID.randomUUID(),image,image,id,image);
+					""",UUID.randomUUID(),imageUrl,imageUrl,id,imageUrl);
             }
         }
     }
     private static String text(JsonNode n,String key) { String v=n.path(key).asText("").strip();return v.isEmpty()?null:v; }
+	private static String image(JsonNode n, String key) {
+		String value = text(n, key);
+		if (value == null) return null;
+		return value.startsWith("http://tong.visitkorea.or.kr/")
+			? "https://" + value.substring("http://".length())
+			: value;
+	}
     private static Integer integer(JsonNode n,String key) { try{return Integer.valueOf(text(n,key));}catch(Exception e){return null;} }
     private static Double number(JsonNode n,String key) { try{return Double.valueOf(text(n,key));}catch(Exception e){return null;} }
     private static OffsetDateTime modified(String value) { try{return LocalDateTime.parse(value,DateTimeFormatter.ofPattern("yyyyMMddHHmmss")).atOffset(ZoneOffset.ofHours(9));}catch(Exception e){return null;} }

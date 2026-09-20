@@ -132,6 +132,22 @@ class AiChatServiceTest {
 	}
 
 	@Test
+	void naturalHelpQuestionOverridesAClassifierMiss() {
+		stubAssistant("일정 조회와 장소 추천 등을 도와드릴 수 있어요.");
+		when(model.classify(any())).thenReturn(decision(AiIntent.GENERAL_CHAT));
+		when(model.replyWithoutTools(any(), any())).thenReturn(
+			new AiGuideReply("일정 조회와 장소 추천 등을 도와드릴 수 있어요.", List.of())
+		);
+
+		service.createMessage(tripId, userId, "무슨 기능을 할 수 있어?", null);
+
+		verify(model).replyWithoutTools(any(), org.mockito.ArgumentMatchers.argThat(
+			decision -> decision.intent() == AiIntent.HELP
+		));
+		verify(contextService, never()).load(any(), any());
+	}
+
+	@Test
 	void itineraryReadUsesOnlyTheReadStage() {
 		stubAssistant("현재 일정은 2일차까지 있어요.");
 		when(model.classify(any())).thenReturn(decision(AiIntent.READ_ITINERARY));
@@ -289,6 +305,36 @@ class AiChatServiceTest {
 
 		verify(model).replyWithWriteTools(any(), org.mockito.ArgumentMatchers.argThat(
 			decision -> decision.intent() == AiIntent.MANAGE_ITINERARY_DAY
+		));
+	}
+
+	@Test
+	void addingANamedPlaceToADayIsNotMistakenForDayCreation() {
+		stubAssistant("창덕궁을 2일차에 추가했어요.");
+		when(model.classify(any())).thenReturn(decision(AiIntent.ADD_PLACE_TO_ITINERARY));
+		when(model.replyWithWriteTools(any(), any())).thenReturn(
+			new AiGuideReply("창덕궁을 2일차에 추가했어요.", List.of())
+		);
+
+		service.createMessage(tripId, userId, "창덕궁을 2일차 일정에 추가해줘", null);
+
+		verify(model).replyWithWriteTools(any(), org.mockito.ArgumentMatchers.argThat(
+			decision -> decision.intent() == AiIntent.ADD_PLACE_TO_ITINERARY
+		));
+	}
+
+	@Test
+	void conditionRemovalCannotFallThroughToRecommendedPlaceAddition() {
+		stubAssistant("휠체어 이용이 어려운 장소를 일정에서 제거했어요.");
+		when(model.classify(any())).thenReturn(decision(AiIntent.ADD_RECOMMENDED_PLACES_TO_ITINERARY));
+		when(model.replyWithWriteTools(any(), any())).thenReturn(
+			new AiGuideReply("휠체어 이용이 어려운 장소를 일정에서 제거했어요.", List.of())
+		);
+
+		service.createMessage(tripId, userId, "휠체어 이용 불가 장소를 일정에서 제거해줘", null);
+
+		verify(model).replyWithWriteTools(any(), org.mockito.ArgumentMatchers.argThat(
+			decision -> decision.intent() == AiIntent.FILTER_PLACES_BY_CONDITION
 		));
 	}
 
