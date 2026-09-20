@@ -15,8 +15,6 @@ DECLARE
   stale_url_count integer;
   empty_demo_trip_count integer;
   missing_demo_thumbnail_count integer;
-  missing_record_photo_count integer;
-  portrait_record_photo_count integer;
   demo_active_trip_count integer;
   demo_archived_trip_count integer;
   demo_empty_trip_count integer;
@@ -28,7 +26,6 @@ DECLARE
   non_kto_demo_place_count integer;
   invalid_kto_content_id_count integer;
   visible_demo_place_count integer;
-  visible_demo_record_photo_count integer;
   invalid_demo_saved_place_count integer;
 BEGIN
   SELECT count(*), count(DISTINCT bio)
@@ -105,24 +102,6 @@ BEGIN
       SELECT 1 FROM itinerary.itinerary_items i
       WHERE i.trip_id = t.id AND i.deleted_at IS NULL
     );
-
-  SELECT count(*) INTO missing_record_photo_count
-  FROM record.trip_record_media rm
-  JOIN record.trip_record_entries r ON r.id = rm.record_entry_id
-  JOIN media.media_files m ON m.id = rm.media_file_id
-  WHERE r.status = 'ACTIVE'
-    AND m.object_key LIKE 'demo/%'
-    AND (m.public_url IS NULL OR m.public_url LIKE 'https://cdn.soomgil.test/%');
-
-  SELECT count(*) INTO portrait_record_photo_count
-  FROM record.trip_record_media rm
-  JOIN record.trip_record_entries r ON r.id = rm.record_entry_id
-  JOIN media.media_files m ON m.id = rm.media_file_id
-  JOIN auth.user_email_addresses e ON e.user_id = r.uploaded_by_user_id
-  WHERE e.normalized_email = 'demo01@soomgil.local'
-    AND m.object_key LIKE 'demo/records/%/portrait%.jpg'
-    AND m.height > m.width
-    AND m.status = 'ACTIVE';
 
   WITH demo_user AS (
     SELECT user_id FROM auth.user_email_addresses
@@ -231,13 +210,6 @@ BEGIN
     JOIN demo_user du ON du.user_id = tm.user_id
     WHERE t.status != 'DELETED'
   )
-  SELECT count(*) INTO visible_demo_record_photo_count
-  FROM record.trip_record_entries r
-  JOIN visible_trips vt ON vt.id = r.trip_id
-  JOIN record.trip_record_media rm ON rm.record_entry_id = r.id
-  JOIN media.media_files m ON m.id = rm.media_file_id
-  WHERE r.status = 'ACTIVE' AND m.status = 'ACTIVE';
-
   SELECT count(*) INTO invalid_demo_saved_place_count
   FROM preference.user_saved_places s
   WHERE s.user_id IN (SELECT md5('demo-user:' || n)::uuid FROM generate_series(1, 120) n)
@@ -276,12 +248,6 @@ BEGIN
   IF missing_demo_thumbnail_count <> 0 THEN
     RAISE EXCEPTION 'Found % demo itinerary places without thumbnails', missing_demo_thumbnail_count;
   END IF;
-  IF missing_record_photo_count <> 0 THEN
-    RAISE EXCEPTION 'Found % record photos without a usable CloudFront URL', missing_record_photo_count;
-  END IF;
-  IF portrait_record_photo_count <> 5 THEN
-    RAISE EXCEPTION 'Expected 5 portrait record photos for demo01, found %', portrait_record_photo_count;
-  END IF;
   IF demo_active_trip_count <> 3 OR demo_archived_trip_count <> 1 OR demo_empty_trip_count <> 0 THEN
     RAISE EXCEPTION 'Expected demo01 to have 3 active and 1 archived non-empty trips, found %, %, % empty',
       demo_active_trip_count, demo_archived_trip_count, demo_empty_trip_count;
@@ -302,10 +268,6 @@ BEGIN
   IF visible_demo_place_count <> 36 OR non_kto_demo_place_count <> 0 OR invalid_kto_content_id_count <> 0 THEN
     RAISE EXCEPTION 'Expected 36 numeric KTO places for demo01, found % places, % non-KTO and % invalid content IDs',
       visible_demo_place_count, non_kto_demo_place_count, invalid_kto_content_id_count;
-  END IF;
-  IF visible_demo_record_photo_count < 11 THEN
-    RAISE EXCEPTION 'Expected at least 11 restored record photos for demo01 trips, found %',
-      visible_demo_record_photo_count;
   END IF;
   IF invalid_demo_saved_place_count <> 0 THEN
     RAISE EXCEPTION 'Found % active demo saved places without a SUPER_LIKE reaction',

@@ -15,7 +15,6 @@ legacy_sources=(
   "${BACKEND_DIR}/dev-seeds/05_itinerary.sql"
   "${BACKEND_DIR}/dev-seeds/06_planning_chat.sql"
   "${BACKEND_DIR}/dev-seeds/08_ai.sql"
-  "${BACKEND_DIR}/dev-seeds/09_record.sql"
   "${BACKEND_DIR}/dev-seeds/10_community.sql"
   "${BACKEND_DIR}/dev-seeds/11_notification_collab_ops.sql"
   "${BACKEND_DIR}/dev-seeds/12_local_user_enrichment.sql"

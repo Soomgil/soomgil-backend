@@ -476,46 +476,6 @@ SELECT md5('demo-chat:'||k||':'||u||':'||minutes_ago)::uuid,md5('demo-trip:'||k)
 FROM msg ON CONFLICT (id) DO NOTHING;
 
 -- ---------------------------------------------------------------------------
--- Trip records and media from completed journeys
--- ---------------------------------------------------------------------------
-WITH completed(k) AS (VALUES ('seoul-palace'),('seoul-night'),('seongsu-picnic'),('daejeon-science'),
- ('daejeon-bread'),('daejeon-green'),('seoul-modern')),
-items AS (
- SELECT i.*,row_number() OVER (PARTITION BY i.trip_id ORDER BY d.day_number,i.sort_order) rn
- FROM itinerary.itinerary_items i JOIN itinerary.itinerary_days d ON d.id=i.itinerary_day_id
- JOIN completed c ON i.trip_id=md5('demo-trip:'||c.k)::uuid
-)
-INSERT INTO record.trip_record_entries
- (id,trip_id,itinerary_day_id,itinerary_item_id,uploaded_by_user_id,title,caption,location_name,lat,lng,taken_at,visibility,status,created_at,updated_at)
-SELECT md5('demo-record:'||i.id)::uuid,i.trip_id,i.itinerary_day_id,i.id,t.owner_user_id,
-       CASE i.rn%4 WHEN 0 THEN '걷다 만난 오늘의 풍경' WHEN 1 THEN i.place_name||'에서 시작한 하루'
-                    WHEN 2 THEN '계획보다 더 좋았던 순간' ELSE '우리 여행의 한 장면' END,
-       CASE i.rn%3 WHEN 0 THEN '사진보다 현장에서 본 빛과 분위기가 훨씬 좋았다. 다음에도 천천히 다시 걷고 싶은 곳.'
-                   WHEN 1 THEN '서두르지 않고 함께 걸어서 더 오래 기억에 남는다.'
-                   ELSE '일정에 넣길 정말 잘했다. 근처 골목까지 둘러보면 반나절이 금방 간다.' END,
-       i.place_name,i.lat,i.lng,d.date::timestamptz + make_interval(hours=>10+i.sort_order*2),
-       'TRIP_MEMBERS','ACTIVE',d.date::timestamptz + make_interval(hours=>10+i.sort_order*2),now()-interval '10 days'
-FROM items i JOIN trip.trips t ON t.id=i.trip_id JOIN itinerary.itinerary_days d ON d.id=i.itinerary_day_id
-WHERE i.rn<=5
-ON CONFLICT (id) DO NOTHING;
-
-INSERT INTO media.media_files
- (id,owner_user_id,bucket,object_key,public_url,mime_type,byte_size,width,height,linked_resource_type,linked_resource_id,status,created_at)
-SELECT md5('demo-record-media:'||r.id)::uuid,r.uploaded_by_user_id,'soomgil-local',
-       'demo/records/'||r.id||'/cover.jpg',
-       'https://picsum.photos/seed/record-'||replace(r.id::text,'-','')||'/1200/900',
-       'image/jpeg',420000+(extract(day from r.taken_at)::bigint*731),1200,900,'TRIP_RECORD',r.id,'ACTIVE',r.created_at
-FROM record.trip_record_entries r
-WHERE r.id IN (SELECT md5('demo-record:'||i.id)::uuid FROM itinerary.itinerary_items i)
-ON CONFLICT (id) DO NOTHING;
-
-INSERT INTO record.trip_record_media (record_entry_id,media_file_id,sort_order,caption,created_at)
-SELECT r.id,md5('demo-record-media:'||r.id)::uuid,0,'여행에서 직접 남긴 사진',r.created_at
-FROM record.trip_record_entries r
-WHERE r.id IN (SELECT md5('demo-record:'||i.id)::uuid FROM itinerary.itinerary_items i)
-ON CONFLICT DO NOTHING;
-
--- ---------------------------------------------------------------------------
 -- Community feed: published trip snapshots, media, hashtags and engagement
 -- ---------------------------------------------------------------------------
 WITH post_seed(k,trip_k,publisher,title,summary,published_days) AS (
@@ -1004,37 +964,6 @@ SELECT md5('demo-bulk-item:'||b.g||':'||i.id)::uuid,md5('demo-bulk-trip:'||b.g):
 FROM bulk b JOIN itinerary.itinerary_items i ON i.trip_id=md5('demo-trip:'||b.k)::uuid AND i.deleted_at IS NULL
 ON CONFLICT(id) DO NOTHING;
 
--- Four records per derived trip create a substantial record gallery.
-WITH ranked AS (
- SELECT i.*,row_number()OVER(PARTITION BY i.trip_id ORDER BY d.sort_order,i.sort_order)rn,d.date,
-  t.owner_user_id FROM itinerary.itinerary_items i JOIN itinerary.itinerary_days d ON d.id=i.itinerary_day_id
- JOIN trip.trips t ON t.id=i.trip_id WHERE i.trip_id IN(SELECT md5('demo-bulk-trip:'||g)::uuid FROM generate_series(1,50)g)
- AND d.group_type = 'DAY' AND d.date IS NOT NULL
-)
-INSERT INTO record.trip_record_entries
- (id,trip_id,itinerary_day_id,itinerary_item_id,uploaded_by_user_id,title,caption,location_name,lat,lng,
- taken_at,visibility,status,created_at,updated_at)
-SELECT md5('demo-bulk-record:'||id)::uuid,trip_id,itinerary_day_id,id,owner_user_id,
- CASE rn WHEN 1 THEN '여행의 첫 장면' WHEN 2 THEN '걷다가 멈춘 곳' WHEN 3 THEN '함께여서 좋았던 순간' ELSE '다시 보고 싶은 풍경' END,
- CASE rn%4 WHEN 0 THEN '다음 여행에도 꼭 다시 넣고 싶은 장소.' WHEN 1 THEN '아침 일찍 가니 한적해서 천천히 둘러볼 수 있었다.'
-  WHEN 2 THEN '근처 골목까지 걸으니 예상보다 볼거리가 많았다.' ELSE '일정 사이에 여유를 둔 덕분에 오래 머물렀다.' END,
- place_name,lat,lng,date::timestamptz+make_interval(hours=>(9+rn*2)::int),'TRIP_MEMBERS','ACTIVE',
- date::timestamptz+make_interval(hours=>(9+rn*2)::int),now()
-FROM ranked WHERE rn<=4 ON CONFLICT(id) DO NOTHING;
-
-INSERT INTO media.media_files
- (id,owner_user_id,bucket,object_key,public_url,mime_type,byte_size,width,height,linked_resource_type,linked_resource_id,status,created_at)
-SELECT md5('demo-bulk-record-media:'||r.id)::uuid,r.uploaded_by_user_id,'soomgil-local',
- 'demo/bulk-records/'||r.id||'.jpg','https://picsum.photos/seed/bulk-record-'||replace(r.id::text,'-','')||'/1200/900',
- 'image/jpeg',480000,1200,900,'TRIP_RECORD',r.id,'ACTIVE',r.created_at
-FROM record.trip_record_entries r WHERE r.id IN(SELECT md5('demo-bulk-record:'||i.id)::uuid FROM itinerary.itinerary_items i)
-ON CONFLICT(id) DO NOTHING;
-
-INSERT INTO record.trip_record_media(record_entry_id,media_file_id,sort_order,caption,created_at)
-SELECT r.id,md5('demo-bulk-record-media:'||r.id)::uuid,0,'여행자가 직접 남긴 기록',r.created_at
-FROM record.trip_record_entries r WHERE r.id IN(SELECT md5('demo-bulk-record:'||i.id)::uuid FROM itinerary.itinerary_items i)
-ON CONFLICT DO NOTHING;
-
 -- Fifty more feed posts backed by real itineraries.
 INSERT INTO community.posts
  (id,source_trip_id,source_trip_version,published_by_user_id,visibility,title,summary,snapshot_version,
@@ -1194,9 +1123,6 @@ UNION ALL SELECT 'trips',count(*) FROM trip.trips WHERE display_destination LIKE
 UNION ALL SELECT 'itinerary_items',count(*) FROM itinerary.itinerary_items WHERE place_provider='KTO' AND
  external_place_id ~ '^[0-9]+$' AND
  (external_place_id::int BETWEEN 10001 AND 10040 OR external_place_id::int BETWEEN 20001 AND 20028)
-UNION ALL SELECT 'records',count(*) FROM record.trip_record_entries WHERE id IN (
- SELECT md5('demo-record:'||i.id)::uuid FROM itinerary.itinerary_items i UNION ALL
- SELECT md5('demo-bulk-record:'||i.id)::uuid FROM itinerary.itinerary_items i)
 UNION ALL SELECT 'community_posts',count(*) FROM community.posts WHERE id IN (
  SELECT md5('demo-bulk-post:'||g)::uuid FROM generate_series(1,50)g UNION ALL
  SELECT md5('demo-post:'||k)::uuid FROM (VALUES ('palace-post'),('night-post'),('seongsu-post'),('science-post'),('bread-post'),('green-post'),('modern-post'),('family-post'),('autumn-post'))x(k))

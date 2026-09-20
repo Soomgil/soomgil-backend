@@ -97,16 +97,6 @@ SELECT NOT EXISTS (
   \echo '  ↳ demo AI data already exists; skipping 08'
 \endif
 
-\echo '→ Loading 09_record.sql ...'
-SELECT NOT EXISTS (
-  SELECT 1 FROM record.trip_record_entries WHERE id = 'c1e00000-0000-4000-8000-000000000001'
-) AS load_record_seed \gset
-\if :load_record_seed
-  \i 09_record.sql
-\else
-  \echo '  ↳ demo records already exist; skipping 09'
-\endif
-
 \echo '→ Loading 10_community.sql ...'
 SELECT NOT EXISTS (
   SELECT 1 FROM community.posts WHERE id = '10000000-0000-4000-8000-000000000001'

@@ -12,7 +12,7 @@ SELECT table_schema, table_name, column_name
 FROM information_schema.columns
 WHERE table_schema IN (
   'auth', 'social', 'media', 'geo', 'trip', 'itinerary', 'planning',
-  'chat', 'preference', 'ai', 'record', 'community', 'notification',
+  'chat', 'preference', 'ai', 'community', 'notification',
   'collab', 'ops'
 )
   AND data_type IN ('timestamp with time zone', 'timestamp without time zone')

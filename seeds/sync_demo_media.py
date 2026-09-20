@@ -100,23 +100,12 @@ COPY (
 
     UNION ALL
 
-    SELECT 'record', m.object_key, COALESCE(r.location_name, '대한민국 여행'),
-           abs(hashtext(m.object_key)) % 5
-    FROM media.media_files m
-    JOIN record.trip_record_entries r ON m.linked_resource_type = 'TRIP_RECORD'
-      AND m.linked_resource_id = r.id
-    WHERE m.object_key LIKE 'demo/%'
-
-    UNION ALL
-
-    SELECT 'record', m.object_key,
-           COALESCE(r.location_name, t.display_destination, '대한민국 여행'),
+    SELECT 'trip', m.object_key,
+           COALESCE(t.display_destination, '대한민국 여행'),
            abs(hashtext(m.object_key)) % 5
     FROM media.media_files m
     JOIN trip.trips t ON m.linked_resource_type = 'trip.trips'
       AND m.linked_resource_id = t.id
-    LEFT JOIN record.trip_record_media rm ON rm.media_file_id = m.id
-    LEFT JOIN record.trip_record_entries r ON r.id = rm.record_entry_id
     WHERE m.object_key LIKE 'demo/trips/%'
 
     UNION ALL
