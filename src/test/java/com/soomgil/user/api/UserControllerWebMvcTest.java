@@ -235,7 +235,7 @@ class UserControllerWebMvcTest {
 	void getUserProfileReturnsPublicProfile() throws Exception {
 		UserPublicProfile profile = new UserPublicProfile(
 			UUID.randomUUID(), "민지", null, "안녕하세요", null, null, null, null,
-			UserProfileVisibility.PUBLIC
+			UserProfileVisibility.PUBLIC, java.util.List.of(), null
 		);
 		when(getUserPublicProfileQueryHandler.handle(any(GetUserPublicProfileQuery.class))).thenReturn(profile);
 
