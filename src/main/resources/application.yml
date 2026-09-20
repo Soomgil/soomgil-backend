@@ -6,11 +6,23 @@ spring:
   ai:
     model:
       chat: ${AI_CHAT_MODEL:none}
+      # 숨길은 텍스트 채팅만 사용한다. Spring AI OpenAI 스타터가 다른 모델까지
+      # 기본 활성화해 API 키 없는 테스트 컨텍스트를 깨뜨리지 않도록 명시적으로 끈다.
+      embedding: none
+      image: none
+      moderation: none
+      audio:
+        speech: none
+        transcription: none
     openai:
       api-key: ${OPENAI_API_KEY:}
       chat:
         options:
           model: ${OPENAI_CHAT_MODEL:gpt-5.6-terra}
+          # GPT-5 계열은 임의 temperature를 받지 않으며, Chat Completions의
+          # function tool은 reasoning_effort=none일 때만 지원된다.
+          temperature: 1.0
+          reasoning-effort: none
     google:
       genai:
         api-key: ${GMS_API_KEY:}

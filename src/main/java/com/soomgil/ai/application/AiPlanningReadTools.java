@@ -51,12 +51,12 @@ public final class AiPlanningReadTools extends AiToolSupport {
 	public Object getNote(NoteScopeInput input) {
 		UUID dayId = input == null ? null : input.itineraryDayId();
 		return execute("getNote", AiToolExecutionPolicy.READ, input, null,
-			() -> noteHandler.handle(new GetNoteQuery(
+			() -> noteHandler.findOptional(new GetNoteQuery(
 				tripId,
 				dayId == null ? PlanningScopeType.TRIP : PlanningScopeType.DAY,
 				dayId,
 				userId
-			)));
+			)).orElse(null));
 	}
 
 	/** @param itineraryDayId 일차 체크리스트만 조회할 때의 일차 ID. null이면 여행방 전체 */

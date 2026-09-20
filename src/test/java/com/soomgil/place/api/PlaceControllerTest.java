@@ -22,6 +22,7 @@ import com.soomgil.place.application.query.dto.PlaceSearchQuery;
 import com.soomgil.place.application.query.handler.PlaceDetailQueryHandler;
 import com.soomgil.place.application.query.handler.PlaceSearchQueryHandler;
 import com.soomgil.place.application.query.handler.PopularPlacesQueryHandler;
+import com.soomgil.place.application.query.handler.RegionViewportQueryHandler;
 import java.net.URI;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -43,7 +44,8 @@ class PlaceControllerTest {
 		searchHandler = new RecordingPlaceSearchQueryHandler();
 		detailHandler = new RecordingPlaceDetailQueryHandler();
 		mockMvc = MockMvcBuilders.standaloneSetup(new PlaceController(
-			searchHandler, detailHandler, mock(PopularPlacesQueryHandler.class)
+			searchHandler, detailHandler, mock(PopularPlacesQueryHandler.class),
+			mock(RegionViewportQueryHandler.class)
 		))
 			.setControllerAdvice(new GlobalExceptionHandler(new ProblemDetailsFactory()))
 			.setMessageConverters(new MappingJackson2HttpMessageConverter(

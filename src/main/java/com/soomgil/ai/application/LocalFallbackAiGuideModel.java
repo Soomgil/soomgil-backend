@@ -1,8 +1,15 @@
 package com.soomgil.ai.application;
 
 import com.soomgil.ai.api.dto.AiToolCall;
+import com.soomgil.global.error.BusinessException;
+import com.soomgil.itinerary.application.query.dto.ItineraryView;
 import com.soomgil.itinerary.domain.model.RouteMode;
+import com.soomgil.place.api.dto.PagedPlaceSummary;
+import com.soomgil.place.api.dto.PlaceSummary;
 import com.soomgil.planning.api.dto.PlanningMutationResponse;
+import com.soomgil.planning.api.dto.Checklist;
+import com.soomgil.planning.api.dto.Note;
+import com.soomgil.preference.api.dto.PagedPlaceRecommendation;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -34,14 +41,14 @@ public class LocalFallbackAiGuideModel implements AiGuideModel {
 		if (q.matches("(ㅎㅇ|안녕.*|반가워.*|하이|헬로|hi|hello|고마워.*|고맙습니다|감사.*)")) {
 			intent = AiIntent.GENERAL_CHAT;
 		}
-		else if (q.matches(".*(뭐할수있어|무엇을할수|사용법|기능알려|도와줄수|뭐도와줘).*")) {
+		else if (q.matches(".*(뭐할수있어|무엇을할수|무슨기능|어떤기능|사용법|기능알려|도와줄수|뭐도와줘).*")) {
 			intent = AiIntent.HELP;
 		}
 		else if (requestedRouteMode(request.question()) != null && isRouteConnectionRequest(request.question())) {
 			intent = AiIntent.CONNECT_DAY_ROUTES;
 		}
-		else if (q.matches(".*(동선|이동경로|이동.*경로|경로|길).*(최적화|정리|개선|재구성|짜줘|짜기|연결|이어)|"
-			+ ".*(최적화|개선|재구성|연결|이어).*(동선|이동경로|경로|길)|"
+		else if (q.matches(".*(동선|이동경로|이동.*경로|경로|길).*(최적화|정리|개선|재구성|짜줘|짜기|연결|이어).*|"
+			+ ".*(최적화|개선|재구성|연결|이어).*(동선|이동경로|경로|길).*|"
 			+ ".*가까운.*곳.*묶어|.*가까운.*곳.*같이|효율.*동선.*")) {
 			intent = AiIntent.OPTIMIZE_ROUTE;
 		}
@@ -50,8 +57,8 @@ public class LocalFallbackAiGuideModel implements AiGuideModel {
 			+ ".*여행.*필요.*준비|.*예약.*필요.*체크|.*준비물.*뭐.*|.*체크리스트.*뭐.*")) {
 			intent = AiIntent.GENERATE_CHECKLIST_FROM_ITINERARY;
 		}
-		else if (q.matches(".*(유료|무료|장애인|유모차|접근|휴무|닫은|폐업|예약.*필수|입장료).*(빼|삭제|제거|없애)|"
-			+ ".*(빼|삭제|제거|없애).*(유료|무료|장애인|유모차|접근|입장료)|"
+		else if (q.matches(".*(유료|무료|장애인|휠체어|유모차|접근|휴무|닫은|폐업|예약.*필수|입장료).*(빼|삭제|제거|없애).*|"
+			+ ".*(빼|삭제|제거|없애).*(유료|무료|장애인|휠체어|유모차|접근|입장료).*|"
 			+ ".*장애인.*이용.*불가.*|.*유모차.*진입.*불가.*")) {
 			intent = AiIntent.FILTER_PLACES_BY_CONDITION;
 		}
@@ -62,8 +69,8 @@ public class LocalFallbackAiGuideModel implements AiGuideModel {
 		else if (q.matches(".*(삭제|지워|제거|빼줘|빼기|없애).*")) {
 			intent = AiIntent.DELETE_ITINERARY_ITEM;
 		}
-		else if (q.matches(".*(요약|정리|분석|리뷰|코스.*봐줘|코스.*리뷰|한눈에.*보)|"
-			+ ".*(여행일정|여행.*일정|전체.*일정|일정.*전체).*(어때|어떨까|봐줘|알려)")) {
+		else if (q.matches(".*(요약|정리|분석|리뷰|코스.*봐줘|코스.*리뷰|한눈에.*보).*|"
+			+ ".*(여행일정|여행.*일정|전체.*일정|일정.*전체).*(어때|어떨까|봐줘|알려).*")) {
 			intent = AiIntent.SUMMARIZE_ITINERARY;
 		}
 		else if (q.contains("체크리스트")) {
@@ -120,31 +127,34 @@ public class LocalFallbackAiGuideModel implements AiGuideModel {
 	@Override
 	public AiGuideReply replyWithReadTools(AiGuideRequest request, AiIntentDecision decision) {
 		try {
-			AiExecutableTools executable = toolsFactory.create(request, decision.intent()).getFirst();
-			Object result = switch (decision.intent()) {
-				case READ_ITINERARY -> ((AiItineraryReadTools) executable).getCurrentItinerary();
-				case READ_PLANNING -> ((AiPlanningReadTools) executable).getChecklists(
-					new AiPlanningReadTools.ChecklistScopeInput(null)
-				);
-				case SUMMARIZE_ITINERARY -> ((AiSummarizeItineraryTools) executable).summarizeItinerary();
-				case SEARCH_PLACES -> ((AiPlaceSearchTools) executable).searchPlaces(
-					new AiPlaceSearchTools.SearchPlacesInput(request.question(), viewport(request), null, null)
-				);
-				case RECOMMEND_PLACES -> ((AiPlaceRecommendationTools) executable).recommendPlaces(
-					new AiPlaceRecommendationTools.RecommendPlacesInput(viewport(request), null, null, "BASIC", 5)
-				);
-				default -> null;
+			List<AiExecutableTools> tools = toolsFactory.create(request, decision.intent());
+			AiExecutableTools primary = tools.getFirst();
+			return switch (decision.intent()) {
+				case READ_ITINERARY -> {
+					ItineraryView itinerary = (ItineraryView) ((AiItineraryReadTools) primary).getCurrentItinerary();
+					yield new AiGuideReply(formatItinerary(itinerary, false), primary.executedCalls());
+				}
+				case READ_PLANNING -> readPlanning((AiPlanningReadTools) primary);
+				case SUMMARIZE_ITINERARY -> {
+					ItineraryView itinerary = (ItineraryView) ((AiSummarizeItineraryTools) primary).summarizeItinerary();
+					yield new AiGuideReply(formatItinerary(itinerary, true), primary.executedCalls());
+				}
+				case SEARCH_PLACES -> {
+					PagedPlaceSummary places = (PagedPlaceSummary) ((AiPlaceSearchTools) primary).searchPlaces(
+						new AiPlaceSearchTools.SearchPlacesInput(placeQuery(request.question()), viewport(request), null, null)
+					);
+					yield new AiGuideReply(formatPlaces(places), primary.executedCalls());
+				}
+				case RECOMMEND_PLACES -> {
+					String bbox = viewport(request) == null ? inferredBbox(request) : viewport(request);
+					PagedPlaceRecommendation recommendations =
+						(PagedPlaceRecommendation) ((AiPlaceRecommendationTools) primary).recommendPlaces(
+							new AiPlaceRecommendationTools.RecommendPlacesInput(bbox, null, null, "BASIC", 5)
+						);
+					yield new AiGuideReply(formatRecommendations(recommendations), primary.executedCalls());
+				}
+				default -> replyWithoutTools(request, decision);
 			};
-			List<AiToolCall> calls = executable.executedCalls();
-			if (calls.isEmpty()) {
-				return new AiGuideReply(
-					"AI 분석 서버가 일시적으로 원활하지 않아요. 잠시 후 다시 시도해주세요.", List.of()
-				);
-			}
-			return new AiGuideReply(
-				"요청한 정보를 조회했어요. 화면에서 최신 내용을 확인해주세요.",
-				calls
-			);
 		}
 		catch (RuntimeException exception) {
 			return failed("조회", exception);
@@ -154,7 +164,8 @@ public class LocalFallbackAiGuideModel implements AiGuideModel {
 	@Override
 	public AiGuideReply replyWithWriteTools(AiGuideRequest request, AiIntentDecision decision) {
 		try {
-			AiExecutableTools executable = toolsFactory.create(request, decision.intent()).getFirst();
+			List<AiExecutableTools> tools = toolsFactory.create(request, decision.intent());
+			AiExecutableTools executable = tools.getFirst();
 			return switch (decision.intent()) {
 				case WRITE_NOTE -> writeNote(request, (AiNoteTools) executable);
 				case WRITE_CHECKLIST -> writeChecklist(request, (AiChecklistTools) executable);
@@ -162,9 +173,8 @@ public class LocalFallbackAiGuideModel implements AiGuideModel {
 				case MOVE_ITINERARY_ITEM -> moveItem(request, (AiMoveItineraryItemTools) executable);
 				case ADD_RECOMMENDED_PLACES_TO_ITINERARY ->
 					addRecommendedPlaces(request, (AiAddRecommendedPlacesTools) executable);
-				case ADD_PLACE_TO_ITINERARY -> new AiGuideReply(
-					"정확한 장소 정보가 필요해요. 먼저 장소를 검색하거나 추천받은 뒤 추가할 장소와 일차를 지정해주세요.",
-					List.of()
+				case ADD_PLACE_TO_ITINERARY -> addPlace(
+					request, (AiAddPlaceTools) executable, (AiPlaceSearchTools) tools.get(1)
 				);
 				case MANAGE_ITINERARY_DAY -> manageDay(request, (AiItineraryDayTools) executable);
 				case FILTER_PLACES_BY_CONDITION -> filterPlaces(request, (AiFilterPlacesTools) executable);
@@ -176,6 +186,138 @@ public class LocalFallbackAiGuideModel implements AiGuideModel {
 		catch (RuntimeException exception) {
 			return failed("변경", exception);
 		}
+	}
+
+	@SuppressWarnings("unchecked")
+	private AiGuideReply readPlanning(AiPlanningReadTools tools) {
+		List<Checklist> checklists = (List<Checklist>) tools.getChecklists(
+			new AiPlanningReadTools.ChecklistScopeInput(null)
+		);
+		Note note = (Note) tools.getNote(new AiPlanningReadTools.NoteScopeInput(null));
+		return new AiGuideReply(formatPlanning(checklists, note), tools.executedCalls());
+	}
+
+	private String formatItinerary(ItineraryView itinerary, boolean summary) {
+		if (itinerary == null || itinerary.days() == null || itinerary.days().isEmpty()) {
+			return "아직 등록된 여행 일정이 없어요.";
+		}
+		List<String> lines = new ArrayList<>();
+		lines.add(summary ? "현재 여행 일정을 요약했어요." : "현재 여행 일정이에요.");
+		int placeCount = 0;
+		for (var day : itinerary.days()) {
+			String label = day.dayNumber() == null
+				? (day.title() == null || day.title().isBlank() ? "일차 미정" : day.title())
+				: day.dayNumber() + "일차" + (day.title() == null || day.title().isBlank() ? "" : " " + day.title());
+			List<String> names = day.items() == null ? List.of() : day.items().stream()
+				.map(item -> item.placeName() == null || item.placeName().isBlank() ? "이름 없는 장소" : item.placeName())
+				.toList();
+			placeCount += names.size();
+			lines.add(label + ": " + (names.isEmpty() ? "등록된 장소 없음" : String.join(" → ", names)));
+		}
+		if (summary) {
+			int routeCount = itinerary.routes() == null ? 0 : itinerary.routes().size();
+			lines.add("총 " + placeCount + "개 장소와 " + routeCount + "개 이동 경로가 등록되어 있어요.");
+		}
+		return String.join("\n", lines);
+	}
+
+	private String formatPlanning(List<Checklist> checklists, Note note) {
+		List<String> lines = new ArrayList<>();
+		if (note == null) {
+			lines.add("공동 메모: 저장된 내용 없음");
+		}
+		else {
+			lines.add("공동 메모: " + note.content());
+		}
+		if (checklists == null || checklists.isEmpty()) {
+			lines.add("체크리스트: 저장된 항목 없음");
+		}
+		else {
+			for (Checklist checklist : checklists) {
+				String title = checklist.title() == null || checklist.title().isBlank()
+					? "체크리스트" : checklist.title();
+				List<String> items = checklist.items() == null ? List.of() : checklist.items().stream()
+					.map(item -> item.content())
+					.toList();
+				lines.add(title + ": " + (items.isEmpty() ? "항목 없음" : String.join(", ", items)));
+			}
+		}
+		return String.join("\n", lines);
+	}
+
+	private String formatPlaces(PagedPlaceSummary places) {
+		if (places == null || places.items() == null || places.items().isEmpty()) {
+			return "조건에 맞는 장소를 찾지 못했어요. 장소 이름이나 지역을 조금 더 구체적으로 알려주세요.";
+		}
+		List<String> lines = new ArrayList<>();
+		lines.add("찾은 장소예요.");
+		for (PlaceSummary place : places.items().stream().limit(5).toList()) {
+			String detail = place.address() == null || place.address().isBlank() ? "주소 정보 없음" : place.address();
+			if (place.category() != null && !place.category().isBlank()) detail += " · " + place.category();
+			lines.add("- " + place.name() + ": " + detail);
+		}
+		return String.join("\n", lines);
+	}
+
+	private String formatRecommendations(PagedPlaceRecommendation recommendations) {
+		if (recommendations == null || recommendations.items() == null || recommendations.items().isEmpty()) {
+			return "현재 지도 범위와 여행방 취향에 맞는 추천 장소를 찾지 못했어요.";
+		}
+		List<String> lines = new ArrayList<>();
+		lines.add("여행방 취향을 반영한 추천 장소예요.");
+		for (var recommendation : recommendations.items().stream().limit(5).toList()) {
+			PlaceSummary place = recommendation.place();
+			String reason = recommendation.recommendationReason();
+			lines.add("- " + place.name()
+				+ (reason == null || reason.isBlank() ? "" : ": " + reason));
+		}
+		return String.join("\n", lines);
+	}
+
+	private AiGuideReply addPlace(
+		AiGuideRequest request,
+		AiAddPlaceTools addTools,
+		AiPlaceSearchTools searchTools
+	) {
+		String query = placeQuery(request.question());
+		if (query.isBlank()) {
+			return new AiGuideReply("추가할 장소 이름을 알려주세요.", List.of());
+		}
+		PagedPlaceSummary found = (PagedPlaceSummary) searchTools.searchPlaces(
+			new AiPlaceSearchTools.SearchPlacesInput(query, viewport(request), null, null)
+		);
+		if (found == null || found.items() == null || found.items().isEmpty()) {
+			return new AiGuideReply(
+				"'" + query + "' 장소를 찾지 못했어요. 이름이나 지역을 더 정확히 알려주세요.",
+				searchTools.executedCalls()
+			);
+		}
+		PlaceSummary place = found.items().getFirst();
+		UUID targetDayId = dayId(request);
+		if (dayNumber(request.question()) != null && targetDayId == null) {
+			return new AiGuideReply(
+				dayNumber(request.question()) + "일차를 찾지 못했어요. 먼저 해당 일차를 만들어주세요.",
+				searchTools.executedCalls()
+			);
+		}
+		addTools.addPlaceToItinerary(new AiAddPlaceTools.AddPlaceInput(
+			request.baseVersion(), targetDayId, nextSortOrder(request, targetDayId),
+			place.provider().name(), place.externalPlaceId(), place.name(), place.address(),
+			place.lat(), place.lng(), place.thumbnailUrl() == null ? null : place.thumbnailUrl().toString()
+		));
+		List<AiToolCall> calls = new ArrayList<>(searchTools.executedCalls());
+		calls.addAll(addTools.executedCalls());
+		return new AiGuideReply(place.name() + "을(를) 일정에 추가했어요.", calls);
+	}
+
+	private int nextSortOrder(AiGuideRequest request, UUID targetDayId) {
+		if (request.tripContext() == null || targetDayId == null) return 0;
+		return request.tripContext().days().stream()
+			.filter(day -> targetDayId.equals(day.id()))
+			.flatMap(day -> day.items().stream())
+			.mapToInt(AiTripContext.ItemSummary::sortOrder)
+			.max()
+			.orElse(-1) + 1;
 	}
 
 	private AiGuideReply addRecommendedPlaces(AiGuideRequest request, AiAddRecommendedPlacesTools tools) {
@@ -414,12 +556,35 @@ public class LocalFallbackAiGuideModel implements AiGuideModel {
 				break;
 			}
 		}
-		return result.replaceAll("(이라고|라고)?\\s*(써줘|작성해줘|기록해줘|추가해줘|넣어줘|저장해줘|수정해줘)[.!?]?$", "")
-			.trim();
+		result = result.replaceAll(
+			"(이라고|라고)?\\s*(써줘|작성해줘|기록해줘|추가해줘|넣어줘|저장해줘|수정해줘)[.!?]?$", ""
+		).trim();
+		result = result.replaceAll("\\s*항목(을|를)?$", "").trim();
+		return result.replaceAll("^[\\\"'“”‘’]+|[\\\"'“”‘’]+$", "").trim();
+	}
+
+	private String placeQuery(String question) {
+		if (question == null) return "";
+		String value = question.trim();
+		Matcher beforeDay = Pattern.compile("^(.*?)(?:을|를)?\\s*\\d+일차").matcher(value);
+		if (beforeDay.find() && !beforeDay.group(1).isBlank()) return cleanPlaceQuery(beforeDay.group(1));
+		Matcher afterDay = Pattern.compile(
+			"\\d+일차(?:\\s*일정)?(?:에|으로|로)?\\s*(.*?)(?:을|를)?\\s*(?:일정에\\s*)?(?:추가|넣어|등록)"
+		).matcher(value);
+		if (afterDay.find() && !afterDay.group(1).isBlank()) return cleanPlaceQuery(afterDay.group(1));
+		return cleanPlaceQuery(value.replaceAll(
+			"(?:을|를)?\\s*(검색해줘|검색|찾아줘|찾아|일정에\\s*추가해줘|추가해줘|넣어줘|등록해줘)[.!?]?$", ""
+		));
+	}
+
+	private String cleanPlaceQuery(String value) {
+		return value == null ? "" : value.trim().replaceAll("^[\\\"'“”‘’]+|[\\\"'“”‘’]+$", "").trim();
 	}
 
 	private String viewport(AiGuideRequest request) {
-		return request.viewport() == null ? null : request.viewport().minLng() + "," + request.viewport().minLat()
+		return request.viewport() == null || request.viewport().minLng() == null || request.viewport().minLat() == null
+			|| request.viewport().maxLng() == null || request.viewport().maxLat() == null
+			? null : request.viewport().minLng() + "," + request.viewport().minLat()
 			+ "," + request.viewport().maxLng() + "," + request.viewport().maxLat();
 	}
 
@@ -563,6 +728,10 @@ public class LocalFallbackAiGuideModel implements AiGuideModel {
 	}
 
 	private AiGuideReply failed(String action, RuntimeException exception) {
+		if (exception instanceof BusinessException businessException
+			&& businessException.getMessage() != null && !businessException.getMessage().isBlank()) {
+			return new AiGuideReply(businessException.getMessage(), List.of());
+		}
 		return new AiGuideReply(
 			action + "을 처리하지 못했어요. AI 분석 서버가 일시적으로 원활하지 않을 수 있어요. 잠시 후 다시 시도해주세요.",
 			List.<AiToolCall>of()
