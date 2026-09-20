@@ -34,6 +34,25 @@ class ResolveSourceTest(unittest.TestCase):
 
         self.assertIn("w=900&h=1350", source["url"])
 
+    def test_uses_curated_kto_source_without_unsplash_lookup(self) -> None:
+        asset = {
+            "kind": "community",
+            "object_key": "demo/community/post/cover.jpg",
+            "search_term": "성산일출봉",
+            "variant": 0,
+            "source_url": "http://tong.visitkorea.or.kr/cms/example.jpg",
+            "source_page": "http://tong.visitkorea.or.kr/cms/example.jpg",
+            "source_license": "한국관광공사 TourAPI 이미지 이용조건",
+            "source_artist": "한국관광공사",
+        }
+
+        with patch.object(sync_demo_media, "unsplash_photo_pool") as pool:
+            source = sync_demo_media.resolve_source(asset)
+
+        pool.assert_not_called()
+        self.assertEqual("https://tong.visitkorea.or.kr/cms/example.jpg", source["url"])
+        self.assertEqual("한국관광공사", source["artist"])
+
 
 if __name__ == "__main__":
     unittest.main()

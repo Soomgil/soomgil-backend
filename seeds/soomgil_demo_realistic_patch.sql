@@ -739,22 +739,64 @@ WHERE r.user_id IN (SELECT md5('demo-user:' || n)::uuid FROM generate_series(1, 
 ON CONFLICT (user_id, provider, external_place_id) DO UPDATE
 SET deleted_at = NULL;
 
+-- Curated community feed: fourteen nationwide posts from dev-seeds plus four
+-- Seoul/Daejeon posts. Deleting a post cascades to comments, likes, retrips,
+-- hashtags, media links, and normalized snapshot rows. Titles, summaries, and
+-- comments belonging to the selected posts are intentionally left untouched.
+WITH known_demo_posts(id) AS (
+  SELECT ('10000000-0000-4000-8000-' || lpad(n::text, 12, '0'))::uuid
+  FROM generate_series(1, 16) n
+  UNION ALL
+  SELECT md5('demo-post:' || post_key)::uuid
+  FROM (VALUES ('palace-post'), ('night-post'), ('seongsu-post'), ('science-post'),
+               ('bread-post'), ('green-post'), ('modern-post'), ('family-post'),
+               ('autumn-post')) known(post_key)
+  UNION ALL
+  SELECT md5('demo-bulk-post:' || n)::uuid
+  FROM generate_series(1, 50) n
+), selected_posts(id) AS (
+  SELECT ('10000000-0000-4000-8000-' || lpad(n::text, 12, '0'))::uuid
+  FROM (VALUES (1), (2), (3), (4), (5), (6), (7), (8),
+               (10), (11), (12), (13), (14), (15)) selected(n)
+  UNION ALL
+  SELECT md5('demo-post:' || post_key)::uuid
+  FROM (VALUES ('palace-post'), ('night-post'), ('bread-post'), ('green-post')) selected(post_key)
+)
+DELETE FROM community.posts p
+WHERE EXISTS (SELECT 1 FROM known_demo_posts known WHERE known.id = p.id)
+  AND NOT EXISTS (SELECT 1 FROM selected_posts selected WHERE selected.id = p.id);
+
+WITH known_demo_posts(id) AS (
+  SELECT ('10000000-0000-4000-8000-' || lpad(n::text, 12, '0'))::uuid
+  FROM generate_series(1, 16) n
+  UNION ALL
+  SELECT md5('demo-post:' || post_key)::uuid
+  FROM (VALUES ('palace-post'), ('night-post'), ('seongsu-post'), ('science-post'),
+               ('bread-post'), ('green-post'), ('modern-post'), ('family-post'),
+               ('autumn-post')) known(post_key)
+  UNION ALL
+  SELECT md5('demo-bulk-post:' || n)::uuid
+  FROM generate_series(1, 50) n
+), selected_posts(id) AS (
+  SELECT ('10000000-0000-4000-8000-' || lpad(n::text, 12, '0'))::uuid
+  FROM (VALUES (1), (2), (3), (4), (5), (6), (7), (8),
+               (10), (11), (12), (13), (14), (15)) selected(n)
+  UNION ALL
+  SELECT md5('demo-post:' || post_key)::uuid
+  FROM (VALUES ('palace-post'), ('night-post'), ('bread-post'), ('green-post')) selected(post_key)
+)
+DELETE FROM media.media_files m
+WHERE m.linked_resource_type = 'COMMUNITY_POST'
+  AND EXISTS (SELECT 1 FROM known_demo_posts known WHERE known.id = m.linked_resource_id)
+  AND NOT EXISTS (SELECT 1 FROM selected_posts selected WHERE selected.id = m.linked_resource_id);
+
 COMMIT;
 
 SELECT 'demo_users' metric, count(*) value FROM auth.users
 WHERE id IN (SELECT md5('demo-user:' || n)::uuid FROM generate_series(1, 120) n)
 UNION ALL SELECT 'demo_posts', count(*) FROM community.posts
-WHERE id IN (SELECT md5('demo-bulk-post:' || g)::uuid FROM generate_series(1, 50) g)
-   OR id IN (SELECT md5('demo-post:' || k)::uuid FROM (VALUES
-     ('palace-post'), ('night-post'), ('seongsu-post'), ('science-post'), ('bread-post'),
-     ('green-post'), ('modern-post'), ('family-post'), ('autumn-post')) v(k))
+WHERE deleted_at IS NULL
 UNION ALL SELECT 'demo_comments', count(*) FROM community.post_comments
-WHERE post_id IN (SELECT md5('demo-bulk-post:' || g)::uuid FROM generate_series(1, 50) g)
-   OR post_id IN (SELECT md5('demo-post:' || k)::uuid FROM (VALUES
-     ('palace-post'), ('night-post'), ('seongsu-post'), ('science-post'), ('bread-post'),
-     ('green-post'), ('modern-post'), ('family-post'), ('autumn-post')) v(k))
+WHERE post_id IN (SELECT id FROM community.posts WHERE deleted_at IS NULL)
 UNION ALL SELECT 'demo_likes', count(*) FROM community.post_likes
-WHERE post_id IN (SELECT md5('demo-bulk-post:' || g)::uuid FROM generate_series(1, 50) g)
-   OR post_id IN (SELECT md5('demo-post:' || k)::uuid FROM (VALUES
-     ('palace-post'), ('night-post'), ('seongsu-post'), ('science-post'), ('bread-post'),
-     ('green-post'), ('modern-post'), ('family-post'), ('autumn-post')) v(k));
+WHERE post_id IN (SELECT id FROM community.posts WHERE deleted_at IS NULL);

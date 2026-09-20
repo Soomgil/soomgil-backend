@@ -34,24 +34,18 @@ BEGIN
   FROM auth.user_profiles
   WHERE user_id IN (SELECT md5('demo-user:' || n)::uuid FROM generate_series(1, 120) n);
 
-  WITH demo_posts AS (
-    SELECT md5('demo-bulk-post:' || g)::uuid id FROM generate_series(1, 50) g
-    UNION ALL
-    SELECT md5('demo-post:' || k)::uuid FROM (VALUES
-      ('palace-post'), ('night-post'), ('seongsu-post'), ('science-post'), ('bread-post'),
-      ('green-post'), ('modern-post'), ('family-post'), ('autumn-post')
-    ) v(k)
-  )
   SELECT count(*), count(DISTINCT title), count(DISTINCT summary)
   INTO post_count, distinct_title_count, distinct_summary_count
-  FROM community.posts p JOIN demo_posts d ON d.id = p.id;
+  FROM community.posts p
+  WHERE p.deleted_at IS NULL;
 
   WITH demo_posts AS (
-    SELECT md5('demo-bulk-post:' || g)::uuid id FROM generate_series(1, 50) g
+    SELECT ('10000000-0000-4000-8000-' || lpad(n::text, 12, '0'))::uuid id
+    FROM (VALUES (1), (2), (3), (4), (5), (6), (7), (8),
+                 (10), (11), (12), (13), (14), (15)) selected(n)
     UNION ALL
     SELECT md5('demo-post:' || k)::uuid FROM (VALUES
-      ('palace-post'), ('night-post'), ('seongsu-post'), ('science-post'), ('bread-post'),
-      ('green-post'), ('modern-post'), ('family-post'), ('autumn-post')
+      ('palace-post'), ('night-post'), ('bread-post'), ('green-post')
     ) v(k)
   )
   SELECT count(*), count(DISTINCT content),
@@ -60,11 +54,12 @@ BEGIN
   FROM community.post_comments c JOIN demo_posts d ON d.id = c.post_id;
 
   WITH demo_posts AS (
-    SELECT md5('demo-bulk-post:' || g)::uuid id FROM generate_series(1, 50) g
+    SELECT ('10000000-0000-4000-8000-' || lpad(n::text, 12, '0'))::uuid id
+    FROM (VALUES (1), (2), (3), (4), (5), (6), (7), (8),
+                 (10), (11), (12), (13), (14), (15)) selected(n)
     UNION ALL
     SELECT md5('demo-post:' || k)::uuid FROM (VALUES
-      ('palace-post'), ('night-post'), ('seongsu-post'), ('science-post'), ('bread-post'),
-      ('green-post'), ('modern-post'), ('family-post'), ('autumn-post')
+      ('palace-post'), ('night-post'), ('bread-post'), ('green-post')
     ) v(k)
   ), counts AS (
     SELECT d.id, count(l.user_id) likes
@@ -250,16 +245,16 @@ BEGIN
     RAISE EXCEPTION 'Expected 120 distinct demo profiles, found % profiles and % bios',
       profile_count, distinct_bio_count;
   END IF;
-  IF post_count <> 59 OR distinct_title_count <> 59 OR distinct_summary_count <> 59 THEN
-    RAISE EXCEPTION 'Expected 59 unique demo posts, found % posts, % titles, % summaries',
+  IF post_count <> 18 OR distinct_title_count <> 18 OR distinct_summary_count <> 18 THEN
+    RAISE EXCEPTION 'Expected 18 curated demo posts, found % posts, % titles, % summaries',
       post_count, distinct_title_count, distinct_summary_count;
   END IF;
-  IF comment_count <> 320 OR distinct_comment_count <> 320 OR reply_count < 150 THEN
-    RAISE EXCEPTION 'Expected 320 unique comments and at least 150 replies, found %, %, %',
+  IF comment_count <> 37 OR distinct_comment_count <> 37 OR reply_count <> 6 THEN
+    RAISE EXCEPTION 'Expected 37 preserved comments and 6 replies, found %, %, %',
       comment_count, distinct_comment_count, reply_count;
   END IF;
-  IF like_count < 3000 OR distinct_like_counts <> 59 THEN
-    RAISE EXCEPTION 'Expected distributed likes for every post, found % likes and % counts',
+  IF like_count <> 263 OR distinct_like_counts <> 10 THEN
+    RAISE EXCEPTION 'Expected preserved engagement for curated posts, found % likes and % counts',
       like_count, distinct_like_counts;
   END IF;
   IF stale_url_count <> 0 THEN
@@ -304,17 +299,8 @@ END $$;
 
 SELECT 'profiles' metric, 120 actual
 UNION ALL SELECT 'posts', count(*) FROM community.posts
-WHERE id IN (SELECT md5('demo-bulk-post:' || g)::uuid FROM generate_series(1, 50) g)
-   OR id IN (SELECT md5('demo-post:' || k)::uuid FROM (VALUES
-     ('palace-post'), ('night-post'), ('seongsu-post'), ('science-post'), ('bread-post'),
-     ('green-post'), ('modern-post'), ('family-post'), ('autumn-post')) v(k))
+WHERE deleted_at IS NULL
 UNION ALL SELECT 'comments', count(*) FROM community.post_comments
-WHERE post_id IN (SELECT md5('demo-bulk-post:' || g)::uuid FROM generate_series(1, 50) g)
-   OR post_id IN (SELECT md5('demo-post:' || k)::uuid FROM (VALUES
-     ('palace-post'), ('night-post'), ('seongsu-post'), ('science-post'), ('bread-post'),
-     ('green-post'), ('modern-post'), ('family-post'), ('autumn-post')) v(k))
+WHERE post_id IN (SELECT id FROM community.posts WHERE deleted_at IS NULL)
 UNION ALL SELECT 'likes', count(*) FROM community.post_likes
-WHERE post_id IN (SELECT md5('demo-bulk-post:' || g)::uuid FROM generate_series(1, 50) g)
-   OR post_id IN (SELECT md5('demo-post:' || k)::uuid FROM (VALUES
-     ('palace-post'), ('night-post'), ('seongsu-post'), ('science-post'), ('bread-post'),
-     ('green-post'), ('modern-post'), ('family-post'), ('autumn-post')) v(k));
+WHERE post_id IN (SELECT id FROM community.posts WHERE deleted_at IS NULL);
