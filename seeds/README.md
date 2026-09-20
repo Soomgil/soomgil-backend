@@ -3,7 +3,7 @@
 `soomgil_demo_seoul_daejeon.sql`은 Flyway V1~V38 적용 후 넣는 로컬 전용 데이터입니다.
 운영 마이그레이션에는 포함되지 않으며 기존 데이터를 삭제하지 않습니다.
 
-`load-seeds.sh`는 서울 기본 시드와 제주·부산·경주·여행 기록 시드를 합쳐
+`load-seeds.sh`는 서울 기본 시드와 제주·부산·경주·커뮤니티 시드를 합쳐
 `generated/soomgil_demo_dashboard_dump.sql`을 다시 만든 후 적용합니다. 마지막에는
 실제 KTO API 응답 스냅샷과 `soomgil_jeju_place_tags.sql`의 제주 AI 태그를 적용한 뒤
 `verify_demo_data.sql`로 품질 조건을 검사합니다.
@@ -14,7 +14,7 @@
 - 서울 40곳, 대전 28곳의 검색 가능한 실재 장소와 이미지·취향 태그
 - 스와이프 반응, 저장 장소, 사용자별 취향 가중치
 - 원본·파생 여행 80여 개와 일차별 일정, 경로, 메모, 체크리스트, 채팅
-- 완료 여행 기록 225개와 실제 S3 미디어, 테스트 계정용 세로 기록 사진 5장
+- 여행·커뮤니티·프로필에 연결된 실제 S3 호환 미디어
 - 테스트 계정의 진행 중 여행 3개·보관 여행 1개, 실제 KTO 장소와 작성 글 2개
 - 서로 다른 제목·요약의 커뮤니티 게시물 59개
 - 게시물마다 다른 좋아요 수 3,297개
@@ -69,8 +69,13 @@ docker exec -i soomgil-postgres-1 psql -U soomgil -d soomgil \
 
 ## S3 이미지 동기화
 
-시드를 넣은 다음 `.env`의 AWS S3 설정을 사용해 프로필, 장소, 여행 기록,
+시드를 넣은 다음 `.env`의 AWS S3 설정을 사용해 프로필, 장소, 여행,
 커뮤니티 이미지를 비공개 S3에 업로드합니다.
+
+로컬에서는 별도 설정이 없으면 `S3_BUCKET=soomgil-local`,
+`S3_PUBLIC_BASE_URL=http://localhost:9000/soomgil-local`을 사용합니다. 이후 AWS 배포에서는
+같은 시드나 코드를 수정하지 않고 두 환경변수만 실제 S3 버킷과 CloudFront 주소로
+교체합니다. CloudFront 배포 도메인은 시드 파일에 하드코딩하지 않습니다.
 
 ```bash
 python3 -m venv /tmp/soomgil-demo-media-venv

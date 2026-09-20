@@ -27,6 +27,7 @@ DECLARE
   invalid_kto_content_id_count integer;
   visible_demo_place_count integer;
   invalid_demo_saved_place_count integer;
+  orphan_snapshot_thumbnail_count integer;
 BEGIN
   SELECT count(*), count(DISTINCT bio)
   INTO profile_count, distinct_bio_count
@@ -91,8 +92,11 @@ BEGIN
     SELECT thumbnail_url FROM itinerary.itinerary_items
     UNION ALL
     SELECT thumbnail_url FROM community.post_snapshot_items
+    UNION ALL
+    SELECT snapshot::text FROM community.posts
   ) urls
-  WHERE url LIKE 'https://cdn.soomgil.test/%';
+  WHERE url LIKE '%https://cdn.soomgil.test/%'
+     OR url LIKE '%https://daobk0bynum21.cloudfront.net/%';
 
   SELECT count(*) INTO empty_demo_trip_count
   FROM trip.trips t
@@ -223,6 +227,25 @@ BEGIN
         AND r.reaction = 'SUPER_LIKE'
     );
 
+  WITH snapshot_urls AS (
+    SELECT DISTINCT jsonb_path_query(snapshot, '$.days[*].items[*].thumbnailUrl') #>> '{}' AS url
+    FROM community.posts
+  ), known_urls AS (
+    SELECT thumbnail_url AS url FROM itinerary.itinerary_items WHERE thumbnail_url IS NOT NULL
+    UNION
+    SELECT thumbnail_url FROM community.post_snapshot_items WHERE thumbnail_url IS NOT NULL
+    UNION
+    SELECT public_url FROM media.media_files WHERE public_url IS NOT NULL
+    UNION
+    SELECT first_image1 FROM tourism_source.attractions WHERE first_image1 IS NOT NULL
+    UNION
+    SELECT first_image2 FROM tourism_source.attractions WHERE first_image2 IS NOT NULL
+  )
+  SELECT count(*) INTO orphan_snapshot_thumbnail_count
+  FROM snapshot_urls s
+  WHERE s.url LIKE '%/demo/%'
+    AND NOT EXISTS (SELECT 1 FROM known_urls k WHERE k.url = s.url);
+
   IF profile_count <> 120 OR distinct_bio_count <> 120 THEN
     RAISE EXCEPTION 'Expected 120 distinct demo profiles, found % profiles and % bios',
       profile_count, distinct_bio_count;
@@ -240,7 +263,7 @@ BEGIN
       like_count, distinct_like_counts;
   END IF;
   IF stale_url_count <> 0 THEN
-    RAISE EXCEPTION 'Found % stale cdn.soomgil.test demo image URLs', stale_url_count;
+    RAISE EXCEPTION 'Found % stale demo image URL records', stale_url_count;
   END IF;
   IF empty_demo_trip_count <> 0 THEN
     RAISE EXCEPTION 'Found % demo trips without itinerary places', empty_demo_trip_count;
@@ -272,6 +295,10 @@ BEGIN
   IF invalid_demo_saved_place_count <> 0 THEN
     RAISE EXCEPTION 'Found % active demo saved places without a SUPER_LIKE reaction',
       invalid_demo_saved_place_count;
+  END IF;
+  IF orphan_snapshot_thumbnail_count <> 0 THEN
+    RAISE EXCEPTION 'Found % demo snapshot thumbnails without a seeded media source',
+      orphan_snapshot_thumbnail_count;
   END IF;
 END $$;
 

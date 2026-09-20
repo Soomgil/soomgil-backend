@@ -5,7 +5,12 @@ spring:
     name: soomgil-backend
   ai:
     model:
-      chat: ${AI_CHAT_MODEL:google-genai}
+      chat: ${AI_CHAT_MODEL:none}
+    openai:
+      api-key: ${OPENAI_API_KEY:}
+      chat:
+        options:
+          model: ${OPENAI_CHAT_MODEL:gpt-5.6-terra}
     google:
       genai:
         api-key: ${GMS_API_KEY:}
@@ -79,7 +84,7 @@ mybatis:
 soomgil:
   ai:
     gms:
-      enabled: ${GMS_GEMINI_ENABLED:true}
+      enabled: ${GMS_GEMINI_ENABLED:false}
       base-url: ${GMS_GEMINI_BASE_URL:https://gms.ssafy.io/gmsapi/generativelanguage.googleapis.com}
       api-version: ${GMS_GEMINI_API_VERSION:v1beta}
   kto:

@@ -54,7 +54,7 @@ class ResetPasswordCommandHandlerTest {
 
 		assertThat(result).isNotNull();
 		verify(passwordResetTokenMapper).markUsed(eq(token.id()), any(Instant.class));
-		verify(passwordCredentialMapper).updatePasswordHash(userId, "new-hash");
+		verify(passwordCredentialMapper).upsertPasswordHash(userId, "new-hash");
 		verify(userSessionMapper).revokeAllForUser(eq(userId), any(Instant.class), eq("PASSWORD_RESET"));
 	}
 
@@ -69,7 +69,7 @@ class ResetPasswordCommandHandlerTest {
 			.extracting(e -> ((AuthException) e).errorCode())
 			.isEqualTo(ErrorCode.INVALID_TOKEN);
 
-		verify(passwordCredentialMapper, never()).updatePasswordHash(any(UUID.class), anyString());
+		verify(passwordCredentialMapper, never()).upsertPasswordHash(any(UUID.class), anyString());
 		verify(userSessionMapper, never()).revokeAllForUser(any(UUID.class), any(Instant.class), anyString());
 	}
 

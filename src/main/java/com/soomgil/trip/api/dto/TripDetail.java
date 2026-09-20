@@ -4,6 +4,7 @@ import com.soomgil.geo.api.dto.LegalRegion;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -20,6 +21,8 @@ public record TripDetail(
 	TripAccessRole myRole,
 	@NotNull
 	Long itineraryVersion,
+	LocalDate startDate,
+	LocalDate endDate,
 	@NotNull
 	OffsetDateTime createdAt,
 	UUID ownerUserId,

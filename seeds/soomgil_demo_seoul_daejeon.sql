@@ -1,8 +1,10 @@
 -- Soomgil local demo dataset: Seoul + Daejeon
--- Target schema: Flyway V1..V37
+-- Target schema: current Flyway schema (record feature may be absent since V51).
 -- Safe to re-run: deterministic identifiers and ON CONFLICT clauses are used throughout.
 -- Apply after migrations:
 --   docker compose exec -T postgres psql -U soomgil -d soomgil < seeds/soomgil_demo_seoul_daejeon.sql
+
+SELECT (to_regclass('record.trip_record_entries') IS NOT NULL) AS record_feature_enabled \gset
 
 BEGIN;
 

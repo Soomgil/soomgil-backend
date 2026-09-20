@@ -104,6 +104,11 @@
 		WHERE id = CAST(#{id} AS uuid)
 	</update>
 
+	<delete id="deleteReaction">
+		DELETE FROM preference.user_place_reactions
+		WHERE id = CAST(#{id} AS uuid)
+	</delete>
+
 	<select id="findReactionsNeedingEnrichmentRefresh" resultMap="SwipeReactionRefreshRowMap">
 		SELECT CAST(id AS text) AS id,
 		       CAST(user_id AS text) AS user_id,
