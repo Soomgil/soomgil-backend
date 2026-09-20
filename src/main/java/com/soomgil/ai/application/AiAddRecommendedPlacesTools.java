@@ -1,8 +1,6 @@
 package com.soomgil.ai.application;
 
 import com.soomgil.ai.api.dto.AiToolExecutionPolicy;
-import com.soomgil.global.error.BusinessException;
-import com.soomgil.global.error.ErrorCode;
 import com.soomgil.itinerary.application.command.dto.ItineraryMutationResult;
 import com.soomgil.place.api.dto.PlaceSummary;
 import com.soomgil.preference.api.dto.RecommendationTab;
@@ -28,21 +26,24 @@ public final class AiAddRecommendedPlacesTools extends AiToolSupport {
 
 	private final ListPlaceRecommendationsQueryHandler recommendationHandler;
 	private final AiItineraryToolService itineraryToolService;
+	private final AiRecommendationViewportResolver viewportResolver;
 
 	AiAddRecommendedPlacesTools(
 		AiGuideRequest request,
 		AiToolAuditService auditService,
 		ListPlaceRecommendationsQueryHandler recommendationHandler,
-		AiItineraryToolService itineraryToolService
+		AiItineraryToolService itineraryToolService,
+		AiRecommendationViewportResolver viewportResolver
 	) {
 		super(request, auditService);
 		this.recommendationHandler = recommendationHandler;
 		this.itineraryToolService = itineraryToolService;
+		this.viewportResolver = viewportResolver;
 	}
 
 	@Tool(description = "멤버 취향 기반 추천 장소를 조회하고, 상위 후보 여러 개를 일정에 한 번에 추가한다. "
 		+ "사용자가 '추천 여행지 알아서 넣어줘', '갈 만한 곳 몇 개 일정에 추가해줘'처럼 추천과 추가를 함께 요청할 때 사용한다. "
-		+ "bbox는 현재 지도 viewport를 사용하고, 일차가 불명확하면 itineraryDayId를 null로 두어 일차 미정에 추가한다. "
+		+ "bbox는 비워두면 서버가 현재 지도 범위 또는 여행방 지역으로 자동 결정한다. 일차가 불명확하면 itineraryDayId를 null로 두어 일차 미정에 추가한다. "
 		+ "limit는 최대 10개다. 이미 일정에 있는 장소는 도구 내부에서 건너뛴다.")
 	public Object addRecommendedPlacesToItinerary(AddRecommendedPlacesInput input) {
 		long version = baseVersion(input.baseVersion());
@@ -56,10 +57,8 @@ public final class AiAddRecommendedPlacesTools extends AiToolSupport {
 	}
 
 	private BulkAddRecommendedPlacesResult addRecommendedPlaces(long baseVersion, AddRecommendedPlacesInput input) {
-		String bbox = input.bbox();
-		if (bbox == null || bbox.isBlank()) {
-			throw new BusinessException(ErrorCode.VALIDATION_FAILED, "추천 장소를 추가하려면 지도 범위가 필요해요.");
-		}
+		// bbox가 비어 있으면 현재 지도 viewport → 여행방 지역 순으로 서버가 채운다.
+		String bbox = viewportResolver.resolveBbox(request, input.bbox());
 		int limit = Math.max(1, Math.min(input.limit() == null ? DEFAULT_LIMIT : input.limit(), MAX_LIMIT));
 		RecommendationTab tab = parseTab(input.tab());
 		var page = recommendationHandler.handle(new ListPlaceRecommendationsQuery(
@@ -115,8 +114,7 @@ public final class AiAddRecommendedPlacesTools extends AiToolSupport {
 	}
 
 	private RecommendationTab parseTab(String tab) {
-		if (tab == null || tab.isBlank()) return RecommendationTab.BASIC;
-		return RecommendationTab.valueOf(tab.trim().toUpperCase());
+		return AiRecommendationViewportResolver.parseTab(tab);
 	}
 
 	public record AddRecommendedPlacesInput(

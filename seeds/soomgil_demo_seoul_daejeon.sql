@@ -484,13 +484,8 @@ WITH post_seed(k,trip_k,publisher,title,summary,published_days) AS (
  VALUES
  ('palace-post','seoul-palace',1,'봄날, 서울 궁궐에서 골목까지 천천히','경복궁 문 여는 시간에 맞춰 시작해 북촌과 익선동, 청계천까지 걸었어요. 이동이 짧아 서울 첫 여행에도 추천하는 2박 3일 코스입니다.',92),
  ('night-post','seoul-night',5,'지하철로 모은 서울 야경 네 장면','노들섬 노을에서 반포, 낙산 성곽, 서울스카이까지. 야경 좋아하는 친구들과 다녀온 동선과 촬영 시간을 남깁니다.',61),
- ('seongsu-post','seongsu-picnic',3,'서울숲 피크닉과 성수의 느린 주말','욕심내지 않고 공원과 성수 골목만 오래 걸었습니다. 돗자리 펴기 좋은 자리와 전시 동선까지 담았어요.',48),
- ('science-post','daejeon-science',12,'어른도 신나는 대전 과학 소풍','국립중앙과학관, 엑스포공원, 시립미술관을 한 동선으로 묶었어요. 비 오는 날에도 좋은 대전 1박 2일 코스!',84),
  ('bread-post','daejeon-bread',4,'성심당만 보고 갔다가 골목에 반한 대전','성심당 오픈런 뒤 근현대사전시관과 테미오래, 소제동까지. 빵 봉투 들고 걷기 좋은 원도심 코스예요.',55),
- ('green-post','daejeon-green',8,'대전에 이런 숲이? 초록 가득 1박 2일','장태산 메타세쿼이아 숲부터 대청호, 계족산 황톳길까지 걷고 왔어요. 차가 있으면 가장 편하지만 대중교통 팁도 적었습니다.',32),
- ('modern-post','seoul-modern',7,'공장을 공원으로, 서울 재생건축 여행','DDP에서 시작해 성수의 붉은 벽돌 공장과 문화비축기지까지. 건축과 공간 재생을 좋아한다면 저장해둘 코스.',110),
- ('family-post','family-daejeon',6,'아이와 갈 대전 여름 여행 미리 짜봤어요','과학관과 수목원, 오월드를 무리 없이 나눈 가족 여행 계획입니다. 실내와 야외 비율을 맞췄어요.',3),
- ('autumn-post','daejeon-autumn',17,'올가을 계족산 황톳길 같이 걸어요','황톳길을 걷고 대청호를 본 뒤 유성온천으로 마무리하는 계획. 다녀온 분들의 팁도 기다릴게요.',1)
+ ('green-post','daejeon-green',8,'대전에 이런 숲이? 초록 가득 1박 2일','장태산 메타세쿼이아 숲부터 대청호, 계족산 황톳길까지 걷고 왔어요. 차가 있으면 가장 편하지만 대중교통 팁도 적었습니다.',32)
 )
 INSERT INTO community.posts
  (id,source_trip_id,source_trip_version,published_by_user_id,visibility,title,summary,snapshot_version,

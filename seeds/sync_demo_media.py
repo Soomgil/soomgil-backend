@@ -66,7 +66,78 @@ def required(config: dict[str, str], key: str) -> str:
 def query_assets(container: str, db_user: str, db_name: str) -> list[dict[str, Any]]:
     sql = r"""
 COPY (
-  WITH assets AS (
+  WITH community_place_map(post_id, content_id) AS (
+    VALUES
+      ('10000000-0000-4000-8000-000000000001'::uuid, 126435),  -- 성산일출봉
+      ('10000000-0000-4000-8000-000000000002'::uuid, 126081),  -- 해운대해수욕장
+      ('10000000-0000-4000-8000-000000000003'::uuid, 127722),  -- 안목해변
+      ('10000000-0000-4000-8000-000000000004'::uuid, 126166),  -- 경주 불국사
+      ('10000000-0000-4000-8000-000000000005'::uuid, 1997202), -- 여수 해상케이블카
+      ('10000000-0000-4000-8000-000000000006'::uuid, 2501905), -- 서피비치
+      ('10000000-0000-4000-8000-000000000007'::uuid, 264284),  -- 전주 한옥마을
+      ('10000000-0000-4000-8000-000000000008'::uuid, 126581),  -- 외도 보타니아
+      ('10000000-0000-4000-8000-000000000010'::uuid, 2660802), -- 오설록 티뮤지엄
+      ('10000000-0000-4000-8000-000000000011'::uuid, 128834),  -- 죽녹원
+      ('10000000-0000-4000-8000-000000000012'::uuid, 1919548), -- 순천만국가정원
+      ('10000000-0000-4000-8000-000000000013'::uuid, 126080),  -- 부산 송정해수욕장
+      ('10000000-0000-4000-8000-000000000014'::uuid, 894027),  -- 안동 하회마을
+      ('10000000-0000-4000-8000-000000000015'::uuid, 2734212), -- 대천해수욕장캠핑장
+      (md5('demo-post:palace-post')::uuid, 126508),              -- 경복궁
+      (md5('demo-post:night-post')::uuid, 3013134),              -- 노들섬 라이브하우스
+      (md5('demo-post:bread-post')::uuid, 1796079),              -- 성심당
+      (md5('demo-post:green-post')::uuid, 129438)                -- 장태산자연휴양림
+  ), community_media AS (
+    SELECT DISTINCT mapping.post_id, mapping.content_id, media_ids.media_file_id
+    FROM community_place_map mapping
+    JOIN community.posts p ON p.id = mapping.post_id
+    CROSS JOIN LATERAL (
+      SELECT p.cover_media_file_id AS media_file_id
+      WHERE p.cover_media_file_id IS NOT NULL
+      UNION
+      SELECT pm.media_file_id
+      FROM community.post_media pm
+      WHERE pm.post_id = p.id
+    ) media_ids
+  ), community_source_candidates AS (
+    SELECT m.object_key, a.title, ai.public_url AS source_url,
+           ai.display_order AS priority
+    FROM community_media mapping
+    JOIN media.media_files m ON m.id = mapping.media_file_id
+    JOIN tourism_source.attractions a ON a.content_id = mapping.content_id
+    JOIN tourism_source.attraction_images ai ON ai.attraction_no = a.no
+    WHERE ai.is_active
+      AND ai.public_url ~* '^https?://'
+      AND ai.public_url NOT LIKE '%picsum.photos/%'
+
+    UNION ALL
+
+    SELECT m.object_key, a.title, a.first_image1, 10000
+    FROM community_media mapping
+    JOIN media.media_files m ON m.id = mapping.media_file_id
+    JOIN tourism_source.attractions a ON a.content_id = mapping.content_id
+    WHERE COALESCE(a.first_image1, '') ~* '^https?://'
+      AND a.first_image1 NOT LIKE '%/demo/%'
+
+    UNION ALL
+
+    SELECT m.object_key, a.title, a.first_image2, 10001
+    FROM community_media mapping
+    JOIN media.media_files m ON m.id = mapping.media_file_id
+    JOIN tourism_source.attractions a ON a.content_id = mapping.content_id
+    WHERE COALESCE(a.first_image2, '') ~* '^https?://'
+      AND a.first_image2 NOT LIKE '%/demo/%'
+  ), community_sources AS (
+    SELECT object_key, min(title) AS place_title,
+           (array_agg(source_url ORDER BY priority, source_url))[
+             1 + mod((hashtext(object_key)::bigint & 2147483647), count(*)::bigint)::integer
+           ] AS source_url
+    FROM (
+      SELECT object_key, title, source_url, min(priority) AS priority
+      FROM community_source_candidates
+      GROUP BY object_key, title, source_url
+    ) candidates
+    GROUP BY object_key
+  ), assets AS (
     SELECT 'profile' kind,
            'demo/profiles/' || p.user_id || '.png' object_key,
            p.display_name search_term,
@@ -105,15 +176,16 @@ COPY (
     JOIN trip.trips t ON m.linked_resource_type = 'trip.trips'
       AND m.linked_resource_id = t.id
     WHERE m.object_key LIKE 'demo/trips/%'
+      AND NOT EXISTS (SELECT 1 FROM community_media cm WHERE cm.media_file_id = m.id)
 
     UNION ALL
 
     SELECT 'community', m.object_key,
            COALESCE(first_item.place_name, t.display_destination, '대한민국 여행'),
            abs(hashtext(m.object_key)) % 5
-    FROM media.media_files m
-    JOIN community.posts p ON m.linked_resource_type = 'COMMUNITY_POST'
-      AND m.linked_resource_id = p.id
+    FROM community_media cm
+    JOIN media.media_files m ON m.id = cm.media_file_id
+    JOIN community.posts p ON p.id = cm.post_id
     LEFT JOIN trip.trips t ON t.id = p.source_trip_id
     LEFT JOIN LATERAL (
       SELECT i.place_name
@@ -129,9 +201,16 @@ COPY (
     'kind', kind,
     'object_key', object_key,
     'search_term', search_term,
-    'variant', variant
+    'variant', variant,
+    'source_url', community_sources.source_url,
+    'source_page', community_sources.source_url,
+    'source_license', CASE WHEN community_sources.source_url IS NOT NULL
+      THEN '한국관광공사 TourAPI 이미지 이용조건' END,
+    'source_artist', CASE WHEN community_sources.source_url IS NOT NULL
+      THEN '한국관광공사' END
   )::text
   FROM assets
+  LEFT JOIN community_sources USING (object_key)
   ORDER BY kind, object_key
 ) TO STDOUT;
 """
@@ -195,6 +274,19 @@ def unsplash_photo_pool() -> list[dict[str, str]]:
 
 
 def resolve_source(asset: dict[str, Any], used_source_pages: Optional[set[str]] = None) -> dict[str, str]:
+    if asset.get("source_url"):
+        source_url = str(asset["source_url"])
+        if source_url.startswith("http://tong.visitkorea.or.kr/"):
+            source_url = "https://tong.visitkorea.or.kr/" + source_url.removeprefix(
+                "http://tong.visitkorea.or.kr/"
+            )
+        return {
+            "url": source_url,
+            "mime_type": mimetypes.guess_type(source_url)[0] or "image/jpeg",
+            "source_page": str(asset.get("source_page") or source_url),
+            "license": str(asset.get("source_license") or ""),
+            "artist": str(asset.get("source_artist") or ""),
+        }
     if asset["kind"] == "profile":
         seed = hashlib.sha256(asset["object_key"].encode()).hexdigest()[:20]
         return {
@@ -363,6 +455,7 @@ def main() -> None:
     db_user = config.get("DB_USERNAME", "soomgil")
     db_name = config.get("DB_NAME", "soomgil")
     assets = query_assets(args.container, db_user, db_name)
+    managed_asset_keys = {asset["object_key"] for asset in assets}
     if args.kind:
         selected_kinds = set(args.kind)
         assets = [asset for asset in assets if asset["kind"] in selected_kinds]
@@ -425,7 +518,12 @@ def main() -> None:
             if index % 25 == 0 or index == len(assets):
                 print(f"  {index}/{len(assets)} processed ({len(failures)} failed)")
 
-    completed_by_key = {row["object_key"]: row for row in existing_manifest}
+    managed_kinds = set(args.kind or ["profile", "place", "record", "community"])
+    completed_by_key = {
+        row["object_key"]: row
+        for row in existing_manifest
+        if row.get("kind") not in managed_kinds or row["object_key"] in managed_asset_keys
+    }
     completed_by_key.update({row["object_key"]: row for row in completed})
     write_manifest(list(completed_by_key.values()))
     print(f"Manifest: {MANIFEST_FILE}")

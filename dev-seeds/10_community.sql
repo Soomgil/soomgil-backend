@@ -337,4 +337,12 @@ INSERT INTO community.moderation_actions (id, moderator_user_id, target_type, ta
   ('18000000-0000-4000-8000-000000000001','a0000000-0000-4000-8000-000000000002','POST_COMMENT','15000000-0000-4000-8000-000000000060','HIDE','HIDDEN','커뮤니티 가이드라인 위반')
 ON CONFLICT (id) DO NOTHING;
 
+-- The complete dashboard dataset adds four Seoul/Daejeon posts. Keep only the
+-- fourteen nationwide posts selected for the curated eighteen-post feed here.
+DELETE FROM community.posts
+WHERE id IN (
+  '10000000-0000-4000-8000-000000000009',
+  '10000000-0000-4000-8000-000000000016'
+);
+
 COMMIT;
