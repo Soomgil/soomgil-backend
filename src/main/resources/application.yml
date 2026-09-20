@@ -6,6 +6,14 @@ spring:
   ai:
     model:
       chat: ${AI_CHAT_MODEL:none}
+      # 채팅 모델만 쓴다. 아래를 비활성화하지 않으면 OpenAI 스타터의 음성/이미지/임베딩 자동구성이
+      # 채팅 제공자와 무관하게 OpenAI 키를 요구해, GMS(google-genai)만 설정한 환경에서 앱이 기동조차 못 한다.
+      embedding: none
+      image: none
+      audio:
+        speech: none
+        transcription: none
+      moderation: none
     openai:
       api-key: ${OPENAI_API_KEY:}
       chat:
