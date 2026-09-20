@@ -43,12 +43,25 @@ public class PreferenceUserPreferenceQueryService {
 
 	@Transactional(readOnly = true)
 	public MyPreferenceSummary listMyPreferences() {
-		String userId = currentUserId().toString();
-		if (!mapper.hasAnyReaction(userId)) {
+		return listPreferences(currentUserId());
+	}
+
+	/**
+	 * 지정한 사용자의 여행 취향 분석 결과를 조회한다.
+	 *
+	 * <p>타인 공개 여부 검사는 호출부에서 선행해야 한다.
+	 *
+	 * @param userId 조회 대상 사용자 식별자
+	 * @return 여행 취향 분석 결과
+	 */
+	@Transactional(readOnly = true)
+	public MyPreferenceSummary listPreferences(UUID userId) {
+		String userIdValue = userId.toString();
+		if (!mapper.hasAnyReaction(userIdValue)) {
 			return new MyPreferenceSummary(List.of(), EMPTY_TRAVEL_STYLE, List.of());
 		}
 
-		List<UserPreferenceTagScoreRow> rows = mapper.findUserPreferenceScores(userId);
+		List<UserPreferenceTagScoreRow> rows = mapper.findUserPreferenceScores(userIdValue);
 		if (rows.isEmpty()) {
 			return new MyPreferenceSummary(List.of(), EMPTY_TRAVEL_STYLE, List.of());
 		}

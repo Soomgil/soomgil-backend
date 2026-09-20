@@ -2,12 +2,17 @@ package com.soomgil.user.application.handler;
 
 import com.soomgil.common.cqrs.QueryHandler;
 import com.soomgil.global.error.ErrorCode;
+import com.soomgil.preference.api.dto.MyPreferenceSummary;
+import com.soomgil.preference.api.dto.SavedPlace;
+import com.soomgil.preference.application.command.handler.PreferenceSavedPlaceService;
+import com.soomgil.preference.application.query.handler.PreferenceUserPreferenceQueryService;
 import com.soomgil.user.api.dto.UserPublicProfile;
 import com.soomgil.user.api.dto.UserProfileVisibility;
 import com.soomgil.user.application.query.GetUserPublicProfileQuery;
 import com.soomgil.user.domain.model.UserException;
 import com.soomgil.user.domain.model.UserProfileRecord;
 import com.soomgil.user.infrastructure.persistence.UserPublicProfileMapper;
+import java.util.List;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,13 +37,19 @@ public class GetUserPublicProfileQueryHandler
 
 	private final UserPublicProfileMapper userPublicProfileMapper;
 	private final com.soomgil.social.infrastructure.persistence.UserFollowMapper userFollowMapper;
+	private final PreferenceSavedPlaceService savedPlaceService;
+	private final PreferenceUserPreferenceQueryService preferenceQueryService;
 
 	public GetUserPublicProfileQueryHandler(
 		UserPublicProfileMapper userPublicProfileMapper,
-		com.soomgil.social.infrastructure.persistence.UserFollowMapper userFollowMapper
+		com.soomgil.social.infrastructure.persistence.UserFollowMapper userFollowMapper,
+		PreferenceSavedPlaceService savedPlaceService,
+		PreferenceUserPreferenceQueryService preferenceQueryService
 	) {
 		this.userPublicProfileMapper = userPublicProfileMapper;
 		this.userFollowMapper = userFollowMapper;
+		this.savedPlaceService = savedPlaceService;
+		this.preferenceQueryService = preferenceQueryService;
 	}
 
 	@Override
@@ -71,6 +82,13 @@ public class GetUserPublicProfileQueryHandler
 		boolean canViewPrivateProfile = query.targetUserId().equals(query.viewerUserId())
 			|| Boolean.TRUE.equals(followedByMe);
 		String bio = isPrivate && !canViewPrivateProfile ? null : record.bio();
+		boolean canViewDetails = !isPrivate || canViewPrivateProfile;
+		List<SavedPlace> superLikedPlaces = canViewDetails
+			? savedPlaceService.listForUser(query.targetUserId(), 0, 100).items()
+			: List.of();
+		MyPreferenceSummary preferences = canViewDetails
+			? preferenceQueryService.listPreferences(query.targetUserId())
+			: null;
 
 		return new UserPublicProfile(
 			record.userId(),
@@ -81,7 +99,9 @@ public class GetUserPublicProfileQueryHandler
 			followingCount,
 			followedByMe,
 			followStatus,
-			record.profileVisibility()
+			record.profileVisibility(),
+			superLikedPlaces,
+			preferences
 		);
 	}
 }
