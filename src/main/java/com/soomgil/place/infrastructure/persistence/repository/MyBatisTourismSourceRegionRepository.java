@@ -1,5 +1,6 @@
 package com.soomgil.place.infrastructure.persistence.repository;
 
+import com.soomgil.place.application.port.RegionViewport;
 import com.soomgil.place.application.port.TourismSourceRegionRepository;
 import com.soomgil.place.infrastructure.persistence.mapper.TourismSourceRegionMapper;
 import java.util.Objects;
@@ -23,5 +24,14 @@ public class MyBatisTourismSourceRegionRepository implements TourismSourceRegion
 			return Optional.empty();
 		}
 		return Optional.ofNullable(mapper.findGugunCode(sidoCode, gugunName.strip()));
+	}
+
+	@Override
+	public Optional<RegionViewport> findRegionViewport(int areaCode, Integer gugunCode) {
+		RegionViewport viewport = mapper.findRegionViewport(areaCode, gugunCode);
+		if (viewport == null || viewport.placeCount() == 0) {
+			return Optional.empty();
+		}
+		return Optional.of(viewport);
 	}
 }

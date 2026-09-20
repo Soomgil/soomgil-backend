@@ -17,4 +17,13 @@ public interface TourismSourceRegionRepository {
 	 * @return KTO 시군구 코드. 없으면 empty
 	 */
 	Optional<Integer> findGugunCode(int sidoCode, String gugunName);
+
+	/**
+	 * 지역(시도, 선택적 시군구)에 속한 관광 원천 장소들의 좌표 범위를 구한다.
+	 *
+	 * @param areaCode  KTO 시도 코드
+	 * @param gugunCode KTO 시군구 코드. null이면 시도 전체
+	 * @return 좌표가 있는 장소가 하나라도 있으면 그 범위, 없으면 empty
+	 */
+	Optional<RegionViewport> findRegionViewport(int areaCode, Integer gugunCode);
 }
