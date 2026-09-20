@@ -21,7 +21,7 @@
 - 내용이 모두 다른 댓글·대댓글 320개
 - 게시물 스냅샷에서 복제된 리트립 여행 24개
 - 알림과 운영 감사 로그
-- 제주 KTO 장소 2,300여 곳의 Gemini 2.5 Flash Lite 태그 결과
+- 전국 17개 지역 KTO 장소 50,915곳의 Gemini 2.5 Flash Lite 태그 결과 (V40 + V55)
 
 ## 적용
 
@@ -39,6 +39,33 @@ docker exec -i soomgil-postgres-1 psql -U soomgil -d soomgil \
 docker exec -i soomgil-postgres-1 psql -U soomgil -d soomgil \
   -v ON_ERROR_STOP=1 < seeds/soomgil_jeju_place_tags.sql
 ```
+
+## AI 장소 태그
+
+전국 KTO 장소 50,915곳의 태그는 Flyway 마이그레이션으로 들어갑니다. 백엔드를 한 번
+띄우면 자동으로 적재되므로 따로 실행할 것은 없습니다.
+
+- `V40__seed_jeju_place_tag_enrichments.sql` — 제주(39) 2,335곳
+- `V55__seed_nationwide_place_tag_enrichments.sql` — 나머지 16개 지역 48,580곳
+
+`seeds/soomgil_jeju_place_tags.sql`은 V40과 같은 내용이며, 데모 dump를 적용한 뒤
+제주 태그를 다시 넣기 위해 `load-seeds.sh`와 `init-demo-dump.mjs`가 사용합니다.
+
+셋 다 모든 행을 임시 테이블에 먼저 넣은 뒤 병합합니다. 같은 장소의 enrichment가
+이미 있으면 그 행의 id를 그대로 재사용하므로 `user_place_reactions` /
+`user_swipe_events` / `synthetic_swipe_events` 가 참조 중이어도 FK 위반 없이
+갱신되고, 여러 번 실행해도 결과가 같습니다.
+
+> V40과 시드 파일은 기존에 enrichment를 지우고 다시 넣는 방식이라, 데모 데이터가
+> 제주 enrichment를 참조하고 있으면 `fk_user_place_reactions_enrichment` 위반으로
+> 실패했습니다. 이번에 위 병합 방식으로 교체했습니다. 이미 V40을 적용한 DB는
+> checksum이 달라져 백엔드가 뜨지 않으므로, 데모 DB를 새로 만들거나
+> (`node init-demo-dump.mjs`) checksum만 비우면 됩니다(데이터는 동일):
+>
+> ```bash
+> docker exec -i soomgil-postgres-1 psql -U soomgil -d soomgil \
+>   -c "UPDATE flyway_schema_history SET checksum = NULL WHERE version = '40';"
+> ```
 
 ## S3 이미지 동기화
 
