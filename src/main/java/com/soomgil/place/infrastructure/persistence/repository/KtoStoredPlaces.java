@@ -14,7 +14,7 @@ public class KtoStoredPlaces {
     public KtoStoredPlaces(NamedParameterJdbcTemplate jdbc) { this.jdbc=jdbc; }
     private static final String SELECT="""
         SELECT a.content_id,a.title,nullif(concat_ws(' ',a.addr1,a.addr2),'') address,a.latitude,a.longitude,
-        coalesce((SELECT public_url FROM tourism_source.attraction_images i WHERE i.attraction_no=a.no AND i.is_active ORDER BY display_order,created_at LIMIT 1),a.first_image1,a.first_image2) thumbnail,
+        coalesce((SELECT public_url FROM tourism_source.attraction_images i WHERE i.attraction_no=a.no AND i.is_active ORDER BY display_order,created_at LIMIT 1),nullif(a.first_image1,''),nullif(a.first_image2,'')) thumbnail,
         ct.content_type_name category,a.overview,a.source_modified_at,
         ARRAY(SELECT DISTINCT public_url FROM tourism_source.attraction_images i WHERE i.attraction_no=a.no AND i.is_active) photos
         FROM tourism_source.attractions a LEFT JOIN tourism_source.contenttypes ct ON ct.content_type_id=a.content_type_id WHERE 1=1
@@ -37,7 +37,8 @@ public class KtoStoredPlaces {
             sql.append(" AND a.longitude BETWEEN :b0 AND :b2 AND a.latitude BETWEEN :b1 AND :b3");
         }
         if(excluded!=null&&!excluded.isEmpty()) {sql.append(" AND a.content_id::text NOT IN (:excluded)");args.put("excluded",excluded);}
-        sql.append(" ORDER BY md5(a.content_id::text || :seed) LIMIT :limit");args.put("seed",seed==null?"":seed);args.put("limit",Math.min(100,Math.max(1,request.limit())));
+        // 이미지가 있는 장소를 먼저 보여준다(추천 카드가 회색 빈 이미지로 뜨지 않도록). 그 안에서는 seed로 섞는다.
+        sql.append(" ORDER BY (nullif(a.first_image1,'') IS NOT NULL OR nullif(a.first_image2,'') IS NOT NULL) DESC, md5(a.content_id::text || :seed) LIMIT :limit");args.put("seed",seed==null?"":seed);args.put("limit",Math.min(100,Math.max(1,request.limit())));
         return rows(sql.toString(),args);
     }
     private List<TourismPlaceFeedItem> rows(String sql,Map<String,?> args) {

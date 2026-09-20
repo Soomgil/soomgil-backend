@@ -2,6 +2,7 @@ package com.soomgil.preference.application.query.handler;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import com.soomgil.place.application.service.LegalRegionKtoCodeResolver;
 import static org.mockito.Mockito.when;
 
 import com.soomgil.global.security.CurrentUser;
@@ -63,7 +64,7 @@ class PreferenceSwipeFeedApiCompositionTest {
 		));
 
 		var handler = new PreferenceSwipeFeedQueryHandler(
-			currentUserProvider, placeClient, mapper, followees, tagPreparationService, accessibilityCacheService
+			currentUserProvider, placeClient, mapper, followees, tagPreparationService, accessibilityCacheService, mock(LegalRegionKtoCodeResolver.class)
 		);
 		var response = handler.handle(new SwipeFeedQuery(null, null, 20, false, "seed"));
 

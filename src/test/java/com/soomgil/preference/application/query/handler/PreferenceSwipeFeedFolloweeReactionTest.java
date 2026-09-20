@@ -3,6 +3,7 @@ package com.soomgil.preference.application.query.handler;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import com.soomgil.place.application.service.LegalRegionKtoCodeResolver;
 import static org.mockito.Mockito.when;
 
 import com.soomgil.global.security.CurrentUser;
@@ -79,7 +80,8 @@ class PreferenceSwipeFeedFolloweeReactionTest {
 			feedMapper,
 			reactionHandler,
 			tagPreparationService,
-			accessibilityCacheService
+			accessibilityCacheService,
+			mock(LegalRegionKtoCodeResolver.class)
 		);
 
 		var response = handler.handle(new SwipeFeedQuery(null, null, 20, true, null));

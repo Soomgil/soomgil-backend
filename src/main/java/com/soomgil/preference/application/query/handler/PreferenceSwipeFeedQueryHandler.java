@@ -8,7 +8,9 @@ import com.soomgil.place.application.port.TourismPlaceFeedClient;
 import com.soomgil.place.application.port.TourismPlaceFeedItem;
 import com.soomgil.place.application.port.TourismPlaceFeedRequest;
 import com.soomgil.place.application.query.dto.PlaceAccessibilityInfo;
+import com.soomgil.place.application.port.KtoRegionCode;
 import com.soomgil.place.application.service.KtoContentTypeResolver;
+import com.soomgil.place.application.service.LegalRegionKtoCodeResolver;
 import com.soomgil.place.application.service.PlaceAccessibilityCacheService;
 import com.soomgil.preference.api.dto.SwipeFeedItem;
 import com.soomgil.preference.api.dto.SwipeFeedPlace;
@@ -46,6 +48,7 @@ public class PreferenceSwipeFeedQueryHandler implements SwipeFeedQueryHandler {
 	private final FindFolloweePlaceReactionsQueryHandler followeeReactionQueryHandler;
 	private final SwipeTagPreparationService tagPreparationService;
 	private final PlaceAccessibilityCacheService accessibilityCacheService;
+	private final LegalRegionKtoCodeResolver regionCodeResolver;
 
 	public PreferenceSwipeFeedQueryHandler(
 		ObjectProvider<CurrentUserProvider> currentUserProvider,
@@ -53,7 +56,8 @@ public class PreferenceSwipeFeedQueryHandler implements SwipeFeedQueryHandler {
 		PreferenceSwipeFeedMapper mapper,
 		FindFolloweePlaceReactionsQueryHandler followeeReactionQueryHandler,
 		SwipeTagPreparationService tagPreparationService,
-		PlaceAccessibilityCacheService accessibilityCacheService
+		PlaceAccessibilityCacheService accessibilityCacheService,
+		LegalRegionKtoCodeResolver regionCodeResolver
 	) {
 		this.currentUserProvider = currentUserProvider;
 		this.placeFeedClient = placeFeedClient;
@@ -61,6 +65,7 @@ public class PreferenceSwipeFeedQueryHandler implements SwipeFeedQueryHandler {
 		this.followeeReactionQueryHandler = followeeReactionQueryHandler;
 		this.tagPreparationService = tagPreparationService;
 		this.accessibilityCacheService = accessibilityCacheService;
+		this.regionCodeResolver = regionCodeResolver;
 	}
 
 	@Transactional(readOnly = true)
@@ -69,7 +74,7 @@ public class PreferenceSwipeFeedQueryHandler implements SwipeFeedQueryHandler {
 		UUID userId = currentUserId();
 		int limit = normalizeLimit(query.limit());
 		var remoteFeed = placeFeedClient.fetch(new TourismPlaceFeedRequest(
-			query.legalRegionCode(),
+			resolveKtoAreaCode(query.legalRegionCode()),
 			query.category(),
 			limit,
 			query.seed(),
@@ -96,6 +101,19 @@ public class PreferenceSwipeFeedQueryHandler implements SwipeFeedQueryHandler {
 			.toList();
 
 		return new SwipeFeedResponse(items, remoteFeed.nextSeed());
+	}
+
+	/**
+	 * 프론트가 준 법정동 코드를 관광 원천이 이해하는 KTO 시도 areaCode로 바꾼다. 이미 KTO 코드이거나
+	 * 대응이 없으면 원래 값을 그대로 둔다(구 데모 호환). 이 변환이 없으면 지역 필터가 legalRegion 코드를
+	 * area_code와 직접 비교해 전국 어디서도 결과가 비게 된다.
+	 */
+	private String resolveKtoAreaCode(String legalRegionCode) {
+		if (legalRegionCode == null || legalRegionCode.isBlank()) {
+			return legalRegionCode;
+		}
+		List<KtoRegionCode> resolved = regionCodeResolver.resolve(List.of(legalRegionCode.strip()));
+		return resolved.isEmpty() ? legalRegionCode : resolved.get(0).areaCode();
 	}
 
 	private UUID currentUserId() {
