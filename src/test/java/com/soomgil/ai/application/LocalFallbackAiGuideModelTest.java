@@ -60,6 +60,22 @@ class LocalFallbackAiGuideModelTest {
 	}
 
 	@Test
+	void classifiesNaturalHelpSummaryAndOptimizationQuestions() {
+		assertThat(model.classify(request("무슨 기능을 할 수 있어?", null)).intent())
+			.isEqualTo(AiIntent.HELP);
+		assertThat(model.classify(request("현재 전체 여행 일정을 요약하고 분석해줘", null)).intent())
+			.isEqualTo(AiIntent.SUMMARIZE_ITINERARY);
+		assertThat(model.classify(request("가까운 장소끼리 묶어서 전체 동선을 최적화해줘", null)).intent())
+			.isEqualTo(AiIntent.OPTIMIZE_ROUTE);
+	}
+
+	@Test
+	void classifiesWheelchairRemovalAsConditionFiltering() {
+		assertThat(model.classify(request("휠체어 이용 불가 장소를 일정에서 제거해줘", null)).intent())
+			.isEqualTo(AiIntent.FILTER_PLACES_BY_CONDITION);
+	}
+
+	@Test
 	void localFallbackUsesAccessibilityMetadataWhenFilteringPlaces() {
 		AiFilterPlacesTools filterTools = mock(AiFilterPlacesTools.class);
 		AiToolCall call = mock(AiToolCall.class);
