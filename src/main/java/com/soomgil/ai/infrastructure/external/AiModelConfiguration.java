@@ -26,15 +26,21 @@ public class AiModelConfiguration {
 	) {
 		ChatModel chatModel = chatModels.getIfAvailable();
 		String modelChat = environment.getProperty("spring.ai.model.chat");
-		String apiKeyConfigured = environment.getProperty("spring.ai.google.genai.api-key");
+		String apiKeyConfigured = "openai".equals(modelChat)
+			? environment.getProperty("spring.ai.openai.api-key")
+			: environment.getProperty("spring.ai.google.genai.api-key");
+		String configuredModel = "openai".equals(modelChat)
+			? environment.getProperty("spring.ai.openai.chat.options.model")
+			: environment.getProperty("spring.ai.google.genai.chat.options.model");
 		String gmsEnabled = environment.getProperty("soomgil.ai.gms.enabled");
 		String apiKeySource = apiKeyConfigured == null || apiKeyConfigured.isBlank()
 			? "MISSING/BLANK"
 			: "(present, length=" + apiKeyConfigured.length() + ")";
 
 		log.info(
-			"AI guide init → spring.ai.model.chat='{}', GMS Gemini enabled={}, API key={}, ChatModel bean={}",
-			modelChat, gmsEnabled, apiKeySource, chatModel == null ? "NOT CREATED" : chatModel.getClass().getSimpleName()
+			"AI guide init → provider='{}', model='{}', GMS Gemini enabled={}, API key={}, ChatModel bean={}",
+			modelChat, configuredModel, gmsEnabled, apiKeySource,
+			chatModel == null ? "NOT CREATED" : chatModel.getClass().getSimpleName()
 		);
 
 		if (chatModel != null) {
@@ -42,7 +48,7 @@ public class AiModelConfiguration {
 		}
 		log.warn(
 			"ChatModel bean not available. Falling back to LocalFallbackAiGuideModel. "
-				+ "To enable Gemini through GMS: set spring.ai.model.chat=google-genai and provide a non-empty GMS_API_KEY."
+				+ "To enable OpenAI: set AI_CHAT_MODEL=openai and provide a non-empty OPENAI_API_KEY."
 		);
 		return new LocalFallbackAiGuideModel(toolsFactory, objectMapper);
 	}

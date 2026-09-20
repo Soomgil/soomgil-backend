@@ -139,7 +139,7 @@ public class RetripCommunityPostService {
 
 		return new TripDetail(
 			tripId, trip.title(), null, TripStatus.ACTIVE, TripAccessRole.OWNER, itineraryVersion,
-			OffsetDateTime.ofInstant(now, ZoneOffset.UTC), userId, List.of(),
+			null, null, OffsetDateTime.ofInstant(now, ZoneOffset.UTC), userId, List.of(),
 			List.of(new com.soomgil.trip.api.dto.TripMember(
 				memberId, tripId, new UserSummary(
 					userId, displayNameHandler.handle(ownerQuery), displayNameHandler.findProfileImageUrl(ownerQuery)

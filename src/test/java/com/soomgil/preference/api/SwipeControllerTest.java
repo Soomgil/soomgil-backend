@@ -26,9 +26,11 @@ import com.soomgil.preference.api.dto.SwipeReaction;
 import com.soomgil.preference.api.dto.SwipeReactionRequest;
 import com.soomgil.preference.api.dto.SwipeReactionResponse;
 import com.soomgil.preference.application.command.dto.SavePlaceCommand;
+import com.soomgil.preference.application.command.dto.RemoveSwipeReactionCommand;
 import com.soomgil.preference.application.command.dto.UnsavePlaceCommand;
 import com.soomgil.preference.application.command.dto.UpsertSwipeReactionCommand;
 import com.soomgil.preference.application.command.handler.SavePlaceCommandHandler;
+import com.soomgil.preference.application.command.handler.RemoveSwipeReactionCommandHandler;
 import com.soomgil.preference.application.command.handler.UnsavePlaceCommandHandler;
 import com.soomgil.preference.application.command.handler.UpsertSwipeReactionCommandHandler;
 import com.soomgil.preference.application.query.dto.ListSavedPlacesQuery;
@@ -55,6 +57,7 @@ class SwipeControllerTest {
 
 	private RecordingSwipeFeedQueryHandler feedHandler;
 	private RecordingUpsertSwipeReactionCommandHandler reactionHandler;
+	private RecordingRemoveSwipeReactionCommandHandler removeReactionHandler;
 	private RecordingSavePlaceCommandHandler saveHandler;
 	private RecordingUnsavePlaceCommandHandler unsaveHandler;
 	private RecordingListSavedPlacesQueryHandler listSavedPlacesHandler;
@@ -67,6 +70,7 @@ class SwipeControllerTest {
 	void setUp() {
 		feedHandler = new RecordingSwipeFeedQueryHandler();
 		reactionHandler = new RecordingUpsertSwipeReactionCommandHandler();
+		removeReactionHandler = new RecordingRemoveSwipeReactionCommandHandler();
 		saveHandler = new RecordingSavePlaceCommandHandler();
 		unsaveHandler = new RecordingUnsavePlaceCommandHandler();
 		listSavedPlacesHandler = new RecordingListSavedPlacesQueryHandler();
@@ -78,6 +82,7 @@ class SwipeControllerTest {
 		mockMvc = MockMvcBuilders.standaloneSetup(new SwipeController(
 				feedHandler,
 				reactionHandler,
+				removeReactionHandler,
 				saveHandler,
 				unsaveHandler,
 				listSavedPlacesHandler,
@@ -135,6 +140,15 @@ class SwipeControllerTest {
 		assertThat(reactionHandler.lastCommand.provider()).isEqualTo(PlaceProvider.KTO);
 		assertThat(reactionHandler.lastCommand.externalPlaceId()).isEqualTo("126508");
 		assertThat(reactionHandler.lastCommand.reaction()).isEqualTo(SwipeReaction.SUPER_LIKE);
+	}
+
+	@Test
+	void removeSwipeReactionDelegatesToCommandHandler() throws Exception {
+		mockMvc.perform(delete("/api/v1/places/KTO/126508/preference-reaction"))
+			.andExpect(status().isNoContent());
+
+		assertThat(removeReactionHandler.lastCommand.provider()).isEqualTo(PlaceProvider.KTO);
+		assertThat(removeReactionHandler.lastCommand.externalPlaceId()).isEqualTo("126508");
 	}
 
 	@Test
@@ -257,6 +271,18 @@ class SwipeControllerTest {
 		public SavedPlace handle(SavePlaceCommand command) {
 			lastCommand = command;
 			return savedPlace();
+		}
+	}
+
+	private static final class RecordingRemoveSwipeReactionCommandHandler
+		implements RemoveSwipeReactionCommandHandler {
+
+		private RemoveSwipeReactionCommand lastCommand;
+
+		@Override
+		public NoResult handle(RemoveSwipeReactionCommand command) {
+			lastCommand = command;
+			return NoResult.INSTANCE;
 		}
 	}
 

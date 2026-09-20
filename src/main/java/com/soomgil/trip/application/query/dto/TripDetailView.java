@@ -3,6 +3,7 @@ package com.soomgil.trip.application.query.dto;
 import com.soomgil.trip.domain.model.TripAccessRole;
 import com.soomgil.trip.domain.model.TripStatus;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import com.soomgil.geo.application.query.dto.LegalRegionView;
 import java.util.UUID;
@@ -20,6 +21,8 @@ public record TripDetailView(
 	TripStatus status,
 	TripAccessRole myRole,
 	long itineraryVersion,
+	LocalDate startDate,
+	LocalDate endDate,
 	Instant createdAt,
 	UUID ownerUserId,
 	List<TripMemberView> members,
@@ -47,7 +50,7 @@ public record TripDetailView(
 		List<TripMemberView> members,
 		UUID retrippedFromPostId
 	) {
-		this(id, title, displayDestination, status, myRole, itineraryVersion, createdAt, ownerUserId, members,
+		this(id, title, displayDestination, status, myRole, itineraryVersion, null, null, createdAt, ownerUserId, members,
 			retrippedFromPostId, List.of());
 	}
 }

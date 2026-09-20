@@ -16,6 +16,7 @@ import com.soomgil.place.infrastructure.persistence.repository.TourismSourcePlac
 import java.net.URI;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 import org.springframework.stereotype.Service;
 
 /**
@@ -23,6 +24,7 @@ import org.springframework.stereotype.Service;
  */
 @Service
 public class TourismSourcePlaceDetailQueryHandler implements PlaceDetailQueryHandler {
+	private static final String RETIRED_DEMO_CDN_HOST = "daobk0bynum21.cloudfront.net";
 
 	private final TourismSourcePlaceDetailRepository repository;
 	private final TourismPlaceFeedClient liveClient;
@@ -62,18 +64,20 @@ public class TourismSourcePlaceDetailQueryHandler implements PlaceDetailQueryHan
 
 	private PlaceDetailItem findDetail(PlaceDetailQuery query) {
 		try {
-			var item=repository.find(query);
-            boolean refresh=liveClient.refreshRequested(query.externalPlaceId());
-            if(refresh || item.photos().size()<2 || item.description()==null || item.description().isBlank()) {
-                var collected=liveClient.fetchOne(query.externalPlaceId());
-                if(collected.isPresent()) {
-                    var fresh=toDetailItem(collected.get());
-                    var photos=java.util.stream.Stream.concat(item.photos().stream(),fresh.photos().stream()).distinct().toList();
-                    return new PlaceDetailItem(item.externalPlaceId(),item.name(),item.address(),item.lat(),item.lng(),item.thumbnailUrl(),photos,item.category(),item.sourceStatus(),
-                        refresh && fresh.description()!=null ? fresh.description() : item.description()==null||item.description().isBlank()?fresh.description():item.description(),item.phone(),item.sourceUpdatedAt(),item.enriched());
-                }
-            }
-            return item;
+			PlaceDetailItem item = repository.find(query);
+			boolean refresh = liveClient.refreshRequested(query.externalPlaceId());
+			boolean incomplete = item.photos().size() < 2
+				|| item.description() == null
+				|| item.description().isBlank()
+				|| !isUsableImage(item.thumbnailUrl())
+				|| item.photos().stream().anyMatch(photo -> !isUsableImage(photo));
+			if (refresh || incomplete) {
+				return liveClient.fetchOne(query.externalPlaceId())
+					.map(this::toDetailItem)
+					.map(fresh -> merge(item, fresh, refresh))
+					.orElse(item);
+			}
+			return item;
 		}
 		catch (BusinessException exception) {
 			if (exception.errorCode() != ErrorCode.RESOURCE_NOT_FOUND || query.provider() != PlaceProvider.KTO) {
@@ -83,6 +87,44 @@ public class TourismSourcePlaceDetailQueryHandler implements PlaceDetailQueryHan
 				.map(this::toDetailItem)
 				.orElseThrow(() -> exception);
 		}
+	}
+
+	private PlaceDetailItem merge(PlaceDetailItem stored, PlaceDetailItem fresh, boolean refresh) {
+		List<URI> freshImages = Stream.concat(
+			Stream.of(fresh.thumbnailUrl()),
+			fresh.photos().stream()
+		).filter(this::isUsableImage).toList();
+		URI thumbnail = isUsableImage(stored.thumbnailUrl())
+			? stored.thumbnailUrl()
+			: freshImages.stream().findFirst().orElse(null);
+		List<URI> photos = Stream.concat(
+			stored.photos().stream().filter(this::isUsableImage),
+			freshImages.stream()
+		).distinct().toList();
+		String description = refresh && fresh.description() != null
+			? fresh.description()
+			: stored.description() == null || stored.description().isBlank()
+				? fresh.description()
+				: stored.description();
+		return new PlaceDetailItem(
+			stored.externalPlaceId(),
+			stored.name(),
+			stored.address(),
+			stored.lat(),
+			stored.lng(),
+			thumbnail,
+			photos,
+			stored.category(),
+			stored.sourceStatus(),
+			description,
+			stored.phone(),
+			stored.sourceUpdatedAt(),
+			stored.enriched()
+		);
+	}
+
+	private boolean isUsableImage(URI uri) {
+		return uri != null && !RETIRED_DEMO_CDN_HOST.equalsIgnoreCase(uri.getHost());
 	}
 
 	private PlaceDetailItem toDetailItem(TourismPlaceFeedItem item) {

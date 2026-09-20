@@ -55,11 +55,15 @@ class KtoListAwardPhotosQueryHandlerTest {
 	}
 
 	@Test
-	void rotatesStartingPositionByDaySoTheSameDayIsStable() {
+	void rotatesStartingPositionByFiveItemsEachDaySoTheSameDayIsStable() {
 		var catalog = catalogOf(
 			item("A", "지역 A, 장소 A", "11"),
 			item("B", "지역 B, 장소 B", "11"),
-			item("C", "지역 C, 장소 C", "11")
+			item("C", "지역 C, 장소 C", "11"),
+			item("D", "지역 D, 장소 D", "11"),
+			item("E", "지역 E, 장소 E", "11"),
+			item("F", "지역 F, 장소 F", "11"),
+			item("G", "지역 G, 장소 G", "11")
 		);
 
 		var firstDay = handlerOn(dayOfYear(1), catalog).handle(new ListAwardPhotosQuery(2, null));
@@ -67,8 +71,8 @@ class KtoListAwardPhotosQueryHandlerTest {
 		var secondDay = handlerOn(dayOfYear(2), catalog).handle(new ListAwardPhotosQuery(2, null));
 
 		assertThat(firstDay).isEqualTo(firstDayAgain);
-		assertThat(firstDay.getFirst().awardContentId()).isEqualTo("B");
-		assertThat(secondDay.getFirst().awardContentId()).isEqualTo("C");
+		assertThat(firstDay.getFirst().awardContentId()).isEqualTo("A");
+		assertThat(secondDay.getFirst().awardContentId()).isEqualTo("F");
 	}
 
 	@Test

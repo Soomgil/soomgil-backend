@@ -21,6 +21,8 @@ else
 fi
 DB_USER="${DB_USERNAME:-soomgil}"
 DB_NAME="${DB_NAME:-soomgil}"
+PUBLIC_MEDIA_BASE_URL="${S3_PUBLIC_BASE_URL:-http://localhost:9000/soomgil-local}"
+MEDIA_BUCKET="${S3_BUCKET:-soomgil-local}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DUMP_FILE="${DUMP_FILE:-${SCRIPT_DIR}/seeds/generated/soomgil_demo_dashboard_dump.sql}"
 JEJU_TAG_DUMP_FILE="${JEJU_TAG_DUMP_FILE:-${SCRIPT_DIR}/seeds/soomgil_jeju_place_tags.sql}"
@@ -57,7 +59,9 @@ fi
 
 echo "Applying ${DUMP_FILE} ..."
 docker exec -i "${CONTAINER}" psql -U "${DB_USER}" -d "${DB_NAME}" \
-  -v ON_ERROR_STOP=1 < "${DUMP_FILE}"
+	-v ON_ERROR_STOP=1 \
+	-v public_media_base_url="${PUBLIC_MEDIA_BASE_URL%/}" \
+	-v media_bucket="${MEDIA_BUCKET}" < "${DUMP_FILE}"
 
 echo "Applying ${JEJU_TAG_DUMP_FILE} ..."
 docker exec -i "${CONTAINER}" psql -U "${DB_USER}" -d "${DB_NAME}" \

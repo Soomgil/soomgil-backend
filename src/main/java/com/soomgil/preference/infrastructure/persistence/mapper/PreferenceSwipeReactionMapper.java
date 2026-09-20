@@ -30,6 +30,8 @@ public interface PreferenceSwipeReactionMapper {
 
 	void updateReaction(UserPlaceReactionUpdateRow row);
 
+	void deleteReaction(@Param("id") String id);
+
 	void insertEvent(UserSwipeEventInsertRow row);
 
 	void upsertSuperLikeSavedPlace(

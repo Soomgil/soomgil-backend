@@ -27,6 +27,16 @@ public interface PasswordCredentialMapper {
 	@Update("UPDATE auth.user_password_credentials SET failed_login_count = 0, updated_at = now() WHERE user_id = #{userId}")
 	void resetFailedLoginCount(@Param("userId") UUID userId);
 
-	@Update("UPDATE auth.user_password_credentials SET password_hash = #{passwordHash}, password_changed_at = now(), updated_at = now() WHERE user_id = #{userId}")
-	void updatePasswordHash(@Param("userId") UUID userId, @Param("passwordHash") String passwordHash);
+	@Insert("""
+		INSERT INTO auth.user_password_credentials (user_id, password_hash)
+		VALUES (#{userId}, #{passwordHash})
+		ON CONFLICT (user_id) DO UPDATE SET
+			password_hash = EXCLUDED.password_hash,
+			password_changed_at = now(),
+			failed_login_count = 0,
+			locked_until = NULL,
+			last_failed_login_at = NULL,
+			updated_at = now()
+		""")
+	void upsertPasswordHash(@Param("userId") UUID userId, @Param("passwordHash") String passwordHash);
 }
