@@ -38,6 +38,53 @@ class KtoTourismPlaceClientTest {
     }
 
 	@Test
+	void fixedPlacesBypassLocalSeedAndUseKtoDetailResponses() throws Exception {
+		var stored = org.mockito.Mockito.mock(com.soomgil.place.infrastructure.persistence.repository.KtoStoredPlaces.class);
+		var responses = org.mockito.Mockito.mock(com.soomgil.place.infrastructure.persistence.repository.KtoResponseRepository.class);
+		var client = new KtoTourismPlaceClient(
+			new KtoTourismPlaceProperties(),
+			org.mockito.Mockito.mock(KtoPlaceDescriptionCache.class),
+			org.mockito.Mockito.mock(KtoPlacePhotoCache.class),
+			org.mockito.Mockito.mock(KtoAwardPhotoClient.class)
+		);
+		client.configurePersistence(responses, stored);
+		var detail = objectMapper.readTree("""
+			{"response":{"header":{"resultCode":"0000"},"body":{"items":{"item":[{
+			  "contentid":"126435","title":"성산일출봉","contenttypeid":"12",
+			  "firstimage":"https://tong.visitkorea.or.kr/seongsan.jpg"
+			}]}}}}
+			""");
+		var images = objectMapper.readTree("""
+			{"response":{"header":{"resultCode":"0000"},"body":{"items":{"item":[{
+			  "originimgurl":"https://tong.visitkorea.or.kr/seongsan-detail.jpg","cpyrhtDivCd":"Type1"
+			}]}}}}
+			""");
+		org.mockito.Mockito.when(responses.load(
+			org.mockito.ArgumentMatchers.any(),
+			org.mockito.ArgumentMatchers.any()
+		)).thenAnswer(invocation -> {
+			java.net.URI uri = invocation.getArgument(0);
+			return uri.getPath().endsWith("detailImage2") ? images : detail;
+		});
+
+		var result = client.fetchFixedPlaces(List.of("126435"));
+
+		assertThat(result).singleElement().satisfies(place -> {
+			assertThat(place.name()).isEqualTo("성산일출봉");
+			assertThat(place.photos()).containsExactly(
+				"https://tong.visitkorea.or.kr/seongsan.jpg",
+				"https://tong.visitkorea.or.kr/seongsan-detail.jpg"
+			);
+		});
+		org.mockito.Mockito.verifyNoInteractions(stored);
+		org.mockito.Mockito.verify(responses, org.mockito.Mockito.times(2)).load(
+			org.mockito.ArgumentMatchers.any(),
+			org.mockito.ArgumentMatchers.any()
+		);
+		client.close();
+	}
+
+	@Test
 	void convertsKtoListAndDetailResponsesIntoFrontendPlaceData() throws Exception {
 		var listBody = objectMapper.readTree("""
 			{
@@ -97,6 +144,26 @@ class KtoTourismPlaceClientTest {
 		var places = KtoTourismPlaceClient.parseList(listBody);
 
 		assertThat(places.getFirst().photos()).containsExactly("https://img.example/thumbnail.jpg");
+	}
+
+	@Test
+	void upgradesOfficialKtoImageUrlsToHttps() throws Exception {
+		var listBody = objectMapper.readTree("""
+			{"response":{"header":{"resultCode":"0000"},"body":{"items":{"item":[{
+			  "contentid":"126435","title":"성산일출봉","contenttypeid":"12",
+			  "firstimage":"http://tong.visitkorea.or.kr/cms/resource/photo.jpg"
+			}]}}}}
+			""");
+		var imageBody = objectMapper.readTree("""
+			{"response":{"header":{"resultCode":"0000"},"body":{"items":{"item":[{
+			  "originimgurl":"http://tong.visitkorea.or.kr/cms/resource/detail.jpg","cpyrhtDivCd":"Type1"
+			}]}}}}
+			""");
+
+		assertThat(KtoTourismPlaceClient.parseList(listBody).getFirst().thumbnailUrl())
+			.isEqualTo("https://tong.visitkorea.or.kr/cms/resource/photo.jpg");
+		assertThat(KtoTourismPlaceClient.parseDetailImages(imageBody))
+			.containsExactly("https://tong.visitkorea.or.kr/cms/resource/detail.jpg");
 	}
 
 	@Test

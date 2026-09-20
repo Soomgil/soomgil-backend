@@ -3,6 +3,8 @@ package com.soomgil.preference.application.service;
 import com.soomgil.global.error.BusinessException;
 import com.soomgil.global.error.ErrorCode;
 import com.soomgil.place.api.dto.PlaceProvider;
+import com.soomgil.place.application.port.TourismPlaceFeedClient;
+import com.soomgil.place.application.port.TourismPlaceFeedItem;
 import com.soomgil.preference.api.dto.CompleteOnboardingPreferenceSurveyRequest;
 import com.soomgil.preference.api.dto.OnboardingPreferenceAnswer;
 import com.soomgil.preference.api.dto.OnboardingPreferenceCompletionResponse;
@@ -13,15 +15,16 @@ import com.soomgil.preference.application.command.dto.UpsertSwipeReactionCommand
 import com.soomgil.preference.application.command.handler.UpsertSwipeReactionCommandHandler;
 import com.soomgil.preference.domain.policy.PreferenceSource;
 import com.soomgil.preference.infrastructure.persistence.mapper.OnboardingPreferenceMapper;
-import com.soomgil.preference.infrastructure.persistence.row.OnboardingSurveyPlaceRow;
+import com.soomgil.preference.infrastructure.persistence.row.OnboardingSurveyPlaceRefRow;
 import com.soomgil.preference.infrastructure.persistence.row.OnboardingSurveyVersionRow;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,13 +39,19 @@ public class OnboardingPreferenceService {
 
 	private final OnboardingPreferenceMapper mapper;
 	private final UpsertSwipeReactionCommandHandler reactionHandler;
+	private final TourismPlaceFeedClient tourismPlaceFeedClient;
+	private final SwipeTagPreparationService tagPreparationService;
 
 	public OnboardingPreferenceService(
 		OnboardingPreferenceMapper mapper,
-		UpsertSwipeReactionCommandHandler reactionHandler
+		UpsertSwipeReactionCommandHandler reactionHandler,
+		TourismPlaceFeedClient tourismPlaceFeedClient,
+		SwipeTagPreparationService tagPreparationService
 	) {
 		this.mapper = mapper;
 		this.reactionHandler = reactionHandler;
+		this.tourismPlaceFeedClient = tourismPlaceFeedClient;
+		this.tagPreparationService = tagPreparationService;
 	}
 
 	/**
@@ -54,13 +63,31 @@ public class OnboardingPreferenceService {
 	@Transactional(readOnly = true)
 	public OnboardingPreferenceSurveyResponse getSurvey(UUID userId) {
 		OnboardingSurveyVersionRow version = activeVersion();
-		List<OnboardingSurveyPlaceRow> rows = surveyPlaces(version);
+		List<OnboardingSurveyPlaceRefRow> rows = surveyPlaces(version);
+		List<TourismPlaceFeedItem> livePlaces = tourismPlaceFeedClient.fetchFixedPlaces(
+			rows.stream().map(OnboardingSurveyPlaceRefRow::externalPlaceId).toList()
+		);
+		Map<String, TourismPlaceFeedItem> livePlaceById = livePlaces.stream()
+			.collect(Collectors.toMap(TourismPlaceFeedItem::externalPlaceId, Function.identity()));
+		if (livePlaceById.size() != rows.size()) {
+			throw new BusinessException(
+				ErrorCode.CONFLICT,
+				"가입 취향 설문의 관광공사 장소 정보를 모두 불러오지 못했습니다."
+			);
+		}
+		Map<String, SwipeTagPreparation> tagPreparation = tagPreparationService.prepare(livePlaces);
 		return new OnboardingPreferenceSurveyResponse(
 			version.id(),
 			version.code(),
 			version.requiredPlaceCount(),
 			mapper.findCompletedAt(userId),
-			rows.stream().map(this::toPlace).toList()
+			rows.stream()
+				.map(row -> toPlace(
+					row,
+					livePlaceById.get(row.externalPlaceId()),
+					tagPreparation.get(row.externalPlaceId())
+				))
+				.toList()
 		);
 	}
 
@@ -81,14 +108,14 @@ public class OnboardingPreferenceService {
 			throw invalid("활성화된 취향 설문 version이 아닙니다.");
 		}
 
-		List<OnboardingSurveyPlaceRow> places = surveyPlaces(version);
+		List<OnboardingSurveyPlaceRefRow> places = surveyPlaces(version);
 		Map<PlaceKey, OnboardingPreferenceAnswer> answers = validateAnswers(request.responses(), places);
 		OffsetDateTime completedAt = mapper.findCompletedAt(userId);
 		if (completedAt != null) {
 			return new OnboardingPreferenceCompletionResponse(version.id(), completedAt);
 		}
 
-		for (OnboardingSurveyPlaceRow place : places) {
+		for (OnboardingSurveyPlaceRefRow place : places) {
 			PlaceKey key = new PlaceKey(place.provider(), place.externalPlaceId());
 			OnboardingPreferenceAnswer answer = answers.get(key);
 			String sourceResourceId = version.id() + ":" + place.externalPlaceId();
@@ -122,8 +149,8 @@ public class OnboardingPreferenceService {
 			.orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "활성 가입 취향 설문이 없습니다."));
 	}
 
-	private List<OnboardingSurveyPlaceRow> surveyPlaces(OnboardingSurveyVersionRow version) {
-		List<OnboardingSurveyPlaceRow> places = mapper.findPlaces(version.id());
+	private List<OnboardingSurveyPlaceRefRow> surveyPlaces(OnboardingSurveyVersionRow version) {
+		List<OnboardingSurveyPlaceRefRow> places = mapper.findPlaces(version.id());
 		if (places.size() != version.requiredPlaceCount()) {
 			throw new BusinessException(
 				ErrorCode.CONFLICT,
@@ -135,7 +162,7 @@ public class OnboardingPreferenceService {
 
 	private Map<PlaceKey, OnboardingPreferenceAnswer> validateAnswers(
 		List<OnboardingPreferenceAnswer> responses,
-		List<OnboardingSurveyPlaceRow> places
+		List<OnboardingSurveyPlaceRefRow> places
 	) {
 		Map<PlaceKey, OnboardingPreferenceAnswer> answers = new LinkedHashMap<>();
 		for (OnboardingPreferenceAnswer answer : responses) {
@@ -154,22 +181,20 @@ public class OnboardingPreferenceService {
 		return answers;
 	}
 
-	private OnboardingPreferencePlace toPlace(OnboardingSurveyPlaceRow row) {
-		List<String> tags = row.tagLabels() == null || row.tagLabels().isBlank()
-			? List.of()
-			: Arrays.stream(row.tagLabels().split("\\|"))
-				.map(String::trim)
-				.filter(tag -> !tag.isBlank())
-				.toList();
+	private OnboardingPreferencePlace toPlace(
+		OnboardingSurveyPlaceRefRow row,
+		TourismPlaceFeedItem livePlace,
+		SwipeTagPreparation tagPreparation
+	) {
 		return new OnboardingPreferencePlace(
 			PlaceProvider.valueOf(row.provider()),
 			row.externalPlaceId(),
-			row.name(),
-			row.address(),
-			row.thumbnailUrl(),
-			row.category(),
-			row.description(),
-			tags,
+			livePlace.name(),
+			livePlace.address(),
+			livePlace.thumbnailUrl(),
+			livePlace.category(),
+			livePlace.description(),
+			tagPreparation == null ? List.of() : tagPreparation.tags(),
 			row.sortOrder()
 		);
 	}

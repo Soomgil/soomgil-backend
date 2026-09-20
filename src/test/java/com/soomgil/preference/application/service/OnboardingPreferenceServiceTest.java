@@ -10,6 +10,8 @@ import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.soomgil.place.api.dto.PlaceProvider;
+import com.soomgil.place.application.port.TourismPlaceFeedClient;
+import com.soomgil.place.application.port.TourismPlaceFeedItem;
 import com.soomgil.preference.api.dto.CompleteOnboardingPreferenceSurveyRequest;
 import com.soomgil.preference.api.dto.OnboardingPreferenceAnswer;
 import com.soomgil.preference.api.dto.SwipeReaction;
@@ -17,10 +19,11 @@ import com.soomgil.preference.application.command.dto.UpsertSwipeReactionCommand
 import com.soomgil.preference.application.command.handler.UpsertSwipeReactionCommandHandler;
 import com.soomgil.preference.domain.policy.PreferenceSource;
 import com.soomgil.preference.infrastructure.persistence.mapper.OnboardingPreferenceMapper;
-import com.soomgil.preference.infrastructure.persistence.row.OnboardingSurveyPlaceRow;
+import com.soomgil.preference.infrastructure.persistence.row.OnboardingSurveyPlaceRefRow;
 import com.soomgil.preference.infrastructure.persistence.row.OnboardingSurveyVersionRow;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -34,12 +37,19 @@ class OnboardingPreferenceServiceTest {
 	private final OnboardingPreferenceMapper mapper = mock(OnboardingPreferenceMapper.class);
 	private final UpsertSwipeReactionCommandHandler reactionHandler =
 		mock(UpsertSwipeReactionCommandHandler.class);
+	private final TourismPlaceFeedClient tourismPlaceFeedClient = mock(TourismPlaceFeedClient.class);
+	private final SwipeTagPreparationService tagPreparationService = mock(SwipeTagPreparationService.class);
 	private final OnboardingPreferenceService service =
-		new OnboardingPreferenceService(mapper, reactionHandler);
+		new OnboardingPreferenceService(
+			mapper,
+			reactionHandler,
+			tourismPlaceFeedClient,
+			tagPreparationService
+		);
 
 	@Test
 	void completesAllTenAnswersAsTripleWeightedOnboardingEvidence() {
-		List<OnboardingSurveyPlaceRow> places = places();
+		List<OnboardingSurveyPlaceRefRow> places = places();
 		OffsetDateTime completedAt = OffsetDateTime.parse("2026-09-19T10:00:00+09:00");
 		when(mapper.findActiveVersion()).thenReturn(Optional.of(new OnboardingSurveyVersionRow(
 			SURVEY_ID,
@@ -82,7 +92,7 @@ class OnboardingPreferenceServiceTest {
 	@Test
 	void returnsExistingCompletionWithoutApplyingEvidenceAgain() {
 		OffsetDateTime completedAt = OffsetDateTime.parse("2026-09-19T10:00:00+09:00");
-		List<OnboardingSurveyPlaceRow> places = places();
+		List<OnboardingSurveyPlaceRefRow> places = places();
 		when(mapper.findActiveVersion()).thenReturn(Optional.of(new OnboardingSurveyVersionRow(
 			SURVEY_ID,
 			"jeju-diversity-v1",
@@ -118,25 +128,38 @@ class OnboardingPreferenceServiceTest {
 		)));
 		when(mapper.findPlaces(SURVEY_ID)).thenReturn(places());
 		when(mapper.findCompletedAt(USER_ID)).thenReturn(completedAt);
+		when(tourismPlaceFeedClient.fetchFixedPlaces(any())).thenReturn(livePlaces());
+		when(tagPreparationService.prepare(any())).thenReturn(Map.of());
 
 		var response = service.getSurvey(USER_ID);
 		var objectMapper = JsonMapper.builder().findAndAddModules().build();
 
 		assertThat(objectMapper.writeValueAsString(response)).contains("\"completed\":true");
+		assertThat(response.places().getFirst().name()).isEqualTo("실제 관광지 1");
 	}
 
-	private List<OnboardingSurveyPlaceRow> places() {
+	private List<OnboardingSurveyPlaceRefRow> places() {
 		return java.util.stream.IntStream.rangeClosed(1, 10)
-			.mapToObj(index -> new OnboardingSurveyPlaceRow(
+			.mapToObj(index -> new OnboardingSurveyPlaceRefRow(
 				"KTO",
 				String.valueOf(126400 + index),
-				"장소 " + index,
-				"제주",
-				null,
-				"관광지",
-				"설명",
-				"자연|산책",
 				index
+			))
+			.toList();
+	}
+
+	private List<TourismPlaceFeedItem> livePlaces() {
+		return java.util.stream.IntStream.rangeClosed(1, 10)
+			.mapToObj(index -> new TourismPlaceFeedItem(
+				String.valueOf(126400 + index),
+				"실제 관광지 " + index,
+				"실제 주소 " + index,
+				37.0,
+				127.0,
+				"https://tong.visitkorea.or.kr/place-" + index + ".jpg",
+				"관광지",
+				"실제 설명 " + index,
+				List.of("https://tong.visitkorea.or.kr/place-" + index + ".jpg")
 			))
 			.toList();
 	}
