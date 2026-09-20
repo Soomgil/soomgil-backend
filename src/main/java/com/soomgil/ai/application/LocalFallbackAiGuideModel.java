@@ -283,10 +283,20 @@ public class LocalFallbackAiGuideModel implements AiGuideModel {
 		if (query.isBlank()) {
 			return new AiGuideReply("추가할 장소 이름을 알려주세요.", List.of());
 		}
+		// "어울리는 장소 3곳으로 일정 초안 만들어줘"처럼 구체적 장소 이름이 없는 요청은
+		// 이름 검색이 아니라 취향 기반 추천 추가로 처리해야 한다(분류가 ADD_PLACE로 새어 들어오는 경우 방어).
+		if (looksLikeRecommendationRequest(query)) {
+			return addRecommendedPlaces(request, recommendedPlacesTools(request));
+		}
 		PagedPlaceSummary found = (PagedPlaceSummary) searchTools.searchPlaces(
 			new AiPlaceSearchTools.SearchPlacesInput(query, viewport(request), null, null)
 		);
 		if (found == null || found.items() == null || found.items().isEmpty()) {
+			if (query.length() > 12 || query.contains(" ")) {
+				// 긴 서술형 문장은 장소 이름일 가능성이 낮으므로 추천 추가로 한 번 더 시도한다.
+				AiGuideReply recommended = addRecommendedPlaces(request, recommendedPlacesTools(request));
+				if (!recommended.toolCalls().isEmpty()) return recommended;
+			}
 			return new AiGuideReply(
 				"'" + query + "' 장소를 찾지 못했어요. 이름이나 지역을 더 정확히 알려주세요.",
 				searchTools.executedCalls()
@@ -600,8 +610,22 @@ public class LocalFallbackAiGuideModel implements AiGuideModel {
 		return minLng + "," + minLat + "," + maxLng + "," + maxLat;
 	}
 
+	private static final Pattern RECOMMENDATION_HINT = Pattern.compile(
+		"추천|어울리|어울릴|갈만|가볼|볼만|괜찮은|좋은\\s*(?:곳|장소|여행지)|취향|초안|알아서|채워|명소|핫플|\\d+\\s*(?:곳|개)"
+	);
+
+	private boolean looksLikeRecommendationRequest(String query) {
+		return query != null && RECOMMENDATION_HINT.matcher(query).find();
+	}
+
+	private AiAddRecommendedPlacesTools recommendedPlacesTools(AiGuideRequest request) {
+		return (AiAddRecommendedPlacesTools) toolsFactory
+			.create(request, AiIntent.ADD_RECOMMENDED_PLACES_TO_ITINERARY)
+			.getFirst();
+	}
+
 	private int requestedLimit(String question) {
-		Matcher matcher = Pattern.compile("(\\d+)개").matcher(question);
+		Matcher matcher = Pattern.compile("(\\d+)\\s*(?:개|곳|군데)").matcher(question);
 		if (matcher.find()) return Math.min(10, Math.max(1, Integer.parseInt(matcher.group(1))));
 		return 3;
 	}

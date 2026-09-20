@@ -93,7 +93,9 @@ public class AiTripToolsFactory {
 			case ADD_PLACE_TO_ITINERARY -> List.of(
 				new AiAddPlaceTools(request, auditService, itineraryToolService),
 				new AiPlaceSearchTools(request, auditService, placeSearchHandler),
-				itineraryRead(request)
+				itineraryRead(request),
+				// 장소 이름이 없거나 검색 결과가 비었을 때 되묻지 않고 취향 기반 추천으로 채울 수 있게 함께 노출한다.
+				new AiAddRecommendedPlacesTools(request, auditService, recommendationHandler, itineraryToolService, viewportResolver)
 			);
 			case ADD_RECOMMENDED_PLACES_TO_ITINERARY -> List.of(
 				new AiAddRecommendedPlacesTools(request, auditService, recommendationHandler, itineraryToolService, viewportResolver),

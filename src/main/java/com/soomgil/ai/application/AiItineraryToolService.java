@@ -6,8 +6,8 @@ import com.soomgil.itinerary.application.command.dto.DeleteItineraryItemCommand;
 import com.soomgil.itinerary.application.command.dto.ItineraryMutationResult;
 import com.soomgil.itinerary.application.command.dto.ItineraryDayOrderCommand;
 import com.soomgil.itinerary.application.command.dto.ItineraryItemOrderCommand;
-import com.soomgil.itinerary.application.command.dto.ItineraryItemView;
 import com.soomgil.itinerary.application.command.dto.MapMatchRouteCommand;
+import com.soomgil.itinerary.application.command.dto.ItineraryItemView;
 import com.soomgil.itinerary.application.command.dto.ReorderItineraryCommand;
 import com.soomgil.itinerary.application.command.dto.RouteSegmentView;
 import com.soomgil.itinerary.application.command.dto.UpdateItineraryItemCommand;
@@ -304,19 +304,56 @@ public class AiItineraryToolService {
 		List<ItemMove> moves
 	) {
 		if (moves == null || moves.isEmpty()) return null;
-		long version = baseVersion;
-		ItineraryMutationResult last = null;
-		List<UUID> affectedItemIds = new ArrayList<>();
+		// 항목을 하나씩 UpdateItineraryItem으로 옮기면 경로가 연결된 항목에서
+		// "Route-connected item must not be moved alone" 규칙에 걸려 최적화가 통째로 실패한다.
+		// moveItem과 같이 전체 순서를 한 번에 재정렬하는 ReorderItinerary 명령으로 적용한다.
+		var itinerary = itineraryHandler.handle(new FindItineraryQuery(tripId, userId));
+		java.util.Map<UUID, ItemMove> moveByItem = new java.util.LinkedHashMap<>();
 		for (ItemMove move : moves) {
-			last = updateItemHandler.handle(new UpdateItineraryItemCommand(
-				tripId, userId, version, move.itemId(), move.itineraryDayId(),
-				move.sortOrder(), move.placeName(), move.address(), move.lat(), move.lng(),
-				move.thumbnailUrl() == null ? null : URI.create(move.thumbnailUrl())
-			));
-			version = last.itineraryVersion();
-			affectedItemIds.add(move.itemId());
+			if (move.itemId() != null) moveByItem.put(move.itemId(), move);
 		}
-		return last;
+		java.util.Set<UUID> knownItemIds = itinerary.days().stream()
+			.flatMap(day -> day.items().stream())
+			.map(ItineraryItemView::id)
+			.collect(java.util.stream.Collectors.toSet());
+		java.util.Set<UUID> knownDayIds = itinerary.days().stream()
+			.map(ItineraryDayDetailView::id)
+			.collect(java.util.stream.Collectors.toSet());
+		for (ItemMove move : moveByItem.values()) {
+			if (!knownItemIds.contains(move.itemId())) {
+				throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "일정에서 옮길 장소를 찾지 못했어요.");
+			}
+			if (move.itineraryDayId() != null && !knownDayIds.contains(move.itineraryDayId())) {
+				throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "목표 일차를 찾지 못했어요.");
+			}
+		}
+		record Placement(UUID itemId, int order, int sequence) {
+		}
+		java.util.Map<UUID, List<Placement>> placements = new java.util.HashMap<>();
+		int sequence = 0;
+		for (var day : itinerary.days()) {
+			for (ItineraryItemView item : day.items().stream().sorted(Comparator.comparingInt(ItineraryItemView::sortOrder)).toList()) {
+				ItemMove move = moveByItem.get(item.id());
+				UUID targetDay = move == null || move.itineraryDayId() == null ? day.id() : move.itineraryDayId();
+				// 이동 지시가 있으면 지정 순서를, 없으면 기존 순서를 쓴다. 지정 순서는 기존 항목보다 앞서도록 미세 가중치를 준다.
+				int order = move == null || move.sortOrder() == null ? item.sortOrder() * 2 + 1 : move.sortOrder() * 2;
+				placements.computeIfAbsent(targetDay, key -> new ArrayList<>()).add(new Placement(item.id(), order, sequence++));
+			}
+		}
+		List<ItineraryDayOrderCommand> order = itinerary.days().stream()
+			.sorted(Comparator.comparingInt(day -> day.sortOrder() == null ? Integer.MAX_VALUE : day.sortOrder()))
+			.map(day -> {
+				List<Placement> dayPlacements = placements.getOrDefault(day.id(), List.of()).stream()
+					.sorted(Comparator.comparingInt(Placement::order).thenComparingInt(Placement::sequence))
+					.toList();
+				List<ItineraryItemOrderCommand> items = new ArrayList<>();
+				for (int index = 0; index < dayPlacements.size(); index++) {
+					items.add(new ItineraryItemOrderCommand(dayPlacements.get(index).itemId(), index));
+				}
+				return new ItineraryDayOrderCommand(day.id(), day.sortOrder() == null ? 0 : day.sortOrder(), items);
+			})
+			.toList();
+		return reorderItineraryHandler.handle(new ReorderItineraryCommand(tripId, userId, baseVersion, order));
 	}
 
 	/**

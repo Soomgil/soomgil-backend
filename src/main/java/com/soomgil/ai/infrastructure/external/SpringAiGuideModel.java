@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.soomgil.ai.api.dto.AiToolCall;
+import com.soomgil.ai.api.dto.AiToolExecutionPolicy;
 import com.soomgil.ai.application.AiExecutableTools;
 import com.soomgil.ai.application.AiGuideModel;
 import com.soomgil.ai.application.AiGuideReply;
@@ -57,6 +58,7 @@ public class SpringAiGuideModel implements AiGuideModel {
 		조건에 맞는 여러 장소를 삭제하는 요청만 FILTER_PLACES_BY_CONDITION입니다.
 		쓰기 intent는 사용자가 작성·추가·이동·삭제·최적화 의사를 명시한 경우에만 선택하세요.
 		"추천해줘"처럼 보여달라는 요청은 RECOMMEND_PLACES이고, "추천해서 넣어줘/추가해줘"는 ADD_RECOMMENDED_PLACES_TO_ITINERARY입니다.
+		"4일차에 어울리는 장소 3곳으로 일정 초안 만들어줘", "빈 날 알아서 채워줘"처럼 구체적인 장소 이름 없이 장소를 채우라는 요청도 ADD_RECOMMENDED_PLACES_TO_ITINERARY입니다. ADD_PLACE_TO_ITINERARY는 사용자가 장소 이름을 직접 말했을 때만 선택하세요.
 		애매하면 반드시 AMBIGUOUS로 분류하고 clarificationQuestion에 한국어 질문을 넣으세요.
 		"안녕", "고마워"는 GENERAL_CHAT, "뭐 할 수 있어?"는 HELP입니다.
 		""";
@@ -197,7 +199,10 @@ public class SpringAiGuideModel implements AiGuideModel {
 				+ "날짜는 yyyy-MM-dd 형식 문자열로 전달하라.";
 			case ADD_PLACE_TO_ITINERARY -> "사용자가 말한 장소가 여행 맥락 JSON에 없으면 searchPlaces 도구로 먼저 찾은 뒤 "
 				+ "그 결과의 provider와 externalPlaceId로 addPlaceToItinerary를 호출하라. "
-				+ "일차가 불명확하면 itineraryDayId를 null로 두어 일차 미정에 추가하라.";
+				+ "일차가 불명확하면 itineraryDayId를 null로 두어 일차 미정에 추가하라. "
+				+ "사용자가 구체적인 장소 이름을 말하지 않았거나(\"어울리는 장소 3곳\", \"갈만한 곳\" 등) searchPlaces 결과가 비어 있으면 "
+				+ "되묻거나 포기하지 말고 addRecommendedPlacesToItinerary를 호출해 취향 기반 추천 장소를 해당 일차(days[].id)에 추가하라. "
+				+ "limit는 사용자가 말한 개수 또는 3개로 하고 bbox는 비워 서버가 채우게 하라.";
 			default -> "노출된 도구 범위 안에서만 작업하세요. 다른 종류의 변경을 시도하지 마세요.";
 		};
 		return replyWithTools(request, decision, mode);
@@ -210,8 +215,11 @@ public class SpringAiGuideModel implements AiGuideModel {
 	 * 사용자가 요청한 변경이 실제로는 일어나지 않은 상태라 결정적 경로로 한 번 더 시도한다.
 	 */
 	private boolean silentlySkippedWrite(AiIntentDecision decision, List<AiToolCall> calls, String content) {
+		// 조회 도구(searchPlaces 등)만 부르고 실제 변경 도구를 호출하지 않은 경우도 "쓰기를 건너뛴 것"으로 본다.
+		boolean noWriteCall = calls.stream()
+			.noneMatch(call -> call.executionPolicy() != AiToolExecutionPolicy.READ);
 		return decision.intent().usesWriteTools()
-			&& calls.isEmpty()
+			&& noWriteCall
 			&& content != null
 			&& !content.contains("?")
 			&& !content.contains("？");

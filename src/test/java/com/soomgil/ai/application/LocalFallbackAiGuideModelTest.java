@@ -52,6 +52,31 @@ class LocalFallbackAiGuideModelTest {
 	}
 
 	@Test
+	void descriptiveAddRequestWithoutPlaceNameFallsBackToRecommendedPlaces() {
+		AiAddPlaceTools addTools = mock(AiAddPlaceTools.class);
+		AiPlaceSearchTools searchTools = mock(AiPlaceSearchTools.class);
+		AiAddRecommendedPlacesTools recommendedTools = mock(AiAddRecommendedPlacesTools.class);
+		AiToolCall call = mock(AiToolCall.class);
+		when(toolsFactory.create(any(), org.mockito.ArgumentMatchers.eq(AiIntent.ADD_PLACE_TO_ITINERARY)))
+			.thenReturn(List.of(addTools, searchTools));
+		when(toolsFactory.create(any(), org.mockito.ArgumentMatchers.eq(AiIntent.ADD_RECOMMENDED_PLACES_TO_ITINERARY)))
+			.thenReturn(List.of(recommendedTools));
+		when(recommendedTools.executedCalls()).thenReturn(List.of(call));
+		AiGuideRequest request = request("4일차에 어울리는 장소 3곳으로 일정 초안 만들어서 추가해줘", mock(AiTripContext.class));
+
+		AiGuideReply reply = model.replyWithWriteTools(
+			request, new AiIntentDecision(AiIntent.ADD_PLACE_TO_ITINERARY, 1.0, "test", null)
+		);
+
+		ArgumentCaptor<AiAddRecommendedPlacesTools.AddRecommendedPlacesInput> input =
+			ArgumentCaptor.forClass(AiAddRecommendedPlacesTools.AddRecommendedPlacesInput.class);
+		verify(recommendedTools).addRecommendedPlacesToItinerary(input.capture());
+		assertThat(input.getValue().limit()).isEqualTo(3);
+		verify(searchTools, org.mockito.Mockito.never()).searchPlaces(any());
+		assertThat(reply.toolCalls()).containsExactly(call);
+	}
+
+	@Test
 	void distinguishesRecommendationLookupFromAddingRecommendedPlaces() {
 		assertThat(model.classify(request("갈만한 여행지 추천해줘", null)).intent())
 			.isEqualTo(AiIntent.RECOMMEND_PLACES);

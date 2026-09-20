@@ -83,6 +83,46 @@ class AiItineraryToolServiceTest {
 	}
 
 	@Test
+	void optimizeReorderAppliesAllMovesWithOneReorderCommandSoRouteConnectedItemsCanMove() {
+		UUID tripId = UUID.randomUUID();
+		UUID userId = UUID.randomUUID();
+		UUID day1 = UUID.randomUUID();
+		UUID day2 = UUID.randomUUID();
+		UUID a = UUID.randomUUID();
+		UUID b = UUID.randomUUID();
+		UUID c = UUID.randomUUID();
+		FindItineraryHandler itineraryHandler = mock(FindItineraryHandler.class);
+		ReorderItineraryHandler reorderHandler = mock(ReorderItineraryHandler.class);
+		when(itineraryHandler.handle(new FindItineraryQuery(tripId, userId))).thenReturn(new ItineraryView(
+			tripId, 7L,
+			List.of(
+				new ItineraryDayDetailView(day1, tripId, ItineraryDayGroupType.DAY, 1, null, "1일차", 0,
+					List.of(item(a, day1, 0, "A", 33.1, 126.1), item(b, day1, 1, "B", 33.2, 126.2))),
+				new ItineraryDayDetailView(day2, tripId, ItineraryDayGroupType.DAY, 2, null, "2일차", 1,
+					List.of(item(c, day2, 0, "C", 33.3, 126.3)))
+			), List.of(), List.of()
+		));
+		when(reorderHandler.handle(any())).thenReturn(new ItineraryMutationResult(
+			tripId, 8L, null, null, null, null, List.of()
+		));
+		AiItineraryToolService service = service(itineraryHandler, reorderHandler);
+
+		// B를 2일차 맨 앞으로, C는 그 뒤로. A는 그대로.
+		service.reorderItems(tripId, userId, 7L, List.of(
+			new AiItineraryToolService.ItemMove(b, day2, 0, null, null, null, null, null),
+			new AiItineraryToolService.ItemMove(c, day2, 1, null, null, null, null, null)
+		));
+
+		ArgumentCaptor<ReorderItineraryCommand> captor = ArgumentCaptor.forClass(ReorderItineraryCommand.class);
+		verify(reorderHandler).handle(captor.capture());
+		assertThat(captor.getValue().baseVersion()).isEqualTo(7L);
+		assertThat(captor.getValue().days()).filteredOn(day -> day.dayId().equals(day1)).singleElement()
+			.satisfies(day -> assertThat(day.itemOrders()).extracting(order -> order.itemId()).containsExactly(a));
+		assertThat(captor.getValue().days()).filteredOn(day -> day.dayId().equals(day2)).singleElement()
+			.satisfies(day -> assertThat(day.itemOrders()).extracting(order -> order.itemId()).containsExactly(b, c));
+	}
+
+	@Test
 	void createsAnUnscheduledDayAndUsesItsNewVersionWhenNoDayWasSelected() {
 		UUID tripId = UUID.randomUUID();
 		UUID userId = UUID.randomUUID();
