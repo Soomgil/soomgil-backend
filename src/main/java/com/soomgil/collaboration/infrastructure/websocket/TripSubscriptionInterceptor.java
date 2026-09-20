@@ -47,7 +47,9 @@ public class TripSubscriptionInterceptor implements ChannelInterceptor {
 		}
 		if (StompCommand.SUBSCRIBE.equals(accessor.getCommand())) {
 			AuthorizedTripSubscription subscription = authorizeSubscription(accessor);
-			presenceBroadcaster.registerSubscription(accessor.getSessionId(), subscription.userId(), subscription.tripId());
+			if (subscription.tripId() != null) {
+				presenceBroadcaster.registerSubscription(accessor.getSessionId(), subscription.userId(), subscription.tripId());
+			}
 		}
 		if (StompCommand.DISCONNECT.equals(accessor.getCommand())) {
 			presenceBroadcaster.unregisterSession(accessor.getSessionId());
@@ -58,6 +60,9 @@ public class TripSubscriptionInterceptor implements ChannelInterceptor {
 	private AuthorizedTripSubscription authorizeSubscription(StompHeaderAccessor accessor) {
 		UUID userId = requireUser(accessor.getUser(), accessor.getSessionId());
 		String destination = accessor.getDestination();
+		if ("/user/queue/notifications".equals(destination)) {
+			return new AuthorizedTripSubscription(null, userId);
+		}
 		Matcher matcher = destination == null ? null : TRIP_TOPIC.matcher(destination);
 		if (matcher == null || !matcher.matches()) {
 			throw new AccessDeniedException("Subscription destination is not allowed.");

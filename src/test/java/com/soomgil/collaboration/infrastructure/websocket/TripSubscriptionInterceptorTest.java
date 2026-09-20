@@ -72,6 +72,13 @@ class TripSubscriptionInterceptorTest {
 	}
 
 	@Test
+	void allowsAuthenticatedUserToSubscribeToPersonalNotifications() {
+		Message<?> message = message(StompCommand.SUBSCRIBE, "/user/queue/notifications", true);
+
+		assertThat(interceptor.preSend(message, channel)).isSameAs(message);
+	}
+
+	@Test
 	void rejectsConnectionWithoutAuthenticatedPrincipal() {
 		Message<?> message = message(StompCommand.CONNECT, null, false);
 

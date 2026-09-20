@@ -8,6 +8,7 @@ import static org.mockito.Mockito.when;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.soomgil.notification.infrastructure.persistence.NotificationMapper;
 import com.soomgil.notification.infrastructure.persistence.NotificationRow;
+import com.soomgil.notification.application.port.NotificationRealtimePublisher;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -26,7 +27,9 @@ class NotificationServiceTest {
 				+ "\"inviteId\":\"00000000-0000-0000-0000-000000000002\",\"inviteCode\":\"ABC\"}",
 			null, Instant.now()
 		)));
-		NotificationService service = new NotificationService(mapper, new ObjectMapper().findAndRegisterModules());
+		NotificationService service = new NotificationService(
+			mapper, new ObjectMapper().findAndRegisterModules(), mock(NotificationRealtimePublisher.class)
+		);
 
 		var result = service.list(userId, true, 0, 20);
 
