@@ -286,10 +286,25 @@ class AiChatServiceTest {
 			new AiGuideReply("일정 기준으로 체크리스트를 만들었어요.", List.of())
 		);
 
-		service.createMessage(tripId, userId, "체크리스트 자동으로 만들어줘", null);
+		service.createMessage(tripId, userId, "현재 여행 계획을 보고 준비물 체크리스트를 자동으로 만들어줘", null);
 
 		verify(model).replyWithWriteTools(any(), org.mockito.ArgumentMatchers.argThat(
 			decision -> decision.intent() == AiIntent.GENERATE_CHECKLIST_FROM_ITINERARY
+		));
+	}
+
+	@Test
+	void unscheduledPlacePlacementUsesReorderEvenWhenClassifierMissesIt() {
+		stubAssistant("일차 미정 장소를 배치했어요.");
+		when(model.classify(any())).thenReturn(decision(AiIntent.UNSUPPORTED));
+		when(model.replyWithWriteTools(any(), any())).thenReturn(
+			new AiGuideReply("일차 미정 장소를 배치했어요.", List.of())
+		);
+
+		service.createMessage(tripId, userId, "일차 미정 관광지를 2일차에 배치해줘", null);
+
+		verify(model).replyWithWriteTools(any(), org.mockito.ArgumentMatchers.argThat(
+			decision -> decision.intent() == AiIntent.OPTIMIZE_ROUTE
 		));
 	}
 

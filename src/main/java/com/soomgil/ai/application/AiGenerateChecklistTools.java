@@ -1,6 +1,8 @@
 package com.soomgil.ai.application;
 
 import com.soomgil.ai.api.dto.AiToolExecutionPolicy;
+import com.soomgil.global.error.BusinessException;
+import com.soomgil.global.error.ErrorCode;
 import com.soomgil.planning.api.dto.PlanningMutationResponse;
 import com.soomgil.planning.api.dto.PlanningScopeType;
 import com.soomgil.planning.application.command.CreateChecklistItemCommand;
@@ -64,8 +66,10 @@ public final class AiGenerateChecklistTools extends AiToolSupport {
 	}
 
 	private BulkChecklistGenerationResult buildChecklistItemsByDay(GenerateItemsByDayInput input) {
-		if (input.dayGroups() == null || input.dayGroups().isEmpty()) {
-			return new BulkChecklistGenerationResult(0, 0, List.of());
+		if (input.dayGroups() == null || input.dayGroups().stream().noneMatch(day ->
+			day != null && day.itineraryDayId() != null && day.items() != null
+				&& day.items().stream().anyMatch(content -> content != null && !content.isBlank()))) {
+			throw new BusinessException(ErrorCode.VALIDATION_FAILED, "생성할 일차별 체크리스트 항목이 필요해요.");
 		}
 		int checklistCount = 0;
 		int itemCount = 0;
@@ -96,6 +100,9 @@ public final class AiGenerateChecklistTools extends AiToolSupport {
 	}
 
 	private PlanningMutationResponse buildChecklistItems(GenerateItemsInput input) {
+		if (input.items() == null || input.items().stream().noneMatch(content -> content != null && !content.isBlank())) {
+			throw new BusinessException(ErrorCode.VALIDATION_FAILED, "생성할 체크리스트 항목이 필요해요.");
+		}
 		UUID checklistId = input.checklistId();
 		PlanningMutationResponse lastResponse = null;
 		if (checklistId == null) {
@@ -111,11 +118,11 @@ public final class AiGenerateChecklistTools extends AiToolSupport {
 		if (checklistId == null) {
 			return lastResponse;
 		}
-		int sortOrder = input.startSortOrder() == null ? 0 : input.startSortOrder();
+		Integer sortOrder = input.startSortOrder();
 		for (String content : input.items()) {
 			if (content == null || content.isBlank()) continue;
 			lastResponse = checklistItemHandler.handle(new CreateChecklistItemCommand(
-				tripId, checklistId, userId, content, sortOrder++
+				tripId, checklistId, userId, content, sortOrder == null ? null : sortOrder++
 			));
 		}
 		return lastResponse;

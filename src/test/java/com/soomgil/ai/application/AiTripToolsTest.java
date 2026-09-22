@@ -273,8 +273,23 @@ class AiTripToolsTest {
 			tripId, userId, PlanningScopeType.DAY, dayThreeId, "3일차 체크리스트"
 		));
 		verify(itemHandler).handle(new CreateChecklistItemCommand(
-			tripId, checklistId, userId, "롯데월드 예매 확인", 0
+			tripId, checklistId, userId, "롯데월드 예매 확인", null
 		));
+	}
+
+	@Test
+	void emptyGeneratedChecklistDoesNotReportSuccessOrCreateAnEmptyList() {
+		UpsertChecklistCommandHandler checklistHandler = mock(UpsertChecklistCommandHandler.class);
+		CreateChecklistItemCommandHandler itemHandler = mock(CreateChecklistItemCommandHandler.class);
+		AiGenerateChecklistTools tools = new AiGenerateChecklistTools(
+			request(UUID.randomUUID(), UUID.randomUUID()), audit(), checklistHandler, itemHandler
+		);
+
+		assertThatThrownBy(() -> tools.generateChecklistItems(new AiGenerateChecklistTools.GenerateItemsInput(
+			null, "TRIP", null, "AI 추천 준비물", List.of(), null
+		))).isInstanceOf(com.soomgil.global.error.BusinessException.class);
+		verify(checklistHandler, org.mockito.Mockito.never()).handle(any());
+		verify(itemHandler, org.mockito.Mockito.never()).handle(any());
 	}
 
 	private PlaceRecommendation recommendation(String name, String externalPlaceId) {
