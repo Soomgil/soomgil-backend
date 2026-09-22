@@ -22,6 +22,7 @@ import com.soomgil.place.api.dto.PlaceSourceStatus;
 import com.soomgil.place.api.dto.PlaceSummary;
 import com.soomgil.place.application.query.handler.PlaceSearchQueryHandler;
 import com.soomgil.planning.api.dto.Checklist;
+import com.soomgil.planning.api.dto.ChecklistItem;
 import com.soomgil.planning.api.dto.Note;
 import com.soomgil.planning.api.dto.PlanningMutationResponse;
 import com.soomgil.planning.api.dto.PlanningScopeType;
@@ -259,15 +260,29 @@ class AiTripToolsTest {
 			null,
 			null
 		));
+		when(itemHandler.handle(new CreateChecklistItemCommand(
+			tripId, checklistId, userId, "롯데월드 예매 확인", null
+		))).thenReturn(new PlanningMutationResponse(
+			tripId, null, null, false, false, null, null,
+			new ChecklistItem(UUID.randomUUID(), checklistId, 0, "롯데월드 예매 확인", List.of(), null), null
+		));
 		AiGenerateChecklistTools tools = new AiGenerateChecklistTools(
 			request(tripId, userId), audit(), checklistHandler, itemHandler
 		);
 
-		tools.generateChecklistItemsByDay(new AiGenerateChecklistTools.GenerateItemsByDayInput(List.of(
-			new AiGenerateChecklistTools.DayChecklistInput(
-				null, dayThreeId, "3일차 체크리스트", List.of("롯데월드 예매 확인"), null
-			)
-		)));
+		AiGenerateChecklistTools.BulkChecklistGenerationResult result =
+			(AiGenerateChecklistTools.BulkChecklistGenerationResult) tools.generateChecklistItemsByDay(
+				new AiGenerateChecklistTools.GenerateItemsByDayInput(List.of(
+					new AiGenerateChecklistTools.DayChecklistInput(
+						null, dayThreeId, "3일차 체크리스트", List.of("롯데월드 예매 확인"), null
+					)
+				))
+			);
+		assertThat(result.checklistCount()).isEqualTo(1);
+		assertThat(result.itemCount()).isEqualTo(1);
+		assertThat(result.dayResults()).containsExactly(
+			new AiGenerateChecklistTools.DayChecklistResult(dayThreeId, checklistId, 1)
+		);
 
 		verify(checklistHandler).handle(new UpsertChecklistCommand(
 			tripId, userId, PlanningScopeType.DAY, dayThreeId, "3일차 체크리스트"

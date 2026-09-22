@@ -76,7 +76,7 @@ public final class AiGenerateChecklistTools extends AiToolSupport {
 		List<DayChecklistResult> results = new java.util.ArrayList<>();
 		for (DayChecklistInput dayGroup : input.dayGroups()) {
 			if (dayGroup == null || dayGroup.itineraryDayId() == null
-				|| dayGroup.items() == null || dayGroup.items().isEmpty()) {
+				|| dayGroup.items() == null || dayGroup.items().stream().noneMatch(content -> content != null && !content.isBlank())) {
 				continue;
 			}
 			PlanningMutationResponse response = buildChecklistItems(new GenerateItemsInput(
@@ -87,13 +87,13 @@ public final class AiGenerateChecklistTools extends AiToolSupport {
 				dayGroup.items(),
 				dayGroup.startSortOrder()
 			));
-			if (response != null && response.checklist() != null) {
+			if (response != null && response.item() != null) {
 				checklistCount++;
 				long created = dayGroup.items().stream()
 					.filter(content -> content != null && !content.isBlank())
 					.count();
 				itemCount += (int) created;
-				results.add(new DayChecklistResult(dayGroup.itineraryDayId(), response.checklist().id(), (int) created));
+				results.add(new DayChecklistResult(dayGroup.itineraryDayId(), response.item().checklistId(), (int) created));
 			}
 		}
 		return new BulkChecklistGenerationResult(checklistCount, itemCount, results);

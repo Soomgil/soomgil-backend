@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.soomgil.ai.api.dto.AiToolCall;
 import com.soomgil.ai.api.dto.AiToolExecutionPolicy;
+import com.soomgil.ai.application.AiChecklistRequestScope;
 import com.soomgil.ai.application.AiExecutableTools;
 import com.soomgil.ai.application.AiGuideModel;
 import com.soomgil.ai.application.AiGuideReply;
@@ -157,6 +158,12 @@ public class SpringAiGuideModel implements AiGuideModel {
 	public AiGuideReply replyWithWriteTools(AiGuideRequest request, AiIntentDecision decision) {
 		if (!decision.intent().usesWriteTools()) {
 			throw new IllegalArgumentException("Write tools cannot handle intent: " + decision.intent());
+		}
+		// 전체 준비물 요청은 TRIP 체크리스트로 확정한다. 모델이 일차별 도구를 선택해
+		// 항목이 0건이라고 답하거나 요청과 다른 범위에 쓰는 일을 막는다.
+		if (decision.intent() == AiIntent.GENERATE_CHECKLIST_FROM_ITINERARY
+			&& AiChecklistRequestScope.isTripWide(request.question())) {
+			return fallback.replyWithWriteTools(request, decision);
 		}
 		String mode = switch (decision.intent()) {
 			case DELETE_ITINERARY_ITEM -> "현재 여행 맥락 JSON에서 사용자가 말한 장소 이름을 확인하고 "

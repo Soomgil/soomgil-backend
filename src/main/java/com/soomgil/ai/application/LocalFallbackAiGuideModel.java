@@ -52,13 +52,13 @@ public class LocalFallbackAiGuideModel implements AiGuideModel {
 		else if (isUnscheduledPlacementRequest(q)) {
 			intent = AiIntent.OPTIMIZE_ROUTE;
 		}
-		else if (q.matches(".*(동선|이동경로|이동.*경로|경로|길).*(최적화|정리|개선|재구성|짜줘|짜기|연결|이어).*|"
-			+ ".*(최적화|개선|재구성|연결|이어).*(동선|이동경로|경로|길).*|"
+		else if (q.matches(".*(동선|이동순서|이동경로|이동.*경로|경로|길).*(최적화|정리|개선|재구성|짜줘|짜기|연결|이어).*|"
+			+ ".*(최적화|개선|재구성|연결|이어).*(동선|이동순서|이동경로|경로|길).*|"
 			+ ".*가까운.*곳.*묶어|.*가까운.*곳.*같이|효율.*동선.*")) {
 			intent = AiIntent.OPTIMIZE_ROUTE;
 		}
-		else if (q.matches(".*(체크리스트|준비물).*(자동|만들|생성|추천|분석|작성|알려|짜)|"
-			+ ".*(자동|분석).*(체크리스트|준비물)|"
+		else if (q.matches(".*(체크리스트|준비물).*(자동|만들|생성|추천|분석|작성|알려|짜).*|"
+			+ ".*(자동|분석).*(체크리스트|준비물).*|"
 			+ ".*여행.*필요.*준비|.*예약.*필요.*체크|.*준비물.*뭐.*|.*체크리스트.*뭐.*")) {
 			intent = AiIntent.GENERATE_CHECKLIST_FROM_ITINERARY;
 		}
@@ -747,10 +747,7 @@ public class LocalFallbackAiGuideModel implements AiGuideModel {
 	}
 
 	private boolean requiresTripLevelChecklist(String question) {
-		String normalized = normalize(question);
-		return normalized.contains("전체") || normalized.contains("공통")
-			|| normalized.contains("여행방") || normalized.contains("여행계획")
-			|| normalized.contains("여행계획보고") || normalized.contains("일정보고");
+		return AiChecklistRequestScope.isTripWide(question);
 	}
 
 	private List<String> tripChecklistItems(AiGuideRequest request) {

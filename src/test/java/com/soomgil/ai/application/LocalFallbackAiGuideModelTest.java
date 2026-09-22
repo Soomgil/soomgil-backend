@@ -154,6 +154,18 @@ class LocalFallbackAiGuideModelTest {
 	}
 
 	@Test
+	void revisedGuideExamplesKeepReadAndWriteIntentsDistinct() {
+		assertThat(model.classify(request("일차별 장소 수와 방문 순서를 분석해줘", null)).intent())
+			.isEqualTo(AiIntent.SUMMARIZE_ITINERARY);
+		assertThat(model.classify(request("실내 관광지 검색해줘", null)).intent())
+			.isEqualTo(AiIntent.SEARCH_PLACES);
+		assertThat(model.classify(request("현재 여행 계획을 보고 준비물 체크리스트를 자동으로 만들어줘", null)).intent())
+			.isEqualTo(AiIntent.GENERATE_CHECKLIST_FROM_ITINERARY);
+		assertThat(model.classify(request("현재 일차 배치는 유지하고 일차별 이동순서만 위치 기준으로 정리해줘", null)).intent())
+			.isEqualTo(AiIntent.OPTIMIZE_ROUTE);
+	}
+
+	@Test
 	void dayTitleDoesNotRestrictUnscheduledPlacePlacementByRegion() {
 		AiOptimizeRouteTools routeTools = mock(AiOptimizeRouteTools.class);
 		AiToolCall call = mock(AiToolCall.class);
