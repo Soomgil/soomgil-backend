@@ -12,8 +12,10 @@ import com.soomgil.planning.api.dto.Note;
 import com.soomgil.preference.api.dto.PagedPlaceRecommendation;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -47,13 +49,16 @@ public class LocalFallbackAiGuideModel implements AiGuideModel {
 		else if (requestedRouteMode(request.question()) != null && isRouteConnectionRequest(request.question())) {
 			intent = AiIntent.CONNECT_DAY_ROUTES;
 		}
-		else if (q.matches(".*(동선|이동경로|이동.*경로|경로|길).*(최적화|정리|개선|재구성|짜줘|짜기|연결|이어).*|"
-			+ ".*(최적화|개선|재구성|연결|이어).*(동선|이동경로|경로|길).*|"
+		else if (isUnscheduledPlacementRequest(q)) {
+			intent = AiIntent.OPTIMIZE_ROUTE;
+		}
+		else if (q.matches(".*(동선|이동순서|이동경로|이동.*경로|경로|길).*(최적화|정리|개선|재구성|짜줘|짜기|연결|이어).*|"
+			+ ".*(최적화|개선|재구성|연결|이어).*(동선|이동순서|이동경로|경로|길).*|"
 			+ ".*가까운.*곳.*묶어|.*가까운.*곳.*같이|효율.*동선.*")) {
 			intent = AiIntent.OPTIMIZE_ROUTE;
 		}
-		else if (q.matches(".*(체크리스트|준비물).*(자동|만들|생성|추천|분석|작성|알려|짜)|"
-			+ ".*(자동|분석).*(체크리스트|준비물)|"
+		else if (q.matches(".*(체크리스트|준비물).*(자동|만들|생성|추천|분석|작성|알려|짜).*|"
+			+ ".*(자동|분석).*(체크리스트|준비물).*|"
 			+ ".*여행.*필요.*준비|.*예약.*필요.*체크|.*준비물.*뭐.*|.*체크리스트.*뭐.*")) {
 			intent = AiIntent.GENERATE_CHECKLIST_FROM_ITINERARY;
 		}
@@ -403,6 +408,9 @@ public class LocalFallbackAiGuideModel implements AiGuideModel {
 			));
 			return new AiGuideReply(dayNumber + "일차 장소들을 " + routeModeLabel(requestedMode) + " 경로로 연결했어요.", tools.executedCalls());
 		}
+		if (isUnscheduledPlacementRequest(normalize(request.question()))) {
+			return placeUnscheduledItems(request, tools);
+		}
 		List<AiItineraryToolService.ItemMove> moves = new ArrayList<>();
 		for (AiTripContext.DaySummary day : request.tripContext().days()) {
 			List<AiTripContext.ItemSummary> sorted = day.items().stream()
@@ -424,6 +432,47 @@ public class LocalFallbackAiGuideModel implements AiGuideModel {
 		}
 		tools.optimizeRoute(new AiOptimizeRouteTools.OptimizeRouteInput(request.baseVersion(), moves));
 		return new AiGuideReply("좌표가 있는 장소들을 기준으로 일차별 동선을 정리했어요.", tools.executedCalls());
+	}
+
+	private AiGuideReply placeUnscheduledItems(AiGuideRequest request, AiOptimizeRouteTools tools) {
+		List<AiTripContext.DaySummary> days = request.tripContext().days().stream()
+			.filter(day -> "DAY".equals(day.groupType()) && day.id() != null)
+			.sorted(Comparator.comparingInt(day -> day.dayNumber() == null ? Integer.MAX_VALUE : day.dayNumber()))
+			.toList();
+		if (days.isEmpty()) return new AiGuideReply("장소를 배치할 일차를 먼저 만들어주세요.", List.of());
+		Integer requestedDayNumber = dayNumber(request.question());
+		AiTripContext.DaySummary requestedDay = requestedDayNumber == null ? null : days.stream()
+			.filter(day -> requestedDayNumber.equals(day.dayNumber()))
+			.findFirst().orElse(null);
+		if (requestedDayNumber != null && requestedDay == null) {
+			return new AiGuideReply(requestedDayNumber + "일차를 먼저 만들어주세요.", List.of());
+		}
+		List<AiTripContext.ItemSummary> unscheduledItems = request.tripContext().days().stream()
+			.filter(day -> "UNSCHEDULED".equals(day.groupType()))
+			.flatMap(day -> day.items().stream())
+			.sorted(Comparator.comparingInt(AiTripContext.ItemSummary::sortOrder))
+			.toList();
+		if (unscheduledItems.isEmpty()) return new AiGuideReply("일차 미정에 배치할 장소가 없어요.", List.of());
+		Map<UUID, Integer> itemCounts = new HashMap<>();
+		for (AiTripContext.DaySummary day : days) itemCounts.put(day.id(), day.items().size());
+		List<AiItineraryToolService.ItemMove> moves = new ArrayList<>();
+		for (AiTripContext.ItemSummary item : unscheduledItems) {
+			AiTripContext.DaySummary target = requestedDay != null ? requestedDay : days.stream()
+				.min(Comparator.comparingInt(day -> itemCounts.get(day.id())))
+				.orElseThrow();
+			int sortOrder = itemCounts.get(target.id());
+			itemCounts.put(target.id(), sortOrder + 1);
+			moves.add(new AiItineraryToolService.ItemMove(
+				item.id(), target.id(), sortOrder, item.placeName(), item.address(), item.lat(), item.lng(), null
+			));
+		}
+		tools.optimizeRoute(new AiOptimizeRouteTools.OptimizeRouteInput(request.baseVersion(), moves));
+		return new AiGuideReply("일차 미정 장소 " + moves.size() + "곳을 실제 일차에 배치했어요.", tools.executedCalls());
+	}
+
+	private boolean isUnscheduledPlacementRequest(String question) {
+		return question.contains("일차미정")
+			&& question.matches(".*(배치|분배).*");
 	}
 
 	private boolean isRouteConnectionRequest(String question) {
@@ -698,10 +747,7 @@ public class LocalFallbackAiGuideModel implements AiGuideModel {
 	}
 
 	private boolean requiresTripLevelChecklist(String question) {
-		String normalized = normalize(question);
-		return normalized.contains("전체") || normalized.contains("공통")
-			|| normalized.contains("여행방") || normalized.contains("여행계획")
-			|| normalized.contains("여행계획보고") || normalized.contains("일정보고");
+		return AiChecklistRequestScope.isTripWide(question);
 	}
 
 	private List<String> tripChecklistItems(AiGuideRequest request) {

@@ -28,7 +28,8 @@ public final class AiOptimizeRouteTools extends AiToolSupport {
 
 	@Tool(description = "여행 동선을 최적화하기 위해 일정 항목들을 다른 일차로 옮기고 정렬한다. "
 		+ "여행 맥락 JSON의 days[].items[].lat,lng 와 days[].id 를 근거로 가까운 장소끼리 묶어 "
-		+ "이동 순서를 재구성하라. 각 move마다 대상 일차 ID와 sort_order를 지정한다.")
+		+ "이동 순서를 재구성하라. 일차 제목은 지역 제한이 아니므로 제목의 지명과 장소 주소가 달라도 배치할 수 있다. "
+		+ "각 move마다 대상 일차 ID와 sort_order를 지정한다.")
 	public Object optimizeRoute(OptimizeRouteInput input) {
 		long version = baseVersion(input.baseVersion());
 		return execute(

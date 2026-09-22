@@ -139,7 +139,7 @@ class LocalFallbackAiGuideModelTest {
 		);
 
 		AiGuideReply reply = model.replyWithWriteTools(
-			request("여행계획 보고 준비물 전체 체크리스트에 작성해줘", context),
+			request("현재 여행 계획을 보고 준비물 체크리스트를 자동으로 만들어줘", context),
 			new AiIntentDecision(AiIntent.GENERATE_CHECKLIST_FROM_ITINERARY, 1.0, "test", null)
 		);
 
@@ -150,6 +150,59 @@ class LocalFallbackAiGuideModelTest {
 		assertThat(input.getValue().scope()).isEqualTo("TRIP");
 		assertThat(input.getValue().itineraryDayId()).isNull();
 		assertThat(input.getValue().items()).contains("입장권 예약 여부와 운영시간 확인하기");
+		assertThat(reply.toolCalls()).containsExactly(call);
+	}
+
+	@Test
+	void revisedGuideExamplesKeepReadAndWriteIntentsDistinct() {
+		assertThat(model.classify(request("일차별 장소 수와 방문 순서를 분석해줘", null)).intent())
+			.isEqualTo(AiIntent.SUMMARIZE_ITINERARY);
+		assertThat(model.classify(request("실내 관광지 검색해줘", null)).intent())
+			.isEqualTo(AiIntent.SEARCH_PLACES);
+		assertThat(model.classify(request("현재 여행 계획을 보고 준비물 체크리스트를 자동으로 만들어줘", null)).intent())
+			.isEqualTo(AiIntent.GENERATE_CHECKLIST_FROM_ITINERARY);
+		assertThat(model.classify(request("현재 일차 배치는 유지하고 일차별 이동순서만 위치 기준으로 정리해줘", null)).intent())
+			.isEqualTo(AiIntent.OPTIMIZE_ROUTE);
+	}
+
+	@Test
+	void dayTitleDoesNotRestrictUnscheduledPlacePlacementByRegion() {
+		AiOptimizeRouteTools routeTools = mock(AiOptimizeRouteTools.class);
+		AiToolCall call = mock(AiToolCall.class);
+		when(toolsFactory.create(any(), org.mockito.ArgumentMatchers.eq(AiIntent.OPTIMIZE_ROUTE)))
+			.thenReturn(List.of(routeTools));
+		when(routeTools.executedCalls()).thenReturn(List.of(call));
+		UUID firstDayId = UUID.randomUUID();
+		UUID secondDayId = UUID.randomUUID();
+		UUID placeId = UUID.randomUUID();
+		AiTripContext.ItemSummary place = new AiTripContext.ItemSummary(
+			placeId, 0, "PLACE", "KTO", "daejeon-place", "한밭수목원", "대전광역시", 36.35, 127.39, null
+		);
+		AiTripContext.ItemSummary firstDayPlace = new AiTripContext.ItemSummary(
+			UUID.randomUUID(), 0, "PLACE", "KTO", "first-day-place", "성심당", "대전광역시", 36.33, 127.43, null
+		);
+		AiTripContext context = new AiTripContext(
+			new AiTripContext.TripSummary(UUID.randomUUID(), "대전 여행", "대전", "PLANNING", "OWNER", 1L),
+			List.of(),
+			List.of(
+				new AiTripContext.DaySummary(firstDayId, "DAY", 1, null, "1일차", List.of(firstDayPlace)),
+				new AiTripContext.DaySummary(secondDayId, "DAY", 2, null, "서울 동부 코스", List.of()),
+				new AiTripContext.DaySummary(UUID.randomUUID(), "UNSCHEDULED", null, null, "일차 미정", List.of(place))
+			),
+			List.of(), List.of(), List.of(), List.of()
+		);
+		AiGuideRequest request = request("일차 미정 관광지를 일차에 배치해줘", context);
+		AiIntentDecision decision = model.classify(request);
+
+		AiGuideReply reply = model.replyWithWriteTools(request, decision);
+
+		assertThat(decision.intent()).isEqualTo(AiIntent.OPTIMIZE_ROUTE);
+		ArgumentCaptor<AiOptimizeRouteTools.OptimizeRouteInput> input =
+			ArgumentCaptor.forClass(AiOptimizeRouteTools.OptimizeRouteInput.class);
+		verify(routeTools).optimizeRoute(input.capture());
+		assertThat(input.getValue().moves()).hasSize(1);
+		assertThat(input.getValue().moves().getFirst().itemId()).isEqualTo(placeId);
+		assertThat(input.getValue().moves().getFirst().itineraryDayId()).isEqualTo(secondDayId);
 		assertThat(reply.toolCalls()).containsExactly(call);
 	}
 

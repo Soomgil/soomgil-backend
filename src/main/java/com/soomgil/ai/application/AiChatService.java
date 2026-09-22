@@ -220,6 +220,12 @@ public class AiChatService {
 				"일정 기반 체크리스트 생성 요청은 자동 생성 도구로 처리합니다."
 			);
 		}
+		if (isUnscheduledPlacementRequest(normalized)) {
+			return decision.force(
+				AiIntent.OPTIMIZE_ROUTE,
+				"일차 미정 장소를 실제 일차에 배치하는 요청은 일정 재배치 도구로 처리합니다."
+			);
+		}
 		// "4일차 추가해줘"는 장소 추가로 분류되기 쉬우나 일차 그룹을 만드는 요청이다.
 		if (isDayManagementRequest(normalized)) {
 			return decision.force(
@@ -373,6 +379,11 @@ public class AiChatService {
 			|| question.matches(".*여행.*필요.*준비.*")
 			|| question.matches(".*예약.*필요.*체크.*")
 			|| question.matches(".*준비물.*뭐.*");
+	}
+
+	private boolean isUnscheduledPlacementRequest(String question) {
+		return question.contains("일차미정")
+			&& question.matches(".*(배치|분배).*");
 	}
 
 	private boolean isRecommendedPlaceAddRequest(String question) {

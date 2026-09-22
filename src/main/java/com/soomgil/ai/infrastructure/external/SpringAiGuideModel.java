@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.soomgil.ai.api.dto.AiToolCall;
 import com.soomgil.ai.api.dto.AiToolExecutionPolicy;
+import com.soomgil.ai.application.AiChecklistRequestScope;
 import com.soomgil.ai.application.AiExecutableTools;
 import com.soomgil.ai.application.AiGuideModel;
 import com.soomgil.ai.application.AiGuideReply;
@@ -48,6 +49,7 @@ public class SpringAiGuideModel implements AiGuideModel {
 		FILTER_PLACES_BY_CONDITION: 특정 조건(유료/무료, 장애인 이용 불가, 유모차 진입 불가, 휴무 등)에 해당하는 일정 항목 삭제. "유료 시설 빼줘", "장애인 접근 불가 장소 삭제" 등
 		GENERATE_CHECKLIST_FROM_ITINERARY: 현재 일정을 분석해 필요한 체크리스트를 자동 생성. "이 여행에 필요한 준비물 알려줘", "체크리스트 자동으로 만들어줘", "예약 필요한 곳 체크리스트에 넣어줘" 등
 		OPTIMIZE_ROUTE: 장소를 어느 일차에 둘지 재배치하고 방문 순서를 정렬. "동선 최적화", "가까운 곳끼리 묶어줘", "이동 순서 정리" 등
+		"일차 미정 관광지를 일차에 배치해줘"도 OPTIMIZE_ROUTE입니다. 일차 제목에 있는 지명은 해당 일차의 지역 제한이 아닙니다.
 		CONNECT_DAY_ROUTES: 한 일차의 장소들을 실제 이동 경로로 연결하거나 이동수단을 바꿈. 도보·자전거·자동차 중 하나를 mode로 쓴다. "2일차 자전거로 이어줘", "도보 경로로 연결해줘", "자동차 길로 바꿔줘", "이 날 경로 연결" 등
 		MANAGE_ITINERARY_DAY: 일차 자체를 추가하거나 일차의 제목·날짜를 변경. "4일차 추가해줘", "하루 더 늘려줘", "2일차 이름 바꿔줘", "3일차 날짜를 10월 5일로" 등. 장소를 추가하는 요청은 여기가 아니다
 		기능 태그는 위 intent 이름입니다. 사용자 요청이 지원 기능과 일치하면 가장 구체적인 기능 태그 하나를 선택하세요.
@@ -157,6 +159,12 @@ public class SpringAiGuideModel implements AiGuideModel {
 		if (!decision.intent().usesWriteTools()) {
 			throw new IllegalArgumentException("Write tools cannot handle intent: " + decision.intent());
 		}
+		// 전체 준비물 요청은 TRIP 체크리스트로 확정한다. 모델이 일차별 도구를 선택해
+		// 항목이 0건이라고 답하거나 요청과 다른 범위에 쓰는 일을 막는다.
+		if (decision.intent() == AiIntent.GENERATE_CHECKLIST_FROM_ITINERARY
+			&& AiChecklistRequestScope.isTripWide(request.question())) {
+			return fallback.replyWithWriteTools(request, decision);
+		}
 		String mode = switch (decision.intent()) {
 			case DELETE_ITINERARY_ITEM -> "현재 여행 맥락 JSON에서 사용자가 말한 장소 이름을 확인하고 "
 				+ "deleteItineraryItem 도구에 placeName을 전달하세요. UUID를 추측하지 마세요.";
@@ -183,8 +191,11 @@ public class SpringAiGuideModel implements AiGuideModel {
 				+ "예: 롯데월드가 3일차 day에 있으면 그 3일차 itineraryDayId 그룹에 '롯데월드 예매 확인'을 넣는다. "
 				+ "여행방 전체 공통 준비물만 generateChecklistItems(TRIP)에 넣고, 일차별 항목을 전체 체크리스트에 몰아넣지 마라. "
 				+ "각 항목은 짧은 한국어 명령문 형태로 작성한다.";
-			case OPTIMIZE_ROUTE -> "여행 맥락 JSON의 days[].items[].lat,lng 로 가까운 장소끼리 같은 일차로 묶어 "
-				+ "optimizeRoute 도구에 이동 계획(moves)을 전달하라. 같은 날 여러 장소 이동 시 sort_order도 재정렬한다. "
+		case OPTIMIZE_ROUTE -> "여행 맥락 JSON의 days[].items[].lat,lng 로 가까운 장소끼리 같은 일차로 묶어 "
+				+ "optimizeRoute 도구에 이동 계획(moves)을 전달하라. 일차 미정 장소 배치를 요청받으면 미정 장소를 실제 일차로 옮겨라. "
+				+ "days[].title은 표시용 이름이며 지역 제한이 아니다. 제목에 지명이 있어도 그 지역과 장소 주소가 다르다는 이유만으로 일차를 비워 두지 마라. "
+				+ "사용자가 명시한 배치 조건이 있다면 그 조건을 따르고, 명시하지 않았다면 기존 일정과 이동 동선을 고려해 배치하라. "
+				+ "같은 날 여러 장소 이동 시 sort_order도 재정렬한다. "
 				+ "이동수단을 바꾸라는 요청이면 optimizeRoute 대신 connectDayRoutes를 사용하라.";
 			case CONNECT_DAY_ROUTES -> "connectDayRoutes 도구로 해당 일차의 장소들을 순서대로 경로 연결하라. "
 				+ "도보는 WALKING, 자전거는 CYCLING, 자동차는 DRIVING을 mode로 전달한다. "
