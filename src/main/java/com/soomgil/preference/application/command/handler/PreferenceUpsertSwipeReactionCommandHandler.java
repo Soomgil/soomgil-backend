@@ -20,6 +20,7 @@ import com.soomgil.preference.infrastructure.persistence.row.UserSwipeEventInser
 import com.soomgil.preference.infrastructure.persistence.row.UserTagEvidenceAdjustmentRow;
 import com.soomgil.preference.infrastructure.persistence.row.UserTagPreferenceScoreSourceRow;
 import com.soomgil.preference.infrastructure.persistence.row.UserTagPreferenceScoreUpdateRow;
+import com.soomgil.preference.infrastructure.websocket.PreferenceReactionRealtimePublisher;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.LinkedHashSet;
@@ -38,15 +39,18 @@ public class PreferenceUpsertSwipeReactionCommandHandler implements UpsertSwipeR
 
 	private final ObjectProvider<CurrentUserProvider> currentUserProvider;
 	private final PreferenceSwipeReactionMapper mapper;
+	private final PreferenceReactionRealtimePublisher realtimePublisher;
 	private final PlaceTagEvidenceCalculator evidenceCalculator;
 	private final UserPreferenceWeightCalculator preferenceWeightCalculator;
 
 	public PreferenceUpsertSwipeReactionCommandHandler(
 		ObjectProvider<CurrentUserProvider> currentUserProvider,
-		PreferenceSwipeReactionMapper mapper
+		PreferenceSwipeReactionMapper mapper,
+		PreferenceReactionRealtimePublisher realtimePublisher
 	) {
 		this.currentUserProvider = currentUserProvider;
 		this.mapper = mapper;
+		this.realtimePublisher = realtimePublisher;
 		this.evidenceCalculator = new PlaceTagEvidenceCalculator();
 		this.preferenceWeightCalculator = new UserPreferenceWeightCalculator();
 	}
@@ -123,6 +127,7 @@ public class PreferenceUpsertSwipeReactionCommandHandler implements UpsertSwipeR
 		synchronizeSavedPlace(userId, placeProvider, command.externalPlaceId(), command.reaction());
 		addCurrentEvidence(userId, reaction, currentEvidence, evidenceMultiplier);
 		recalculatePreferenceScores(userId, previousEvidence, currentEvidence);
+		realtimePublisher.publish(userId);
 
 		return new SwipeReactionResponse(
 			new PlaceRef(command.provider(), command.externalPlaceId()),

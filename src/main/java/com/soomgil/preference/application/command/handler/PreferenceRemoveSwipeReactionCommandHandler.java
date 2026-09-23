@@ -13,6 +13,7 @@ import com.soomgil.preference.infrastructure.persistence.row.UserPlaceReactionRo
 import com.soomgil.preference.infrastructure.persistence.row.UserTagEvidenceAdjustmentRow;
 import com.soomgil.preference.infrastructure.persistence.row.UserTagPreferenceScoreSourceRow;
 import com.soomgil.preference.infrastructure.persistence.row.UserTagPreferenceScoreUpdateRow;
+import com.soomgil.preference.infrastructure.websocket.PreferenceReactionRealtimePublisher;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.beans.factory.ObjectProvider;
@@ -30,15 +31,18 @@ public class PreferenceRemoveSwipeReactionCommandHandler implements RemoveSwipeR
 
 	private final ObjectProvider<CurrentUserProvider> currentUserProvider;
 	private final PreferenceSwipeReactionMapper mapper;
+	private final PreferenceReactionRealtimePublisher realtimePublisher;
 	private final PlaceTagEvidenceCalculator evidenceCalculator = new PlaceTagEvidenceCalculator();
 	private final UserPreferenceWeightCalculator preferenceWeightCalculator = new UserPreferenceWeightCalculator();
 
 	public PreferenceRemoveSwipeReactionCommandHandler(
 		ObjectProvider<CurrentUserProvider> currentUserProvider,
-		PreferenceSwipeReactionMapper mapper
+		PreferenceSwipeReactionMapper mapper,
+		PreferenceReactionRealtimePublisher realtimePublisher
 	) {
 		this.currentUserProvider = currentUserProvider;
 		this.mapper = mapper;
+		this.realtimePublisher = realtimePublisher;
 	}
 
 	@Override
@@ -107,6 +111,7 @@ public class PreferenceRemoveSwipeReactionCommandHandler implements RemoveSwipeR
 			));
 		}
 
+		realtimePublisher.publish(userId);
 		return NoResult.INSTANCE;
 	}
 }

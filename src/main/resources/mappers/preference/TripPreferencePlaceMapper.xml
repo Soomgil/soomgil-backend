@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.soomgil.preference.infrastructure.persistence.mapper.TripPreferencePlaceMapper">
+  <select id="findActiveTripIdsByUser" resultType="java.util.UUID">
+    SELECT trip_id FROM trip.trip_members
+    WHERE user_id = CAST(#{userId} AS uuid) AND status = 'ACTIVE'
+  </select>
   <select id="find" resultType="com.soomgil.preference.api.dto.TripPreferencePlace">
     WITH visible_reactions AS (
       SELECT r.*, p.display_name, p.profile_image_url
